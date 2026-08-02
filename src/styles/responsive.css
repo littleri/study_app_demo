@@ -55,6 +55,14 @@ body {
   border-radius: 0;
 }
 
+/* Chrome is a replaceable layout layer. Its wrapper must not introduce a
+   layout box or move the stable screen/main subtree when the media query
+   changes between Phone and Pad. */
+.phone-chrome,
+.pad-chrome {
+  display: contents;
+}
+
 .screen-content {
   container-name: screen-content;
   container-type: inline-size;

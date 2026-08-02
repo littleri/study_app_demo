@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
 import { StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
+import { PadChrome } from "../layouts/PadChrome";
+import { PhoneChrome } from "../layouts/PhoneChrome";
+import { useDeviceLayout } from "../layouts/useDeviceLayout";
 import { IosStatusBar } from "./IosStatusBar";
 
 export const actionSheetAnimationNames = [
@@ -284,6 +287,7 @@ export function AppShell({
   children: ReactNode;
   hideNav?: boolean;
 }) {
+  const deviceLayout = useDeviceLayout();
   const appShellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [appShellElement, setAppShellElement] = useState<HTMLDivElement | null>(null);
@@ -332,15 +336,26 @@ export function AppShell({
     mainRef.current?.focus({ preventScroll: true });
   }, [focusMainNonce]);
 
+  // Only the device-only chrome changes with the media query. PrimaryNav is a
+  // stable sibling of that replaceable layer so rapid boundary resizes never
+  // create a window where the navigation element has been replaced.
+  const deviceChrome = deviceLayout === "pad" ? (
+    <PadChrome />
+  ) : (
+    <PhoneChrome>
+      <IosStatusBar />
+      <HomeIndicator />
+    </PhoneChrome>
+  );
+
   return (
     <div className="stage">
-      <div ref={setAppShellNode} className="app-shell" role="application" aria-label="BookCourse AI 应用" data-motion-reduced={motionReduced ? "true" : "false"} onClickCapture={onClickCapture}>
-        <IosStatusBar />
+      <div ref={setAppShellNode} className="app-shell" role="application" aria-label="BookCourse AI 应用" data-device-layout={deviceLayout} data-motion-reduced={motionReduced ? "true" : "false"} onClickCapture={onClickCapture}>
+        {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
         <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
         {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
-        <HomeIndicator />
         {overlays}
       </div>
     </div>
