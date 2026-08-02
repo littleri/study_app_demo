@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+output/
+*.log
+
+# Local-only inputs and generated working files
+.env
+.env.local
+source-pdfs/
+.cache/
+tmp/
+.venv-mineru/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

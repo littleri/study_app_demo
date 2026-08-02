@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Motion Presence Harness</title>
+    <script>
+      (() => {
+        const active320 = new Set();
+        let scheduled320 = 0;
+        const nativeSetTimeout = window.setTimeout.bind(window);
+        const nativeClearTimeout = window.clearTimeout.bind(window);
+
+        window.__motionTimerAudit = {
+          get active320() {
+            return active320.size;
+          },
+          get scheduled320() {
+            return scheduled320;
+          }
+        };
+
+        window.setTimeout = (handler, timeout, ...args) => {
+          const isPresenceFallback = Number(timeout) === 320;
+          let timerId;
+          const wrappedHandler = typeof handler === "function"
+            ? () => {
+                if (isPresenceFallback) active320.delete(timerId);
+                handler(...args);
+              }
+            : handler;
+          timerId = nativeSetTimeout(wrappedHandler, timeout);
+          if (isPresenceFallback) {
+            active320.add(timerId);
+            scheduled320 += 1;
+          }
+          return timerId;
+        };
+
+        window.clearTimeout = (timerId) => {
+          active320.delete(timerId);
+          return nativeClearTimeout(timerId);
+        };
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="motion-presence-root"></div>
+    <script type="module" src="/e2e/motion-presence-harness.tsx"></script>
+  </body>
+</html>

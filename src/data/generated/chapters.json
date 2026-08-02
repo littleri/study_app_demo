@@ -1,0 +1,86 @@
+[
+  {
+    "chapter_id": "c1",
+    "level": 1,
+    "source_title": "第 1 章 遗传因子的发现",
+    "ai_title": "课程 1：理解孟德尔遗传规律",
+    "page_start": 1,
+    "page_end": 25,
+    "confidence": 96,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": null
+  },
+  {
+    "chapter_id": "c1s1",
+    "level": 2,
+    "source_title": "第 1 节 孟德尔的豌豆杂交实验（一）",
+    "ai_title": "课程 1.1：从实验设计理解分离定律",
+    "page_start": 11,
+    "page_end": 18,
+    "confidence": 94,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": "c1"
+  },
+  {
+    "chapter_id": "c1s2",
+    "level": 2,
+    "source_title": "第 2 节 孟德尔的豌豆杂交实验（二）",
+    "ai_title": "课程 1.2：用概率解释自由组合",
+    "page_start": 19,
+    "page_end": 25,
+    "confidence": 88,
+    "status": "需检查",
+    "source": "mineru",
+    "parent_id": "c1"
+  },
+  {
+    "chapter_id": "c2",
+    "level": 1,
+    "source_title": "第 2 章 基因和染色体的关系",
+    "ai_title": "课程 2：把基因放到染色体上理解",
+    "page_start": 26,
+    "page_end": 53,
+    "confidence": 95,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": null
+  },
+  {
+    "chapter_id": "c2s1",
+    "level": 2,
+    "source_title": "第 1 节 减数分裂和受精作用",
+    "ai_title": "课程 2.1：同源染色体如何分离",
+    "page_start": 11,
+    "page_end": 21,
+    "confidence": 94,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": "c2"
+  },
+  {
+    "chapter_id": "c3",
+    "level": 1,
+    "source_title": "第 3 章 基因的本质",
+    "ai_title": "课程 3：理解 DNA 与遗传信息",
+    "page_start": 54,
+    "page_end": 76,
+    "confidence": 91,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": null
+  },
+  {
+    "chapter_id": "c4",
+    "level": 1,
+    "source_title": "第 4 章 基因的表达",
+    "ai_title": "课程 4：从基因到蛋白质",
+    "page_start": 77,
+    "page_end": 95,
+    "confidence": 90,
+    "status": "匹配良好",
+    "source": "mineru",
+    "parent_id": null
+  }
+]

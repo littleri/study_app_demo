@@ -1,0 +1,671 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  ActionSheet,
+  AppShell,
+  Toast,
+  actionSheetAnimationNames,
+  type ActionSheetView
+} from "./components/ui";
+import { bookcourseApi } from "./api/bookcourseApi";
+import { runtimeConfig } from "./config/runtime";
+import { AppProvider } from "./context/AppContext";
+import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./context/AppContext";
+import { ScreenTransition, useMotionPresence } from "./motion";
+import {
+  createInitialNavigation,
+  navigate,
+  type NavigationSnapshot
+} from "./motion/navigationMachine";
+import { useReducedMotion } from "./motion/useReducedMotion";
+import {
+  AssignmentScreen,
+  BookCourseScreen,
+  ChapterConfirmScreen,
+  ChatSheetContent,
+  CommunityBookScreen,
+  CommunityImportScreen,
+  CommunityScreen,
+  CourseReadyScreen,
+  DiagnosisScreen,
+  EditChapterSheetContent,
+  ExportPreviewScreen,
+  FlashcardScreen,
+  HomeScreen,
+  LessonReportScreen,
+  LessonScreen,
+  LibraryScreen,
+  MistakeBookScreen,
+  NoteSheetContent,
+  NotesScreen,
+  ParseReadyScreen,
+  ProcessingScreen,
+  ProfileScreen,
+  SourceReaderScreen,
+  SourceSheetContent,
+  StudyPlanScreen,
+  UploadScreen
+} from "./screens";
+import type {
+  ApiAsset,
+  ApiChapter,
+  ApiChunk,
+  CourseSummary,
+  DiagnosisResponse,
+  Flashcard,
+  JobStatusResponse,
+  Lesson,
+  LessonBuildJobResponse,
+  QuizQuestion,
+  ScanResult,
+  StudyPlan
+} from "./types/api";
+import type { Screen, SheetState, SourcePageTarget, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
+
+const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
+  home: {},
+  upload: { title: "上传书籍", subtitle: "把教材变成 AI 课程", back: true, hideNav: true },
+  parseReady: { title: "解析教材", subtitle: "确认资料后开始生成", back: true, hideNav: true },
+  processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
+  chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true },
+  courseReady: { title: "生成成功", back: true, hideNav: true },
+  library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
+  community: { title: "社区", subtitle: "发现同学共享的 AI 课程" },
+  communityBook: { title: "共享课程", subtitle: "导入后加入你的书库", back: true },
+  communityImport: { title: "导入成功", subtitle: "已生成可学习内容", back: true },
+  book: { title: "课程主页", subtitle: "生物 必修 2", back: true },
+  plan: { title: "学习计划", subtitle: "科学规划，高效学习", back: true, hideNav: true },
+  flashcards: { title: "知识点闪卡", subtitle: "背诵本节概念与错题卡点", back: true, hideNav: true },
+  lesson: { title: "章节学习", subtitle: "第 2 章 1 节", back: true, hideNav: true },
+  assignment: { title: "作业练习", subtitle: "提交后获得卡点诊断", back: true, hideNav: true },
+  diagnosis: { title: "作业诊断", subtitle: "定位理解卡点", back: true, hideNav: true },
+  mistakes: { title: "错题本", subtitle: "按知识点复习", back: true, hideNav: true },
+  notes: { title: "导学笔记", subtitle: "沉淀学习产出", back: true, hideNav: true },
+  source: { title: "原文文档", subtitle: "定位到引用页", back: true, hideNav: true },
+  export: { title: "导出预览", subtitle: "选择要导出的模块", back: true, hideNav: true },
+  report: { title: "章节报告", subtitle: "完成后调整计划", back: true, hideNav: true },
+  profile: { title: "我的", subtitle: "学习数据与偏好" }
+};
+
+function getSheetViewKey(view: ActionSheetView) {
+  return view.key;
+}
+
+type OpenSheetState = Exclude<SheetState, null>;
+
+function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
+  switch (sheet.type) {
+    case "chat":
+      return { type: "chat" };
+    case "source":
+      return { ...sheet };
+    case "note":
+      return { ...sheet };
+    case "editChapter":
+      return {
+        ...sheet,
+        evidence: sheet.evidence
+          ? { ...sheet.evidence, reasons: [...sheet.evidence.reasons] }
+          : undefined
+      };
+  }
+}
+
+export default function App() {
+  const reducedMotion = useReducedMotion();
+  const navigationRef = useRef<NavigationSnapshot>(createInitialNavigation());
+  const [navigation, setNavigation] = useState<NavigationSnapshot>(navigationRef.current);
+  const screen = navigation.screen;
+  const [sheet, setSheet] = useState<SheetState>(null);
+  const sheetRequestedRef = useRef<SheetState>(null);
+  const sheetTriggerRef = useRef<HTMLElement | null>(null);
+  const sheetRestoreFocusRef = useRef(true);
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const toastIdRef = useRef(0);
+  const toastTimerRef = useRef<number | undefined>(undefined);
+  const [selectedUpload, setSelectedUpload] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<UploadedCourseFile | null>(null);
+  const [parseJobId, setParseJobId] = useState<string | null>(null);
+  const [parseJobStatus, setParseJobStatus] = useState<JobStatusResponse | null>(null);
+  const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([]);
+  const [courseSummariesLoadState, setCourseSummariesLoadState] = useState<CourseSummariesLoadState>("loading");
+  const [courseSummariesReadyKind, setCourseSummariesReadyKind] = useState<CourseSummariesReadyKind>("empty");
+  const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
+  const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
+  const courseSummariesRef = useRef<CourseSummary[]>([]);
+  courseSummariesRef.current = courseSummaries;
+  const [parsedScanResult, setParsedScanResult] = useState<ScanResult | null>(null);
+  const [parsedChapters, setParsedChapters] = useState<ApiChapter[] | null>(null);
+  const [parsedChunks, setParsedChunks] = useState<ApiChunk[] | null>(null);
+  const [parsedAssets, setParsedAssets] = useState<ApiAsset[] | null>(null);
+  const [generatedLessons, setGeneratedLessons] = useState<Lesson[] | null>(null);
+  const [lessonBuildJobId, setLessonBuildJobId] = useState<string | null>(null);
+  const [lessonBuildJobStatus, setLessonBuildJobStatus] = useState<LessonBuildJobResponse | null>(null);
+  const [generatedFlashcards, setGeneratedFlashcards] = useState<Flashcard[] | null>(null);
+  const [generatedQuizzes, setGeneratedQuizzes] = useState<QuizQuestion[] | null>(null);
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [currentStudyPlan, setCurrentStudyPlan] = useState<StudyPlan | null>(null);
+  const [latestDiagnosis, setLatestDiagnosis] = useState<DiagnosisResponse | null>(null);
+  const [answer, setAnswer] = useState("");
+  const [savedNoteCount, setSavedNoteCount] = useState(6);
+  const [sourcePageTarget, setSourcePageTarget] = useState<SourcePageTarget | null>(null);
+  const completedParseJobRef = useRef<string | null>(null);
+
+  const commitNavigation = useCallback((resolve: (current: NavigationSnapshot) => NavigationSnapshot) => {
+    const next = resolve(navigationRef.current);
+    navigationRef.current = next;
+    setNavigation(next);
+    return next;
+  }, []);
+
+  const focusCurrentMain = useCallback(() => {
+    if (mainRef.current?.isConnected) mainRef.current.focus({ preventScroll: true });
+  }, []);
+
+  const restoreSheetFocus = useCallback(() => {
+    if (!sheetRestoreFocusRef.current) return;
+    sheetRestoreFocusRef.current = false;
+    if (sheetTriggerRef.current?.isConnected) {
+      sheetTriggerRef.current.focus({ preventScroll: true });
+      return;
+    }
+    focusCurrentMain();
+  }, [focusCurrentMain]);
+
+  const requestSheetClose = useCallback((restoreFocus: boolean) => {
+    if (!sheetRequestedRef.current) return;
+    sheetRestoreFocusRef.current = restoreFocus;
+    sheetRequestedRef.current = null;
+    setSheet(null);
+  }, []);
+
+  const requestSheetCloseForNavigation = useCallback((restoreFocus: boolean) => {
+    // Navigation can arrive after a sheet has already entered its closing
+    // generation. Record the policy even then so its eventual cleanup cannot
+    // steal focus back from the destination screen's main landmark.
+    sheetRestoreFocusRef.current = restoreFocus;
+    if (!sheetRequestedRef.current) return;
+    sheetRequestedRef.current = null;
+    setSheet(null);
+  }, []);
+
+  const go = useCallback((next: Screen) => {
+    const current = navigationRef.current;
+    const nextNavigation = navigate(current, { type: "go", screen: next });
+    requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
+    commitNavigation(() => nextNavigation);
+  }, [commitNavigation, requestSheetCloseForNavigation]);
+
+  const back = useCallback(() => {
+    const current = navigationRef.current;
+    const nextNavigation = navigate(current, { type: "back" });
+    requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
+    commitNavigation(() => nextNavigation);
+  }, [commitNavigation, requestSheetCloseForNavigation]);
+
+  const openSourcePage = useCallback((target: SourcePageTarget) => {
+    const current = navigationRef.current;
+    const nextNavigation = navigate(current, { type: "source" });
+    requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
+    setSourcePageTarget(target);
+    commitNavigation(() => nextNavigation);
+  }, [commitNavigation, requestSheetCloseForNavigation]);
+
+  const replaceScreen = useCallback((next: Screen) => {
+    const current = navigationRef.current;
+    const nextNavigation = navigate(current, { type: "replace", screen: next });
+    requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
+    commitNavigation(() => nextNavigation);
+  }, [commitNavigation, requestSheetCloseForNavigation]);
+
+  const openSheet = useCallback((nextSheet: SheetState) => {
+    if (!nextSheet) {
+      requestSheetClose(true);
+      return;
+    }
+    if (!sheetRequestedRef.current && !sheetTriggerRef.current?.isConnected && document.activeElement instanceof HTMLElement) {
+      sheetTriggerRef.current = document.activeElement;
+    }
+    const sheetSnapshot = snapshotSheetState(nextSheet);
+    sheetRestoreFocusRef.current = true;
+    sheetRequestedRef.current = sheetSnapshot;
+    setSheet(sheetSnapshot);
+  }, [requestSheetClose]);
+
+  const closeSheet = useCallback(() => {
+    requestSheetClose(true);
+  }, [requestSheetClose]);
+
+  const captureSheetTrigger = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    // A closing sheet deliberately clears the requested value while its frozen
+    // panel is still mounted. Ignore all overlay interactions in that window:
+    // otherwise a blocked Save/Delete click could overwrite the original
+    // restore target with an element that is about to unmount.
+    if (
+      sheetRequestedRef.current ||
+      !(event.target instanceof Element) ||
+      event.target.closest(".sheet-overlay")
+    ) return;
+    const trigger = event.target.closest<HTMLElement>(
+      "button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+    );
+    if (trigger) sheetTriggerRef.current = trigger;
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current !== undefined) window.clearTimeout(toastTimerRef.current);
+  }, []);
+
+  const showToast = useCallback((text: string, tone: ToastTone = "success") => {
+    if (toastTimerRef.current !== undefined) window.clearTimeout(toastTimerRef.current);
+    const id = toastIdRef.current + 1;
+    toastIdRef.current = id;
+    setToast({ id, text, tone });
+    const timer = window.setTimeout(() => {
+      setToast((current) => (current?.id === id ? null : current));
+      if (toastTimerRef.current === timer) toastTimerRef.current = undefined;
+    }, 3200);
+    toastTimerRef.current = timer;
+  }, []);
+
+  const refreshCourses = useCallback(async () => {
+    const hasExistingCourses = courseSummariesRef.current.length > 0;
+    if (!hasExistingCourses) setCourseSummariesLoadState("loading");
+    setCourseSummariesRefreshing(true);
+    try {
+      const courses = await bookcourseApi.listCourses();
+      setCourseSummaries(courses);
+      setCourseSummariesReadyKind(courses.length > 0 ? "content" : "empty");
+      setCourseSummariesLoadState("ready");
+      setCourseSummariesError(null);
+    } catch (err) {
+      setCourseSummariesError(err instanceof Error ? err.message : "课程列表加载失败");
+      if (!hasExistingCourses) setCourseSummariesLoadState("error");
+    } finally {
+      setCourseSummariesRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshCourses();
+  }, [refreshCourses]);
+
+  useEffect(() => {
+    if (parseJobId) return;
+    const resumable = courseSummaries.find(
+      (course) => course.parse_job_id && ["pending", "processing", "failed"].includes(course.parse_job_status ?? "")
+    );
+    if (!resumable?.parse_job_id || !resumable.parse_job_status) return;
+
+    setUploadedFile({
+      bookId: resumable.book_id,
+      name: resumable.filename || resumable.title,
+      sizeBytes: 0,
+      contentType: resumable.filename?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream",
+      uploadedAt: resumable.updated_at ? resumable.updated_at * 1000 : Date.now()
+    });
+    setParseJobId(resumable.parse_job_id);
+    setParseJobStatus({
+      job_id: resumable.parse_job_id,
+      book_id: resumable.book_id,
+      status: resumable.parse_job_status,
+      stage: resumable.parse_job_stage ?? "pending",
+      progress: resumable.parse_job_progress ?? 0,
+      message: resumable.parse_job_message,
+      error: resumable.parse_job_error
+    });
+  }, [courseSummaries, parseJobId]);
+
+  useEffect(() => {
+    if (!parseJobId || !uploadedFile || completedParseJobRef.current === parseJobId) return;
+
+    const activeParseJobId = parseJobId;
+    const activeBookId = uploadedFile.bookId;
+    let active = true;
+    let timer: number | undefined;
+
+    async function loadParsedCourse(bookId: string) {
+      const [scanResult, nextChapters, nextChunks, nextAssets, plan, lessons, cards, quizzes] = await Promise.all([
+        bookcourseApi.getScanResult(bookId),
+        bookcourseApi.getChapters(bookId),
+        bookcourseApi.getChunks(bookId),
+        bookcourseApi.getAssets(bookId),
+        bookcourseApi.getStudyPlan(bookId, runtimeConfig.defaultUserId),
+        bookcourseApi.getLessons(bookId),
+        bookcourseApi.getFlashcards(bookId),
+        bookcourseApi.getQuizzes(bookId)
+      ]);
+      if (!active) return;
+      setParsedScanResult(scanResult);
+      setParsedChapters(nextChapters);
+      setParsedChunks(nextChunks);
+      setParsedAssets(nextAssets);
+      setCurrentStudyPlan(plan);
+      setGeneratedLessons(lessons);
+      setGeneratedFlashcards(cards);
+      setGeneratedQuizzes(quizzes);
+      setActiveChapterId(nextChapters[0]?.chapter_id ?? null);
+    }
+
+    async function pollParseJob() {
+      try {
+        const job = await bookcourseApi.getJob(activeParseJobId);
+        if (!active) return;
+        setParseJobStatus(job);
+
+        if (job.status === "done") {
+          await loadParsedCourse(activeBookId);
+          if (!active) return;
+          completedParseJobRef.current = activeParseJobId;
+          void refreshCourses();
+          showToast("后台 OCR/解析完成，课程目录已生成");
+          if (navigationRef.current.screen === "parseReady" || navigationRef.current.screen === "processing") {
+            replaceScreen("chapterConfirm");
+          }
+          return;
+        }
+
+        if (job.status === "failed") {
+          showToast(job.error ?? "后台 OCR/解析失败，请检查文件后重试", "warning");
+          return;
+        }
+
+        timer = window.setTimeout(pollParseJob, 2500);
+      } catch (err) {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : "后台解析状态获取失败";
+        showToast(message, "warning");
+        timer = window.setTimeout(pollParseJob, 4000);
+      }
+    }
+
+    void pollParseJob();
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [parseJobId, refreshCourses, replaceScreen, showToast, uploadedFile]);
+
+  const sharedProps = useMemo(
+    () => ({
+      go,
+      back,
+      openSourcePage,
+      openSheet,
+      closeSheet,
+      showToast,
+      selectedUpload,
+      setSelectedUpload,
+      uploadedFile,
+      setUploadedFile,
+      parseJobId,
+      setParseJobId,
+      parseJobStatus,
+      setParseJobStatus,
+      courseSummaries,
+      courseSummariesLoadState,
+      courseSummariesReadyKind,
+      courseSummariesError,
+      courseSummariesRefreshing,
+      refreshCourses,
+      parsedScanResult,
+      setParsedScanResult,
+      parsedChapters,
+      setParsedChapters,
+      parsedChunks,
+      setParsedChunks,
+      parsedAssets,
+      setParsedAssets,
+      generatedLessons,
+      setGeneratedLessons,
+      lessonBuildJobId,
+      setLessonBuildJobId,
+      lessonBuildJobStatus,
+      setLessonBuildJobStatus,
+      generatedFlashcards,
+      setGeneratedFlashcards,
+      generatedQuizzes,
+      setGeneratedQuizzes,
+      activeChapterId,
+      setActiveChapterId,
+      currentStudyPlan,
+      setCurrentStudyPlan,
+      latestDiagnosis,
+      setLatestDiagnosis,
+      answer,
+      setAnswer,
+      savedNoteCount,
+      setSavedNoteCount,
+      sourcePageTarget
+    }),
+    [
+      activeChapterId,
+      answer,
+      back,
+      closeSheet,
+      currentStudyPlan,
+      go,
+      openSheet,
+      openSourcePage,
+      latestDiagnosis,
+      lessonBuildJobId,
+      lessonBuildJobStatus,
+      courseSummaries,
+      courseSummariesError,
+      courseSummariesLoadState,
+      courseSummariesReadyKind,
+      courseSummariesRefreshing,
+      generatedFlashcards,
+      generatedLessons,
+      generatedQuizzes,
+      parseJobStatus,
+      parseJobId,
+      parsedAssets,
+      parsedChapters,
+      parsedChunks,
+      parsedScanResult,
+      refreshCourses,
+      savedNoteCount,
+      selectedUpload,
+      showToast,
+      sourcePageTarget,
+      uploadedFile
+    ]
+  );
+
+  const requestedSheetView = useMemo<ActionSheetView | null>(() => {
+    if (!sheet) return null;
+
+    if (sheet.type === "chat") {
+      return {
+        key: "chat",
+        sheet,
+        title: "问 AI",
+        content: (
+          <ChatSheetContent
+            activeChapterId={activeChapterId}
+            openSheet={openSheet}
+            parsedChapters={parsedChapters}
+            uploadedFile={uploadedFile}
+          />
+        )
+      };
+    }
+
+    if (sheet.type === "source") {
+      return {
+        key: `source:${sheet.title}:${sheet.page}`,
+        sheet,
+        title: "查看原文",
+        content: <SourceSheetContent title={sheet.title} page={sheet.page} image={sheet.image} />
+      };
+    }
+
+    if (sheet.type === "note") {
+      return {
+        key: `note:${sheet.concept}`,
+        sheet,
+        title: "导学笔记",
+        content: (
+          <NoteSheetContent
+            concept={sheet.concept}
+            setSavedNoteCount={setSavedNoteCount}
+            closeSheet={closeSheet}
+            showToast={showToast}
+          />
+        )
+      };
+    }
+
+    const chapter = parsedChapters?.find((item) => item.chapter_id === sheet.chapterId);
+    if (!chapter || !parsedChapters) return null;
+    const chapterSnapshot = { ...chapter };
+    const chaptersSnapshot = parsedChapters.map((item) => ({ ...item }));
+    const evidenceSnapshot = sheet.evidence
+      ? { ...sheet.evidence, reasons: [...sheet.evidence.reasons] }
+      : undefined;
+
+    return {
+      key: `editChapter:${sheet.chapterId}`,
+      sheet,
+      title: "编辑章节",
+      content: (
+        <EditChapterSheetContent
+          chapter={chapterSnapshot}
+          chapters={chaptersSnapshot}
+          evidence={evidenceSnapshot}
+          pageCount={parsedScanResult?.page_count}
+          closeSheet={closeSheet}
+          onSave={(nextChapter) => {
+            setParsedChapters((current) => current?.map((item) => (
+              item.chapter_id === nextChapter.chapter_id ? nextChapter : item
+            )) ?? null);
+            closeSheet();
+            showToast("本章修改已保存，请继续确认目录");
+          }}
+          onDelete={(chapterIds) => {
+            const removalIds = new Set(chapterIds);
+            setParsedChapters((current) => current?.filter((item) => !removalIds.has(item.chapter_id)) ?? null);
+            closeSheet();
+            showToast(`已移除 ${chapterIds.length} 个目录项`, "info");
+          }}
+        />
+      )
+    };
+  }, [
+    activeChapterId,
+    closeSheet,
+    openSheet,
+    parsedChapters,
+    parsedScanResult?.page_count,
+    sheet,
+    showToast,
+    uploadedFile
+  ]);
+
+  const sheetPresence = useMotionPresence({
+    requested: requestedSheetView,
+    getKey: getSheetViewKey,
+    reducedMotion,
+    motionNames: actionSheetAnimationNames
+  });
+
+  const header = titles[screen];
+
+  function renderScreen() {
+    switch (screen) {
+      case "home":
+        return <HomeScreen />;
+      case "upload":
+        return <UploadScreen />;
+      case "parseReady":
+        return <ParseReadyScreen />;
+      case "processing":
+        return <ProcessingScreen />;
+      case "chapterConfirm":
+        return <ChapterConfirmScreen />;
+      case "courseReady":
+        return <CourseReadyScreen />;
+      case "library":
+        return <LibraryScreen />;
+      case "community":
+        return <CommunityScreen />;
+      case "communityBook":
+        return <CommunityBookScreen />;
+      case "communityImport":
+        return <CommunityImportScreen />;
+      case "book":
+        return <BookCourseScreen />;
+      case "plan":
+        return <StudyPlanScreen />;
+      case "flashcards":
+        return <FlashcardScreen />;
+      case "lesson":
+        return <LessonScreen />;
+      case "assignment":
+        return <AssignmentScreen />;
+      case "diagnosis":
+        return <DiagnosisScreen />;
+      case "mistakes":
+        return <MistakeBookScreen />;
+      case "notes":
+        return <NotesScreen />;
+      case "source":
+        return <SourceReaderScreen />;
+      case "export":
+        return <ExportPreviewScreen />;
+      case "report":
+        return <LessonReportScreen />;
+      case "profile":
+        return <ProfileScreen />;
+      default:
+        return <HomeScreen />;
+    }
+  }
+
+  const setMainElement = useCallback((element: HTMLElement | null) => {
+    mainRef.current = element;
+  }, []);
+
+  return (
+    <AppProvider value={sharedProps}>
+      <AppShell
+        active={screen}
+        motionReduced={reducedMotion}
+        focusMainNonce={navigation.nonce}
+        onMainElement={setMainElement}
+        onClickCapture={captureSheetTrigger}
+        overlays={(
+          <>
+            <ActionSheet
+              view={sheetPresence.rendered}
+              state={sheetPresence.state}
+              presenceId={sheetPresence.presenceId}
+              close={closeSheet}
+              onAnimationEnd={sheetPresence.onAnimationEnd}
+              onAnimationCancel={sheetPresence.onAnimationCancel}
+              onExited={restoreSheetFocus}
+            />
+            <Toast toast={toast} />
+          </>
+        )}
+        title={header.title}
+        subtitle={header.subtitle}
+        showBack={header.back}
+        hideNav={header.hideNav}
+        onBack={back}
+        go={go}
+      >
+        <ScreenTransition
+          screenKey={screen}
+          direction={navigation.direction}
+          nonce={navigation.nonce}
+          initial={navigation.nonce === 0}
+          reducedMotion={reducedMotion}
+        >
+          {renderScreen()}
+        </ScreenTransition>
+      </AppShell>
+    </AppProvider>
+  );
+}

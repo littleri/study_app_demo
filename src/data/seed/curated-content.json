@@ -1,0 +1,582 @@
+{
+  "schema_version": 1,
+  "provenance": {
+    "content_scope": "第2章第1节：减数分裂和受精作用",
+    "fixture_policy": "Curated demo copy is human-authored; the content builder refreshes its source evidence from MinerU."
+  },
+  "book": {
+    "id": "book_biology_2",
+    "title": "生物 必修 2 遗传与进化",
+    "shortTitle": "遗传与进化",
+    "fileName": "人教版高中生物必修2遗传与进化.pdf",
+    "publisher": "人民教育出版社",
+    "pages": 125,
+    "fileSize": "38.8 MB",
+    "chapterCount": 7,
+    "sectionCount": 20,
+    "knowledgePointCount": 96,
+    "progress": 18,
+    "mastery": 68,
+    "planDays": 14,
+    "dailyMinutes": 30,
+    "cover": "/assets/textbook/biology-cover-thumb.webp"
+  },
+  "scan": {
+    "book_id": "book_biology_2",
+    "source_unit": "page"
+  },
+  "chapters": [
+    {
+      "chapter_id": "c1",
+      "level": 1,
+      "source_title": "第 1 章 遗传因子的发现",
+      "ai_title": "课程 1：理解孟德尔遗传规律",
+      "page_start": 1,
+      "page_end": 25,
+      "confidence": 96,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": null
+    },
+    {
+      "chapter_id": "c1s1",
+      "level": 2,
+      "source_title": "第 1 节 孟德尔的豌豆杂交实验（一）",
+      "ai_title": "课程 1.1：从实验设计理解分离定律",
+      "page_start": 11,
+      "page_end": 18,
+      "confidence": 94,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": "c1"
+    },
+    {
+      "chapter_id": "c1s2",
+      "level": 2,
+      "source_title": "第 2 节 孟德尔的豌豆杂交实验（二）",
+      "ai_title": "课程 1.2：用概率解释自由组合",
+      "page_start": 19,
+      "page_end": 25,
+      "confidence": 88,
+      "status": "需检查",
+      "source": "mineru",
+      "parent_id": "c1"
+    },
+    {
+      "chapter_id": "c2",
+      "level": 1,
+      "source_title": "第 2 章 基因和染色体的关系",
+      "ai_title": "课程 2：把基因放到染色体上理解",
+      "page_start": 26,
+      "page_end": 53,
+      "confidence": 95,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": null
+    },
+    {
+      "chapter_id": "c2s1",
+      "level": 2,
+      "source_title": "第 1 节 减数分裂和受精作用",
+      "ai_title": "课程 2.1：同源染色体如何分离",
+      "page_start": 11,
+      "page_end": 21,
+      "confidence": 94,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": "c2"
+    },
+    {
+      "chapter_id": "c3",
+      "level": 1,
+      "source_title": "第 3 章 基因的本质",
+      "ai_title": "课程 3：理解 DNA 与遗传信息",
+      "page_start": 54,
+      "page_end": 76,
+      "confidence": 91,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": null
+    },
+    {
+      "chapter_id": "c4",
+      "level": 1,
+      "source_title": "第 4 章 基因的表达",
+      "ai_title": "课程 4：从基因到蛋白质",
+      "page_start": 77,
+      "page_end": 95,
+      "confidence": 90,
+      "status": "匹配良好",
+      "source": "mineru",
+      "parent_id": null
+    }
+  ],
+  "assets": [
+    {
+      "asset_id": "asset_meiosis_30",
+      "book_id": "book_biology_2",
+      "chapter_id": "c2s1",
+      "source_type": "extracted",
+      "page": 11,
+      "type": "figure",
+      "caption": "减数分裂小节页面（视觉基线页图）",
+      "bbox": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "image_url": "/assets/textbook/biology-lesson-meiosis-1.webp",
+      "thumbnail_url": "/assets/textbook/biology-lesson-meiosis-1.webp",
+      "source_page_image_url": "/assets/textbook/biology-lesson-meiosis-1.webp",
+      "source_chunk_ids": [
+        "chunk_c2s1_11"
+      ],
+      "concepts": [
+        "同源染色体",
+        "四分体"
+      ],
+      "review_status": "approved",
+      "source_page_pdf": 11,
+      "source_page_printed": 16,
+      "source_origin": "migrated-source-frontend-baseline",
+      "mineru_extracted": false,
+      "authorization_status": "internal-demo-only; verify before distribution",
+      "provenance_note": "该页图来自源前端既有视觉基线，本轮内容引用由 MinerU OCR 重新建立。"
+    },
+    {
+      "asset_id": "asset_meiosis_35",
+      "book_id": "book_biology_2",
+      "chapter_id": "c2s1",
+      "source_type": "extracted",
+      "page": 12,
+      "type": "figure",
+      "caption": "精子形成与减数分裂过程页面（视觉基线页图）",
+      "bbox": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "image_url": "/assets/textbook/biology-lesson-meiosis-2.webp",
+      "thumbnail_url": "/assets/textbook/biology-lesson-meiosis-2.webp",
+      "source_page_image_url": "/assets/textbook/biology-lesson-meiosis-2.webp",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "concepts": [
+        "受精作用"
+      ],
+      "review_status": "approved",
+      "source_page_pdf": 12,
+      "source_page_printed": 17,
+      "source_origin": "migrated-source-frontend-baseline",
+      "mineru_extracted": false,
+      "authorization_status": "internal-demo-only; verify before distribution",
+      "provenance_note": "该页图来自源前端既有视觉基线，本轮内容引用由 MinerU OCR 重新建立。"
+    }
+  ],
+  "flashcards": [
+    {
+      "card_id": "fc_homologous",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "什么是同源染色体？",
+      "back": "形态、大小一般相同，一条来自父方、一条来自母方，并控制同一类性状的一对染色体。",
+      "concept": "同源染色体",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "due": "today",
+      "mastery": 58,
+      "reason": "来自作业诊断卡点",
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "card_id": "fc_tetrad",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "四分体为什么叫“四”？",
+      "back": "一对同源染色体联会后，每条染色体含两条姐妹染色单体，因此共有四条染色单体。",
+      "concept": "四分体",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "due": "today",
+      "mastery": 64,
+      "reason": "章节学习生成",
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "card_id": "fc_meiosis_i",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "同源染色体分离发生在哪一次分裂？",
+      "back": "发生在减数第一次分裂后期，这是染色体数目减半的关键步骤。",
+      "concept": "减数第一次分裂",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "due": "today",
+      "mastery": 52,
+      "reason": "错题自动加入",
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "card_id": "fc_sister",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "姐妹染色单体在什么时候分离？",
+      "back": "姐妹染色单体在减数第二次分裂后期分离，容易和同源染色体分离混淆。",
+      "concept": "姐妹染色单体",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "due": "today",
+      "mastery": 55,
+      "reason": "来自作业诊断卡点",
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "card_id": "fc_fertilization",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "受精作用如何维持染色体数目稳定？",
+      "back": "精子和卵细胞结合后，两套配子染色体合并，使受精卵恢复体细胞染色体数目。",
+      "concept": "受精作用",
+      "source_chunk_ids": [
+        "chunk_c2s1_19"
+      ],
+      "page_start": 19,
+      "page_end": 19,
+      "due": "today",
+      "mastery": 70,
+      "reason": "章节学习生成",
+      "printed_page_start": 24,
+      "printed_page_end": 24
+    },
+    {
+      "card_id": "fc_one_two",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "front": "“一次复制、两次分裂”是什么意思？",
+      "back": "DNA 只复制一次，但细胞连续分裂两次，因此配子中染色体数目减半。",
+      "concept": "减数分裂过程",
+      "source_chunk_ids": [
+        "chunk_c2s1_11"
+      ],
+      "page_start": 11,
+      "page_end": 11,
+      "due": "today",
+      "mastery": 62,
+      "reason": "章节学习生成",
+      "printed_page_start": 16,
+      "printed_page_end": 16
+    }
+  ],
+  "quizzes": [
+    {
+      "question_id": "quiz_meiosis_01",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "prompt": "同源染色体分离发生在减数分裂的哪个阶段？",
+      "choices": [
+        "减数第一次分裂后期",
+        "减数第二次分裂后期",
+        "有丝分裂后期",
+        "受精作用后"
+      ],
+      "answer": "减数第一次分裂后期",
+      "explanation": "减数第一次分裂后期分离同源染色体，姐妹染色单体在第二次分裂后期分离。",
+      "concept": "减数第一次分裂",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "question_id": "quiz_meiosis_02",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "prompt": "四分体由什么形成？",
+      "choices": [
+        "两条非同源染色体",
+        "一对联会的同源染色体",
+        "两个配子",
+        "一条染色体和一个基因"
+      ],
+      "answer": "一对联会的同源染色体",
+      "explanation": "联会发生在同源染色体之间，每条染色体含两条姐妹染色单体，共形成四分体。",
+      "concept": "四分体",
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "page_start": 13,
+      "page_end": 13,
+      "printed_page_start": 18,
+      "printed_page_end": 18
+    },
+    {
+      "question_id": "quiz_meiosis_03",
+      "book_id": "book_biology_2",
+      "lesson_id": "lesson_meiosis",
+      "chapter_id": "c2s1",
+      "prompt": "受精作用对染色体数目的作用是什么？",
+      "choices": [
+        "使染色体数目减半",
+        "使染色体数目恢复到体细胞水平",
+        "使染色体全部复制",
+        "使同源染色体消失"
+      ],
+      "answer": "使染色体数目恢复到体细胞水平",
+      "explanation": "配子结合后，两套单倍体染色体重新组合，受精卵恢复体细胞染色体数目。",
+      "concept": "受精作用",
+      "source_chunk_ids": [
+        "chunk_c2s1_19"
+      ],
+      "page_start": 19,
+      "page_end": 19,
+      "printed_page_start": 24,
+      "printed_page_end": 24
+    }
+  ],
+  "studyPlan": {
+    "user_id": "local_user",
+    "book_id": "book_biology_2",
+    "days": 14,
+    "daily_minutes": 30,
+    "tasks": [
+      {
+        "task_id": "task_01",
+        "user_id": "local_user",
+        "day": 1,
+        "title": "孟德尔实验导读",
+        "task_type": "导读 + 小测",
+        "minutes": 25,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "done",
+        "score": 88,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_02",
+        "user_id": "local_user",
+        "day": 2,
+        "title": "分离定律",
+        "task_type": "课程 + 练习",
+        "minutes": 30,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "done",
+        "score": 82,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_03",
+        "user_id": "local_user",
+        "day": 3,
+        "title": "自由组合定律",
+        "task_type": "作业诊断",
+        "minutes": 35,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "done",
+        "score": 78,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_04",
+        "user_id": "local_user",
+        "day": 4,
+        "title": "错题复习：遗传图解",
+        "task_type": "薄弱点复习",
+        "minutes": 20,
+        "lesson_id": null,
+        "review_target": "遗传图解",
+        "status": "done",
+        "score": 80,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_05",
+        "user_id": "local_user",
+        "day": 5,
+        "title": "减数分裂和受精作用",
+        "task_type": "课程 + 图示讲解",
+        "minutes": 30,
+        "lesson_id": "lesson_meiosis",
+        "review_target": null,
+        "status": "in_progress",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_06",
+        "user_id": "local_user",
+        "day": 6,
+        "title": "同源染色体薄弱点",
+        "task_type": "闪卡复习 + 再练",
+        "minutes": 18,
+        "lesson_id": "lesson_meiosis",
+        "review_target": "同源染色体、减数第一次分裂",
+        "status": "pending",
+        "score": null,
+        "weak_points": [
+          "同源染色体与姐妹染色单体"
+        ]
+      },
+      {
+        "task_id": "task_07",
+        "user_id": "local_user",
+        "day": 7,
+        "title": "伴性遗传",
+        "task_type": "课程 + 练习",
+        "minutes": 30,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_08",
+        "user_id": "local_user",
+        "day": 8,
+        "title": "DNA 结构",
+        "task_type": "课程 + 闪卡",
+        "minutes": 30,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_09",
+        "user_id": "local_user",
+        "day": 9,
+        "title": "DNA 复制",
+        "task_type": "课程 + 练习",
+        "minutes": 30,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_10",
+        "user_id": "local_user",
+        "day": 10,
+        "title": "基因表达",
+        "task_type": "图示讲解",
+        "minutes": 25,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_11",
+        "user_id": "local_user",
+        "day": 11,
+        "title": "综合错题回顾",
+        "task_type": "诊断练习",
+        "minutes": 30,
+        "lesson_id": null,
+        "review_target": "历史卡点",
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_12",
+        "user_id": "local_user",
+        "day": 12,
+        "title": "遗传规律综合题",
+        "task_type": "限时练习",
+        "minutes": 35,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_13",
+        "user_id": "local_user",
+        "day": 13,
+        "title": "章节闪卡总复习",
+        "task_type": "闪卡复习",
+        "minutes": 20,
+        "lesson_id": "lesson_meiosis",
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      },
+      {
+        "task_id": "task_14",
+        "user_id": "local_user",
+        "day": 14,
+        "title": "学习成果报告",
+        "task_type": "总结与调整",
+        "minutes": 15,
+        "lesson_id": null,
+        "review_target": null,
+        "status": "pending",
+        "score": null,
+        "weak_points": []
+      }
+    ]
+  },
+  "assignment": {
+    "assignment_id": "assignment_c2s1",
+    "title": "判断同源染色体分离发生在哪个时期",
+    "source": "《遗传与进化》第 2 章第 1 节 · 教材第 18 页（PDF 第 13 页）",
+    "question": "同源染色体分离发生在减数分裂的哪个阶段？请说明它与染色体数目减半的关系。",
+    "initialAnswer": "减数第二次分裂后期",
+    "correctIdea": "同源染色体分离发生在减数第一次分裂后期，这一步让每个子细胞只获得每对同源染色体中的一条。"
+  },
+  "diagnosis": {
+    "result": "你的答案把同源染色体和姐妹染色单体混在了一起。减数第二次分裂后期分离的是姐妹染色单体，而同源染色体分离发生在减数第一次分裂后期。",
+    "stuck_point": "没有区分同源染色体分离与姐妹染色单体分离。",
+    "knowledge_points": [
+      "同源染色体",
+      "减数第一次分裂",
+      "姐妹染色单体"
+    ],
+    "review_page": "教材第 18 页（PDF 第 13 页）· 同源染色体分离",
+    "hint": "先问自己：分离的是一对同源染色体，还是复制后连在一起的两条姐妹染色单体。"
+  },
+  "aiReplies": {
+    "default": "同源染色体可以理解成一对来源不同、形态相似、控制同一类性状的染色体。在减数第一次分裂后期，它们被拉向细胞两极，因此配子里只保留每对同源染色体中的一条。",
+    "example": "如果体细胞里有一对 1 号同源染色体，一条来自父方，一条来自母方。减数第一次分裂后，两个子细胞会各拿到其中一条，这就是染色体数目减半的关键。",
+    "quiz": "练习：在减数第二次分裂后期，分离的对象是什么？A. 同源染色体 B. 姐妹染色单体 C. 四分体 D. 等位基因"
+  }
+}
