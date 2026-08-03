@@ -56,6 +56,7 @@ export function DevicePreviewStudio() {
     [fitScale, settings.device, settings.orientation, settings.quality]
   );
   const layout = getDeviceLayout(settings.device);
+  const isIphonePortrait = settings.device === "iphone-17-pro" && settings.orientation === "portrait";
 
   const updateAvailableSize = useCallback(() => {
     const element = canvasAreaRef.current;
@@ -188,13 +189,39 @@ export function DevicePreviewStudio() {
       ) : null}
       <div ref={canvasAreaRef} className="device-preview-canvas-area" data-testid="device-preview-canvas-area">
         <div
-          className="device-preview-canvas"
+          className={`device-preview-canvas${isIphonePortrait ? " device-preview-canvas--iphone-17-pro" : ""}`}
           data-testid="device-preview-canvas"
           data-canvas-width={geometry.canvasWidth}
           data-canvas-height={geometry.canvasHeight}
           style={{ height: `${geometry.canvasHeight}px`, width: `${geometry.canvasWidth}px` }}
         >
-          <div className="device-preview-frame" data-testid="device-preview-frame" style={frameStyle}>
+          <div
+            className={`device-preview-frame${isIphonePortrait ? " device-preview-frame--iphone-17-pro" : ""}`}
+            data-testid="device-preview-frame"
+            data-device={settings.device}
+            data-orientation={settings.orientation}
+            style={frameStyle}
+          >
+            {isIphonePortrait ? (
+              <div
+                className="device-preview-bezel"
+                data-testid="device-preview-bezel"
+                data-device-bezel="iphone-17-pro"
+                aria-hidden="true"
+              />
+            ) : null}
+            {isIphonePortrait ? (
+              <div
+                className="device-preview-hardware-controls"
+                data-testid="device-preview-hardware-controls"
+                aria-hidden="true"
+              >
+                <span className="device-preview-hardware-control device-preview-hardware-control--action" data-hardware-control="action" />
+                <span className="device-preview-hardware-control device-preview-hardware-control--volume-up" data-hardware-control="volume-up" />
+                <span className="device-preview-hardware-control device-preview-hardware-control--volume-down" data-hardware-control="volume-down" />
+                <span className="device-preview-hardware-control device-preview-hardware-control--side" data-hardware-control="side" />
+              </div>
+            ) : null}
             <iframe
               ref={iframeRef}
               className="device-preview-iframe"
@@ -203,6 +230,14 @@ export function DevicePreviewStudio() {
               width={geometry.logicalWidth}
               height={geometry.logicalHeight}
             />
+            {isIphonePortrait ? (
+              <div
+                className="device-preview-dynamic-island"
+                data-testid="device-preview-dynamic-island"
+                data-dynamic-island="true"
+                aria-hidden="true"
+              />
+            ) : null}
           </div>
         </div>
       </div>

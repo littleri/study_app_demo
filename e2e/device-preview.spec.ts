@@ -50,10 +50,77 @@ test.describe("device preview studio", () => {
     ))).toBe(true);
     await expect(embeddedFrame.locator("[data-testid='ios-status-bar']")).toBeVisible();
     await expect(embeddedFrame.locator(".ios-status-bar__time")).toHaveText("9:41");
-    await expect(embeddedFrame.locator(".ios-status-bar__signal-bar")).toHaveCount(4);
+    await expect(embeddedFrame.locator(".ios-status-bar__cellular")).toBeVisible();
     await expect(embeddedFrame.locator(".ios-status-bar__wifi")).toBeVisible();
     await expect(embeddedFrame.locator(".ios-status-bar__battery")).toBeVisible();
     await expect(embeddedFrame.locator(".home-indicator")).toBeVisible();
+
+    const statusBarGeometry = await embeddedFrame.locator("[data-testid='ios-status-bar']").evaluate((statusBar) => {
+      const statusRect = statusBar.getBoundingClientRect();
+      const geometry = (selector: string) => {
+        const element = statusBar.querySelector<HTMLElement>(selector);
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return {
+          height: rect.height,
+          width: rect.width,
+          x: rect.x - statusRect.x,
+          y: rect.y - statusRect.y
+        };
+      };
+      const time = statusBar.querySelector<HTMLElement>(".ios-status-bar__time");
+      if (!time) return null;
+      const timeStyles = getComputedStyle(time);
+      return {
+        height: statusRect.height,
+        width: statusRect.width,
+        timeGroup: geometry(".ios-status-bar__time-group"),
+        time: geometry(".ios-status-bar__time"),
+        indicators: geometry(".ios-status-bar__indicators"),
+        cellular: geometry(".ios-status-bar__cellular"),
+        wifi: geometry(".ios-status-bar__wifi"),
+        battery: geometry(".ios-status-bar__battery"),
+        batteryBorder: geometry(".ios-status-bar__battery-border"),
+        batteryCap: geometry(".ios-status-bar__battery-cap"),
+        batteryLevel: geometry(".ios-status-bar__battery-level"),
+        typography: {
+          fontFamily: timeStyles.fontFamily,
+          fontSize: timeStyles.fontSize,
+          fontWeight: timeStyles.fontWeight,
+          lineHeight: timeStyles.lineHeight
+        }
+      };
+    });
+    expect(statusBarGeometry).not.toBeNull();
+    if (!statusBarGeometry) throw new Error("The iPhone status bar geometry did not mount");
+    expect(statusBarGeometry.width).toBeCloseTo(402, 1);
+    expect(statusBarGeometry.height).toBeCloseTo(62, 1);
+    expect(statusBarGeometry.timeGroup).toEqual({ x: 24, y: 21, width: 100, height: 22 });
+    expect(statusBarGeometry.time).toEqual({ x: 55.5, y: 21.75, width: 37, height: 22 });
+    expect(statusBarGeometry.indicators).toEqual({ x: 278, y: 21, width: 100, height: 22 });
+    expect(statusBarGeometry.cellular?.x).toBeCloseTo(288.665, 1);
+    expect(statusBarGeometry.cellular?.y).toBeCloseTo(26.387, 1);
+    expect(statusBarGeometry.cellular?.width).toBeCloseTo(19.2, 1);
+    expect(statusBarGeometry.cellular?.height).toBeCloseTo(12.226, 1);
+    expect(statusBarGeometry.wifi?.x).toBeCloseTo(314.865, 1);
+    expect(statusBarGeometry.wifi?.y).toBeCloseTo(26.336, 1);
+    expect(statusBarGeometry.wifi?.width).toBeCloseTo(17.142, 1);
+    expect(statusBarGeometry.wifi?.height).toBeCloseTo(12.328, 1);
+    expect(statusBarGeometry.battery?.x).toBeCloseTo(339.007, 1);
+    expect(statusBarGeometry.battery).toMatchObject({ y: 26, height: 13 });
+    expect(statusBarGeometry.battery?.width).toBeCloseTo(27.328, 1);
+    expect(statusBarGeometry.batteryBorder).toMatchObject({ y: 26, width: 25, height: 13 });
+    expect(statusBarGeometry.batteryCap?.x).toBeCloseTo(365.007, 1);
+    expect(statusBarGeometry.batteryCap?.y).toBeCloseTo(30.5, 1);
+    expect(statusBarGeometry.batteryCap?.width).toBeCloseTo(1.328, 1);
+    expect(statusBarGeometry.batteryCap?.height).toBeCloseTo(4.075, 1);
+    expect(statusBarGeometry.batteryLevel).toMatchObject({ y: 28, width: 21, height: 9 });
+    expect(statusBarGeometry.typography.fontFamily).toContain("SF Pro");
+    expect(statusBarGeometry.typography).toMatchObject({
+      fontSize: "17px",
+      fontWeight: "590",
+      lineHeight: "22px"
+    });
 
     await page.getByTestId("device-preview-orientation-landscape").click();
     await expect.poll(async () => {
@@ -129,6 +196,185 @@ test.describe("device preview studio", () => {
     }).toBe(true);
   });
 
+  test("renders the iPhone 17 Pro bezel and Dynamic Island only in portrait", async ({ page }) => {
+    await page.goto("/?preview=devices&device=iphone-17-pro&orientation=portrait&quality=fit");
+
+    const frame = page.getByTestId("device-preview-frame");
+    const bezel = page.getByTestId("device-preview-bezel");
+    const controls = page.getByTestId("device-preview-hardware-controls");
+    const island = page.getByTestId("device-preview-dynamic-island");
+    await expect(frame).toHaveAttribute("data-device", "iphone-17-pro");
+    await expect(frame).toHaveAttribute("data-orientation", "portrait");
+    await expect(bezel).toBeVisible();
+    await expect(controls).toBeVisible();
+    await expect(island).toBeVisible();
+    await expect(bezel).toHaveAttribute("aria-hidden", "true");
+    await expect(controls).toHaveAttribute("aria-hidden", "true");
+    await expect(island).toHaveAttribute("aria-hidden", "true");
+    await expect(controls.locator("[data-hardware-control]")).toHaveCount(4);
+
+    const portraitGeometry = await page.evaluate(() => {
+      const frame = document.querySelector<HTMLElement>("[data-testid='device-preview-frame']");
+      const bezel = document.querySelector<HTMLElement>("[data-testid='device-preview-bezel']");
+      const controls = document.querySelector<HTMLElement>("[data-testid='device-preview-hardware-controls']");
+      const island = document.querySelector<HTMLElement>("[data-testid='device-preview-dynamic-island']");
+      if (!frame || !bezel || !controls || !island) return null;
+      const frameRect = frame.getBoundingClientRect();
+      const bezelRect = bezel.getBoundingClientRect();
+      const islandRect = island.getBoundingClientRect();
+      const iframe = frame.querySelector("iframe");
+      if (!iframe) return null;
+      const frameStyles = getComputedStyle(frame);
+      const iframeStyles = getComputedStyle(iframe);
+      const bezelStyles = getComputedStyle(bezel);
+      const bezelBeforeStyles = getComputedStyle(bezel, "::before");
+      const controlStyles = getComputedStyle(controls);
+      const islandStyles = getComputedStyle(island);
+      const islandSensorStyles = getComputedStyle(island, "::before");
+      const islandCameraStyles = getComputedStyle(island, "::after");
+      const hardwareControls = Object.fromEntries(Array.from(
+        controls.querySelectorAll<HTMLElement>("[data-hardware-control]")
+      ).map((control) => {
+        const rect = control.getBoundingClientRect();
+        const name = control.dataset.hardwareControl ?? "unknown";
+        return [name, {
+          height: rect.height,
+          left: rect.left - frameRect.left,
+          pointerEvents: getComputedStyle(control).pointerEvents,
+          right: rect.right - frameRect.right,
+          top: rect.top - frameRect.top,
+          width: rect.width
+        }];
+      }));
+      return {
+        bezelHeight: bezelRect.height,
+        bezelWidth: bezelRect.width,
+        bezelBeforeInset: bezelBeforeStyles.top,
+        bezelBeforeRadius: bezelBeforeStyles.borderRadius,
+        bezelInsetLeft: bezelStyles.left,
+        bezelInsetTop: bezelStyles.top,
+        bezelRadius: bezelStyles.borderRadius,
+        frameHeight: frameRect.height,
+        frameWidth: frameRect.width,
+        frameRadius: frameStyles.borderRadius,
+        islandHeight: islandRect.height,
+        islandCamera: {
+          backgroundImage: islandCameraStyles.backgroundImage,
+          boxShadow: islandCameraStyles.boxShadow,
+          content: islandCameraStyles.content,
+          height: islandCameraStyles.height,
+          width: islandCameraStyles.width
+        },
+        islandDecoration: {
+          borderWidth: islandStyles.borderWidth,
+          boxShadow: islandStyles.boxShadow
+        },
+        islandRadius: islandStyles.borderRadius,
+        islandSensor: {
+          backgroundImage: islandSensorStyles.backgroundImage,
+          boxShadow: islandSensorStyles.boxShadow,
+          content: islandSensorStyles.content,
+          height: islandSensorStyles.height,
+          width: islandSensorStyles.width
+        },
+        islandTop: islandRect.top - frameRect.top,
+        islandTopCss: islandStyles.top,
+        islandWidth: islandRect.width,
+        hardwareControls,
+        pointerEvents: [bezelStyles.pointerEvents, controlStyles.pointerEvents, islandStyles.pointerEvents],
+        screenRadius: iframeStyles.borderRadius,
+        variables: {
+          blackBezel: frameStyles.getPropertyValue("--iphone-black-bezel").trim(),
+          islandHeight: frameStyles.getPropertyValue("--iphone-island-height").trim(),
+          islandRadius: frameStyles.getPropertyValue("--iphone-island-radius").trim(),
+          islandTop: frameStyles.getPropertyValue("--iphone-island-top").trim(),
+          islandWidth: frameStyles.getPropertyValue("--iphone-island-width").trim(),
+          metalRing: frameStyles.getPropertyValue("--iphone-metal-ring").trim(),
+          screenRadius: frameStyles.getPropertyValue("--iphone-screen-radius").trim(),
+          shellInset: frameStyles.getPropertyValue("--iphone-shell-visible-inset").trim(),
+          shellRadius: frameStyles.getPropertyValue("--iphone-shell-radius").trim()
+        }
+      };
+    });
+    expect(portraitGeometry).not.toBeNull();
+    if (!portraitGeometry) throw new Error("The iPhone 17 Pro portrait chrome did not mount");
+    const scale = portraitGeometry.frameWidth / 402;
+    expect(portraitGeometry.frameHeight).toBeCloseTo(874 * scale, 1);
+    expect(portraitGeometry.bezelWidth).toBeCloseTo(portraitGeometry.frameWidth + 32 * scale, 1);
+    expect(portraitGeometry.bezelHeight).toBeCloseTo(portraitGeometry.frameHeight + 32 * scale, 1);
+    expect(portraitGeometry.islandWidth).toBeCloseTo(126 * scale, 1);
+    expect(portraitGeometry.islandHeight).toBeCloseTo(37 * scale, 1);
+    expect(portraitGeometry.islandTop).toBeCloseTo(14 * scale, 1);
+    expect(portraitGeometry.frameRadius).toBe("61px");
+    expect(portraitGeometry.screenRadius).toBe("61px");
+    expect(portraitGeometry.bezelRadius).toBe("77px");
+    expect(portraitGeometry.bezelInsetLeft).toBe("-16px");
+    expect(portraitGeometry.bezelInsetTop).toBe("-16px");
+    expect(portraitGeometry.bezelBeforeInset).toBe("6px");
+    expect(portraitGeometry.bezelBeforeRadius).toBe("71px");
+    expect(portraitGeometry.islandRadius).toBe("18.5px");
+    expect(portraitGeometry.islandTopCss).toBe("14px");
+    expect(portraitGeometry.variables).toEqual({
+      blackBezel: "10px",
+      islandHeight: "37px",
+      islandRadius: "18.5px",
+      islandTop: "14px",
+      islandWidth: "126px",
+      metalRing: "6px",
+      screenRadius: "61px",
+      shellInset: "16px",
+      shellRadius: "77px"
+    });
+    expect(portraitGeometry.islandDecoration).toEqual({ borderWidth: "0px", boxShadow: "none" });
+    expect(portraitGeometry.islandSensor).toEqual({
+      backgroundImage: "none",
+      boxShadow: "none",
+      content: '""',
+      height: "23px",
+      width: "42px"
+    });
+    expect(portraitGeometry.islandCamera).toMatchObject({
+      boxShadow: "none",
+      content: '""',
+      height: "17px",
+      width: "17px"
+    });
+    expect(portraitGeometry.islandCamera.backgroundImage).toContain("radial-gradient");
+    expect(portraitGeometry.pointerEvents).toEqual(["none", "none", "none"]);
+    const expectedControls = {
+      action: { side: "left", top: 170, height: 42 },
+      "volume-up": { side: "left", top: 243, height: 68 },
+      "volume-down": { side: "left", top: 329, height: 68 },
+      side: { side: "right", top: 266, height: 107 }
+    } as const;
+    for (const [name, expected] of Object.entries(expectedControls)) {
+      const control = portraitGeometry.hardwareControls[name];
+      expect(control).toBeDefined();
+      expect(control.width).toBeCloseTo(4 * scale, 1);
+      expect(control.height).toBeCloseTo(expected.height * scale, 1);
+      expect(control.top).toBeCloseTo(expected.top * scale, 1);
+      expect(control.pointerEvents).toBe("none");
+      if (expected.side === "left") {
+        expect(control.left).toBeCloseTo(-19 * scale, 1);
+      } else {
+        expect(control.right).toBeCloseTo(19 * scale, 1);
+      }
+    }
+
+    await page.getByTestId("device-preview-orientation-landscape").click();
+    await expect(page.getByTestId("device-preview-bezel")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-hardware-controls")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-dynamic-island")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-frame")).toHaveAttribute("data-orientation", "landscape");
+
+    await page.getByTestId("device-preview-device-ipad-pro-11").click();
+    await page.getByTestId("device-preview-orientation-portrait").click();
+    await expect(page.getByTestId("device-preview-bezel")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-hardware-controls")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-dynamic-island")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-frame")).toHaveAttribute("data-device", "ipad-pro-11");
+  });
+
   test("keeps Fit inside the dynamic viewport and announces the final resized geometry", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 903 });
     await page.goto("/?preview=devices&quality=fit");
@@ -189,6 +435,43 @@ test.describe("device preview studio", () => {
         mutationCount: Number(announcer.dataset.testMutationCount ?? "0")
       };
     }), { timeout: 2_000 }).toEqual({ matchesFinalGeometry: true, mutationCount: 1 });
+  });
+
+  test("uses a side control rail on wide workspaces and stacks controls on narrow screens", async ({ page }) => {
+    await page.setViewportSize({ width: 603, height: 903 });
+    await page.goto("/?preview=devices&quality=fit");
+
+    await expect.poll(() => page.evaluate(() => {
+      const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
+      const summary = document.querySelector<HTMLElement>(".device-preview-output-summary");
+      const canvasArea = document.querySelector<HTMLElement>(".device-preview-canvas-area");
+      const studio = document.querySelector<HTMLElement>(".device-preview-studio");
+      if (!toolbar || !summary || !canvasArea || !studio) return false;
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const summaryRect = summary.getBoundingClientRect();
+      const canvasRect = canvasArea.getBoundingClientRect();
+      return toolbarRect.x === 0
+        && toolbarRect.y === 0
+        && toolbarRect.height === studio.getBoundingClientRect().height
+        && summaryRect.x >= toolbarRect.right - 1
+        && canvasRect.x >= toolbarRect.right - 1
+        && canvasRect.y >= summaryRect.bottom - 1;
+    })).toBe(true);
+
+    await page.setViewportSize({ width: 420, height: 903 });
+    await expect.poll(() => page.evaluate(() => {
+      const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
+      const summary = document.querySelector<HTMLElement>(".device-preview-output-summary");
+      const canvasArea = document.querySelector<HTMLElement>(".device-preview-canvas-area");
+      if (!toolbar || !summary || !canvasArea) return false;
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const summaryRect = summary.getBoundingClientRect();
+      const canvasRect = canvasArea.getBoundingClientRect();
+      return toolbarRect.x === 0
+        && toolbarRect.width === window.innerWidth
+        && summaryRect.y >= toolbarRect.bottom - 1
+        && canvasRect.y >= summaryRect.bottom - 1;
+    })).toBe(true);
   });
 
   test("makes chrome-free HD output an exact viewport canvas and restores chrome with Escape", async ({ page }) => {

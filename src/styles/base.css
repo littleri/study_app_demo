@@ -100,10 +100,12 @@ textarea:focus-visible {
   inset: 0 0 auto;
   display: none;
   height: var(--status-bar-height);
+  box-sizing: border-box;
+  grid-template-columns: 100px 100px;
   align-items: center;
   justify-content: space-between;
-  padding-inline: max(22px, var(--safe-area-left)) max(22px, var(--safe-area-right));
-  color: #182137;
+  padding: 21px max(24px, var(--safe-area-right)) 19px max(24px, var(--safe-area-left));
+  color: #000000;
   background: transparent;
   pointer-events: none;
 }
@@ -112,93 +114,93 @@ textarea:focus-visible {
   color: #ffffff;
 }
 
-.ios-status-bar__time,
+.ios-status-bar__time-group,
 .ios-status-bar__indicators {
   position: relative;
   z-index: 1;
+  width: 100px;
+  height: 22px;
+  box-sizing: border-box;
+}
+
+.ios-status-bar__time-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 1.5px;
 }
 
 .ios-status-bar__time {
-  min-width: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.28px;
+  width: 37px;
+  height: 22px;
+  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 17px;
+  font-weight: 590;
+  line-height: 22px;
+  letter-spacing: 0;
+  text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
 .ios-status-bar__indicators {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 7px;
-  min-width: 72px;
+  padding: 1px 1px 0 0;
 }
 
-.ios-status-bar__signal {
-  display: inline-flex;
-  width: 17px;
-  height: 14px;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.ios-status-bar__signal-bar {
+.ios-status-bar__cellular {
   display: block;
-  flex: 0 0 3px;
-  width: 3px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.ios-status-bar__signal-bar:nth-child(1) {
-  height: 4px;
-}
-
-.ios-status-bar__signal-bar:nth-child(2) {
-  height: 7px;
-}
-
-.ios-status-bar__signal-bar:nth-child(3) {
-  height: 10px;
-}
-
-.ios-status-bar__signal-bar:nth-child(4) {
-  height: 13px;
+  flex: 0 0 19.2px;
+  width: 19.2px;
+  height: 12.226px;
 }
 
 .ios-status-bar__wifi {
-  flex: 0 0 auto;
+  display: block;
+  flex: 0 0 17.142px;
+  width: 17.142px;
+  height: 12.328px;
 }
 
 .ios-status-bar__battery {
   position: relative;
-  display: inline-flex;
-  width: 24px;
+  display: block;
+  flex: 0 0 27.328px;
+  width: 27.328px;
   height: 13px;
-  align-items: center;
-  padding: 2px;
-  border: 1.7px solid currentColor;
-  border-radius: 4px;
 }
 
-.ios-status-bar__battery::after {
-  content: "";
+.ios-status-bar__battery-border {
   position: absolute;
-  top: 3px;
-  right: -4px;
-  width: 2px;
-  height: 5px;
-  border-radius: 0 2px 2px 0;
-  background: currentColor;
+  inset: 0 auto auto 0;
+  width: 25px;
+  height: 13px;
+  box-sizing: border-box;
+  border: 1px solid currentColor;
+  border-radius: 4.3px;
+  opacity: 0.35;
+}
+
+.ios-status-bar__battery-cap {
+  position: absolute;
+  top: 4.5px;
+  left: 26px;
+  display: block;
+  width: 1.328px;
+  height: 4.075px;
+  opacity: 0.4;
 }
 
 .ios-status-bar__battery-level {
+  position: absolute;
+  top: 2px;
+  left: 2px;
   display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 2px;
+  width: 21px;
+  height: 9px;
+  border-radius: 2.5px;
   background: currentColor;
 }
 

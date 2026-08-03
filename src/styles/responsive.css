@@ -18,7 +18,7 @@
   }
 
   .ios-status-bar {
-    display: flex;
+    display: grid;
   }
 
   .home-indicator {
