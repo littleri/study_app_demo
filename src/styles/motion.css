@@ -230,7 +230,7 @@
 
 .primary-nav .nav-item {
   transition-duration: var(--motion-duration-fast);
-  transition-property: color, box-shadow;
+  transition-property: color, background, box-shadow;
   transition-timing-function: var(--motion-ease-standard);
 }
 
@@ -241,7 +241,7 @@
 }
 
 .primary-nav .nav-item.active .nav-icon {
-  transform: scale(1.14);
+  transform: none;
 }
 
 .primary-nav .nav-item:active .nav-icon,
@@ -265,12 +265,22 @@
 }
 
 .nav-item[data-motion-active="true"][data-motion-nav-kind="upload"] .nav-icon-motion svg {
-  animation-name: motion-nav-active-in;
+  animation-name: motion-nav-upload-active-in;
 }
 
 @keyframes motion-nav-active-in {
   from {
     transform: scale(.94);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes motion-nav-upload-active-in {
+  from {
+    transform: scale(.98);
   }
 
   to {
@@ -1235,6 +1245,7 @@
     transition: none !important;
   }
 
+  .primary-nav .nav-item.active .nav-icon,
   .primary-nav .nav-item.active:active .nav-icon,
   .primary-nav .nav-item:active .nav-icon,
   .ai-orb {

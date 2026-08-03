@@ -224,7 +224,7 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
   ];
 
   return (
-    <nav className="primary-nav glass-nav" data-lg-variant="prominent" aria-label="主导航">
+    <nav className="primary-nav glass-nav" aria-label="主导航">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -239,7 +239,7 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
           >
             <span className="nav-icon">
               <span className="nav-icon-motion">
-                <Icon size={22} aria-hidden="true" />
+                <Icon size={item.screen === "upload" ? 26 : 22} aria-hidden="true" />
               </span>
             </span>
             <span>{item.label}</span>

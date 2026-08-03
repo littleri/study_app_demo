@@ -280,12 +280,43 @@ textarea:focus-visible {
   right: 16px;
   bottom: 16px;
   height: 48px;
-  border-radius: var(--glass-nav-radius);
+  border-radius: 24px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
   padding: 3px 8px;
-  overflow: hidden;
+  overflow: visible;
+  outline: 1px solid rgba(255, 255, 255, 0.36);
+  outline-offset: -2px;
+}
+
+.primary-nav::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.04) 36%, rgba(142, 214, 255, 0.1) 64%, rgba(255, 255, 255, 0.08)),
+    linear-gradient(90deg, rgba(95, 51, 225, 0.08), transparent 32%, rgba(0, 135, 255, 0.08) 64%, transparent);
+  opacity: 0.46;
+}
+
+.primary-nav::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0) 34%),
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2) 46%, transparent 64%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18);
+  opacity: 0.74;
 }
 
 .home-indicator {
@@ -319,8 +350,8 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid transparent;
-  border-radius: var(--glass-nav-item-radius);
+  border: 0;
+  border-radius: 0;
   color: #42516f;
   background: transparent;
   font-size: 12px;
@@ -357,8 +388,7 @@ textarea:focus-visible {
 .nav-item.active {
   color: var(--color-primary);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 0;
+  border: 0;
   box-shadow: none;
   transform: translateY(-14px);
   backdrop-filter: none;
@@ -379,23 +409,25 @@ textarea:focus-visible {
 }
 
 .nav-upload .nav-icon {
-  width: 32px;
-  height: 32px;
-  margin-top: 0;
-  color: inherit;
-  border-radius: 0;
+  width: 48px;
+  height: 48px;
+  margin-top: -18px;
+  color: var(--color-primary);
+  border-radius: 18px;
   display: grid;
   place-items: center;
-  background: transparent;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.06) 44%, rgba(146, 222, 255, 0.08)),
+    rgba(255, 255, 255, 0.14);
   border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  box-shadow: 0 10px 24px rgba(95, 51, 225, 0.08);
+  backdrop-filter: blur(12px) saturate(1.35);
+  -webkit-backdrop-filter: blur(12px) saturate(1.35);
 }
 
 .nav-upload .nav-icon svg {
-  width: 25px;
-  height: 25px;
+  width: 30px;
+  height: 30px;
 }
 
 .icon-button {
@@ -2366,7 +2398,8 @@ html {
   height: 62px;
   grid-template-columns: repeat(4, 1fr);
   padding: 5px 10px;
-  border-radius: var(--glass-nav-radius);
+  border-radius: 31px;
+  outline: 0;
 }
 
 .nav-item {
@@ -2377,7 +2410,6 @@ html {
   font-weight: 700;
   text-shadow: none;
   transform: none;
-  border-radius: var(--glass-nav-item-radius);
 }
 
 .nav-icon {
@@ -2399,42 +2431,30 @@ html {
 
 .nav-item.active {
   color: #1b6dff;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.primary-nav .nav-item:active {
-  background: var(--glass-nav-press);
-  border-color: var(--glass-nav-press-border);
-  border-radius: var(--glass-nav-item-radius);
 }
 
 .nav-item.active .nav-icon,
 .nav-item.active:active .nav-icon {
-  transform: scale(1.14);
+  transform: none;
 }
 
 .nav-upload .nav-icon {
-  width: 28px;
-  height: 28px;
-  margin-top: 0;
-  border-radius: 0;
-  color: inherit;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  width: 66px;
+  height: 66px;
+  margin-top: -28px;
+  border-radius: 50%;
+  color: #ffffff;
+  background: var(--gradient-primary-strong);
+  box-shadow: 0 18px 34px rgba(124, 112, 255, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.62);
 }
 
 .nav-upload .nav-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 31px;
+  height: 31px;
 }
 
 .nav-upload span:last-child {
-  margin-top: 0;
+  margin-top: -3px;
 }
 
 .button {
