@@ -22,7 +22,7 @@ export const demoBook = {
   pages: 125,
   fileSize: "38.8 MB",
   chapterCount: 7,
-  sectionCount: 20,
+  sectionCount: 19,
   knowledgePointCount: 96,
   progress: 18,
   mastery: 68,

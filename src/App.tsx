@@ -19,7 +19,7 @@ import {
 import { useReducedMotion } from "./motion/useReducedMotion";
 import {
   AssignmentScreen,
-  BookCourseScreen,
+  BookSwitcherSheetContent,
   ChapterConfirmScreen,
   ChatSheetContent,
   CommunityBookScreen,
@@ -42,6 +42,7 @@ import {
   ProfileScreen,
   SourceReaderScreen,
   SourceSheetContent,
+  StudyScreen,
   StudyPlanScreen,
   UploadScreen
 } from "./screens";
@@ -59,7 +60,20 @@ import type {
   ScanResult,
   StudyPlan
 } from "./types/api";
-import type { Screen, SheetState, SourcePageTarget, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
+import type { Screen, SheetState, SourcePageTarget, StudyLocation, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
+
+const studyLocationsStorageKey = "bookcourse.study-locations.v1";
+
+function loadStudyLocations(): Record<string, StudyLocation> {
+  try {
+    const stored = window.localStorage.getItem(studyLocationsStorageKey);
+    if (!stored) return {};
+    const parsed = JSON.parse(stored) as Record<string, StudyLocation>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 
 const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
   home: {},
@@ -72,7 +86,8 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   community: { title: "社区", subtitle: "发现同学共享的 AI 课程" },
   communityBook: { title: "共享课程", subtitle: "导入后加入你的书库", back: true },
   communityImport: { title: "导入成功", subtitle: "已生成可学习内容", back: true },
-  book: { title: "课程主页", subtitle: "生物 必修 2", back: true },
+  study: {},
+  book: {},
   plan: { title: "学习计划", subtitle: "科学规划，高效学习", back: true, hideNav: true },
   flashcards: { title: "知识点闪卡", subtitle: "背诵本节概念与错题卡点", back: true, hideNav: true },
   lesson: { title: "章节学习", subtitle: "第 2 章 1 节", back: true, hideNav: true },
@@ -107,6 +122,8 @@ function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
           ? { ...sheet.evidence, reasons: [...sheet.evidence.reasons] }
           : undefined
       };
+    case "bookSwitcher":
+      return { type: "bookSwitcher" };
   }
 }
 
@@ -133,6 +150,7 @@ export default function App() {
   const [courseSummariesReadyKind, setCourseSummariesReadyKind] = useState<CourseSummariesReadyKind>("empty");
   const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
   const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
+  const [courseSelectionLoadingId, setCourseSelectionLoadingId] = useState<string | null>(null);
   const courseSummariesRef = useRef<CourseSummary[]>([]);
   courseSummariesRef.current = courseSummaries;
   const [parsedScanResult, setParsedScanResult] = useState<ScanResult | null>(null);
@@ -150,6 +168,9 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [savedNoteCount, setSavedNoteCount] = useState(6);
   const [sourcePageTarget, setSourcePageTarget] = useState<SourcePageTarget | null>(null);
+  const [studyLocations, setStudyLocations] = useState<Record<string, StudyLocation>>(loadStudyLocations);
+  const studyLocationsRef = useRef(studyLocations);
+  studyLocationsRef.current = studyLocations;
   const completedParseJobRef = useRef<string | null>(null);
 
   const commitNavigation = useCallback((resolve: (current: NavigationSnapshot) => NavigationSnapshot) => {
@@ -296,6 +317,72 @@ export default function App() {
     }
   }, []);
 
+  const updateStudyLocation = useCallback((bookId: string, location: Partial<StudyLocation>) => {
+    setStudyLocations((current) => ({
+      ...current,
+      [bookId]: {
+        expandedChapterId: current[bookId]?.expandedChapterId ?? null,
+        expandedSectionId: current[bookId]?.expandedSectionId ?? null,
+        ...location
+      }
+    }));
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(studyLocationsStorageKey, JSON.stringify(studyLocations));
+    } catch {
+      // Study position persistence is a convenience; an unavailable storage
+      // backend must never block the learning flow.
+    }
+  }, [studyLocations]);
+
+  const selectCourse = useCallback(async (bookId: string) => {
+    if (uploadedFile?.bookId === bookId && parsedChapters?.length) return true;
+    setCourseSelectionLoadingId(bookId);
+    try {
+      const summary = courseSummariesRef.current.find((course) => course.book_id === bookId);
+      const [scan, chapters, chunks, assets, plan, lessons, cards, quizzes] = await Promise.all([
+        bookcourseApi.getScanResult(bookId),
+        bookcourseApi.getChapters(bookId),
+        bookcourseApi.getChunks(bookId),
+        bookcourseApi.getAssets(bookId),
+        bookcourseApi.getStudyPlan(bookId, runtimeConfig.defaultUserId),
+        bookcourseApi.getLessons(bookId),
+        bookcourseApi.getFlashcards(bookId),
+        bookcourseApi.getQuizzes(bookId)
+      ]);
+      const storedLocation = studyLocationsRef.current[bookId];
+      const chapterIds = new Set(chapters.map((chapter) => chapter.chapter_id));
+      const activeId = storedLocation?.expandedSectionId && chapterIds.has(storedLocation.expandedSectionId)
+        ? storedLocation.expandedSectionId
+        : lessons[0]?.chapter_id ?? chapters.find((chapter) => chapter.level > 1)?.chapter_id ?? chapters[0]?.chapter_id ?? null;
+      setUploadedFile({
+        bookId,
+        name: scan.filename || summary?.title || "已选择教材",
+        sizeBytes: 0,
+        contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type,
+        uploadedAt: Date.now()
+      });
+      setParsedScanResult(scan);
+      setParsedChapters(chapters);
+      setParsedChunks(chunks);
+      setParsedAssets(assets);
+      setCurrentStudyPlan(plan);
+      setGeneratedLessons(lessons);
+      setGeneratedFlashcards(cards);
+      setGeneratedQuizzes(quizzes);
+      setActiveChapterId(activeId);
+      setLatestDiagnosis(null);
+      return true;
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "课程数据加载失败", "warning");
+      return false;
+    } finally {
+      setCourseSelectionLoadingId(null);
+    }
+  }, [parsedChapters, showToast, uploadedFile]);
+
   useEffect(() => {
     void refreshCourses();
   }, [refreshCourses]);
@@ -412,6 +499,8 @@ export default function App() {
       openSheet,
       closeSheet,
       showToast,
+      selectCourse,
+      updateStudyLocation,
       selectedUpload,
       setSelectedUpload,
       uploadedFile,
@@ -425,6 +514,7 @@ export default function App() {
       courseSummariesReadyKind,
       courseSummariesError,
       courseSummariesRefreshing,
+      courseSelectionLoadingId,
       refreshCourses,
       parsedScanResult,
       setParsedScanResult,
@@ -454,7 +544,8 @@ export default function App() {
       setAnswer,
       savedNoteCount,
       setSavedNoteCount,
-      sourcePageTarget
+      sourcePageTarget,
+      studyLocations
     }),
     [
       activeChapterId,
@@ -473,6 +564,7 @@ export default function App() {
       courseSummariesLoadState,
       courseSummariesReadyKind,
       courseSummariesRefreshing,
+      courseSelectionLoadingId,
       generatedFlashcards,
       generatedLessons,
       generatedQuizzes,
@@ -485,8 +577,11 @@ export default function App() {
       refreshCourses,
       savedNoteCount,
       selectedUpload,
+      selectCourse,
       showToast,
       sourcePageTarget,
+      studyLocations,
+      updateStudyLocation,
       uploadedFile
     ]
   );
@@ -532,6 +627,15 @@ export default function App() {
             showToast={showToast}
           />
         )
+      };
+    }
+
+    if (sheet.type === "bookSwitcher") {
+      return {
+        key: "bookSwitcher",
+        sheet,
+        title: "切换教材",
+        content: <BookSwitcherSheetContent />
       };
     }
 
@@ -612,8 +716,10 @@ export default function App() {
         return <CommunityBookScreen />;
       case "communityImport":
         return <CommunityImportScreen />;
+      case "study":
+        return <StudyScreen />;
       case "book":
-        return <BookCourseScreen />;
+        return <StudyScreen />;
       case "plan":
         return <StudyPlanScreen />;
       case "flashcards":

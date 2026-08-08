@@ -7,7 +7,6 @@ import {
   Settings,
   Upload
 } from "lucide-react";
-import { runtimeConfig } from "../config/runtime";
 import {
   Button,
   Card,
@@ -55,6 +54,7 @@ export function LibraryScreen() {
     parseJobId,
     parseJobStatus,
     refreshCourses,
+    selectCourse,
     setActiveChapterId,
     setCurrentStudyPlan,
     setLatestDiagnosis,
@@ -189,44 +189,18 @@ export function LibraryScreen() {
     showToast("解析任务仍在后台运行，请刷新课程列表后重试", "warning");
   }
 
-  async function openCourse(course: CourseCardModel, target: "book" | "chapterConfirm" = "book") {
+  async function openCourse(course: CourseCardModel, target: "study" | "chapterConfirm" = "study") {
     if (course.status === "processing" || course.status === "uploaded" || course.status === "error") {
       openProgress(course);
       return;
     }
     setOpeningBookId(course.bookId);
     try {
-      const [scan, chapters, chunks, assets, plan, lessons, cards, quizzes] = await Promise.all([
-        bookcourseApi.getScanResult(course.bookId),
-        bookcourseApi.getChapters(course.bookId),
-        bookcourseApi.getChunks(course.bookId),
-        bookcourseApi.getAssets(course.bookId),
-        bookcourseApi.getStudyPlan(course.bookId, runtimeConfig.defaultUserId),
-        bookcourseApi.getLessons(course.bookId),
-        bookcourseApi.getFlashcards(course.bookId),
-        bookcourseApi.getQuizzes(course.bookId)
-      ]);
-      setUploadedFile({
-        bookId: course.bookId,
-        name: scan.filename || course.title,
-        sizeBytes: 0,
-        contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type,
-        uploadedAt: Date.now()
-      });
-      setParsedScanResult(scan);
-      setParsedChapters(chapters);
-      setParsedChunks(chunks);
-      setParsedAssets(assets);
-      setCurrentStudyPlan(plan);
-      setGeneratedLessons(lessons);
-      setGeneratedFlashcards(cards);
-      setGeneratedQuizzes(quizzes);
-      setActiveChapterId(lessons[0]?.chapter_id ?? chapters[0]?.chapter_id ?? null);
+      const opened = await selectCourse(course.bookId);
+      if (!opened) return;
       setEditingBookId(null);
       setConfirmingDeleteBookId(null);
       go(target);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "课程数据加载失败", "warning");
     } finally {
       setOpeningBookId(null);
     }
@@ -345,7 +319,7 @@ export function LibraryScreen() {
             <div className="button-row">
               <Button
                 loading={openingBookId === course.bookId}
-                onClick={() => void openCourse(course, needsReview ? "chapterConfirm" : "book")}
+                onClick={() => void openCourse(course, needsReview ? "chapterConfirm" : "study")}
               >
                 {actionLabel}
               </Button>

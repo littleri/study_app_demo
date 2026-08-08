@@ -208,6 +208,8 @@ body {
 }
 
 .ai-overlay-layer {
+  --ai-dialog-enter-duration: 380ms;
+  --ai-dialog-exit-duration: 280ms;
   position: absolute;
   z-index: 45;
   inset: 0;
@@ -274,10 +276,18 @@ body {
 .ai-dialog-scroll {
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   display: grid;
   align-content: start;
   gap: 12px;
   padding-right: 2px;
+}
+
+.ai-dialog-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .ai-message-list {
@@ -324,6 +334,23 @@ body {
   min-width: var(--ai-action-target-min);
   height: var(--ai-action-target-min);
   min-height: var(--ai-action-target-min);
+}
+
+/* The phone assistant is a bottom-anchored conversation surface. The sheet
+   itself reaches the visible viewport edge; the safe area is reserved inside
+   the surface so the composer stays clear of the home indicator. */
+@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+  .ai-overlay {
+    top: auto;
+    right: calc(var(--safe-area-right) + 8px);
+    bottom: var(--overlay-visual-bottom);
+    left: calc(var(--safe-area-left) + 8px);
+    width: auto;
+    height: min(80dvh, 700px);
+    max-height: calc(var(--overlay-visual-height) - var(--safe-area-top) - 12px);
+    border-radius: 28px 28px 0 0;
+    padding: 14px 14px calc(14px + var(--safe-area-bottom));
+  }
 }
 
 .sheet-close {
@@ -405,6 +432,11 @@ body {
 }
 
 @media (min-width: 768px) and (min-height: 600px) {
+  .ai-overlay-layer {
+    --ai-dialog-enter-duration: 340ms;
+    --ai-dialog-exit-duration: 250ms;
+  }
+
   .ai-overlay {
     top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--space-layout));
     right: calc(var(--safe-area-right) + var(--space-inline));
@@ -459,6 +491,13 @@ body {
     left: auto;
     width: min(340px, calc(100% - var(--safe-area-left) - var(--safe-area-right) - var(--nav-rail-width) - var(--space-layout) - var(--space-layout) - var(--space-inline)));
     margin: 0;
+  }
+}
+
+@media (max-height: 599px) and (orientation: landscape) {
+  .ai-overlay-layer {
+    --ai-dialog-enter-duration: 240ms;
+    --ai-dialog-exit-duration: 180ms;
   }
 }
 

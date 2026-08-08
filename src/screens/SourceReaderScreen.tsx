@@ -49,11 +49,16 @@ export function SourceReaderScreen() {
   const maxPage = Math.max(pageCount ?? targetEnd, targetEnd, 1);
   const displayTitle = sourcePageTarget?.title ?? uploadedFile?.name ?? "教材原文";
   const exactLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === targetStart);
-  const displayRange = targetStart === targetEnd && typeof exactLocation?.label === "string"
+  const sourceRange = targetStart === targetEnd && typeof exactLocation?.label === "string"
     ? exactLocation.label
     : sourceUnit === "page"
       ? sourcePageLabel(targetStart, targetEnd)
       : `${unitName} ${targetStart}${targetEnd !== targetStart ? `-${targetEnd}` : ""}`;
+  const printedStart = sourcePageTarget?.printedPageStart;
+  const printedEnd = sourcePageTarget?.printedPageEnd ?? printedStart;
+  const displayRange = typeof printedStart === "number"
+    ? `教材${sourcePageLabel(printedStart, typeof printedEnd === "number" ? printedEnd : printedStart)}（PDF ${sourcePageLabel(targetStart, targetEnd)}）`
+    : sourceRange;
   const isOnTargetRange = currentPage >= targetStart && currentPage <= targetEnd;
 
   if (!bookId) {

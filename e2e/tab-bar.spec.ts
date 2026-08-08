@@ -53,7 +53,7 @@ test.describe("four-item sliding tab bar", () => {
       };
     });
 
-    expect(presentation.labels).toEqual(["首页", "社区", "上传", "我的"]);
+    expect(presentation.labels).toEqual(["首页", "社区", "学习", "我的"]);
     expect(Math.max(...presentation.widths) - Math.min(...presentation.widths)).toBeLessThan(1);
     expect(presentation.activeColor).toBe("rgb(255, 255, 255)");
     expect(presentation.inactiveColors).toEqual([
@@ -76,16 +76,16 @@ test.describe("four-item sliding tab bar", () => {
     }
   });
 
-  test("moves the capsule from 首页 to 社区 before settling on the active item", async ({ page }) => {
+  test("moves the capsule from 首页 to 社区 without overshooting the active item", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     const navigation = page.getByRole("navigation", { name: "主导航" });
     const before = await readSelectionGeometry(navigation);
 
     await page.getByRole("button", { name: "社区", exact: true }).click();
     const immediate = await readSelectionGeometry(navigation);
-    await page.waitForTimeout(100);
-    const overshoot = await readSelectionGeometry(navigation);
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(80);
+    const midpoint = await readSelectionGeometry(navigation);
+    await page.waitForTimeout(240);
     const settled = await readSelectionGeometry(navigation);
 
     const axis = before.horizontal ? "x" : "y";
@@ -93,7 +93,8 @@ test.describe("four-item sliding tab bar", () => {
     const destination = immediate.active[axis];
     expect(Math.abs(immediate.selection[axis] - destination)).toBeGreaterThan(1);
     const direction = Math.sign(destination - start);
-    expect((overshoot.selection[axis] - destination) * direction).toBeGreaterThan(1);
+    expect((midpoint.selection[axis] - start) * direction).toBeGreaterThan(0);
+    expect((destination - midpoint.selection[axis]) * direction).toBeGreaterThanOrEqual(0);
     expect(Math.abs(settled.selection[axis] - settled.active[axis])).toBeLessThan(1);
     await expect(page.getByRole("button", { name: "社区", exact: true })).toHaveAttribute("aria-current", "page");
   });

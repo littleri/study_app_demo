@@ -11,6 +11,7 @@ export type Screen =
   | "community"
   | "communityBook"
   | "communityImport"
+  | "study"
   | "book"
   | "plan"
   | "flashcards"
@@ -29,6 +30,7 @@ export type SheetState =
   | { type: "source"; title: string; image: string; page: string }
   | { type: "note"; concept: string }
   | { type: "editChapter"; chapterId: string; evidence?: ChapterEvidence }
+  | { type: "bookSwitcher" }
   | null;
 
 export type ToastTone = "success" | "info" | "warning";
@@ -52,7 +54,14 @@ export type SourcePageTarget = {
   title: string;
   pageStart: number;
   pageEnd?: number | null;
+  printedPageStart?: number | null;
+  printedPageEnd?: number | null;
   from?: Screen | null;
+};
+
+export type StudyLocation = {
+  expandedChapterId: string | null;
+  expandedSectionId: string | null;
 };
 
 export type ChapterStatus = "匹配良好" | "需检查";
@@ -76,4 +85,6 @@ export type AppActions = {
   openSheet: (sheet: SheetState) => void;
   closeSheet: () => void;
   showToast: (text: string, tone?: ToastTone) => void;
+  selectCourse: (bookId: string) => Promise<boolean>;
+  updateStudyLocation: (bookId: string, location: Partial<StudyLocation>) => void;
 };

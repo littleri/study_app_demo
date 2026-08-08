@@ -64,7 +64,9 @@ export function HomeScreen() {
       ? progressTarget
       : courseStatus === "uploaded" && uploadedFile
         ? "parseReady"
-        : "library";
+        : isReady
+          ? "study"
+          : "library";
   const primaryLabel = !hasLiveCourse
     ? "上传第一本教材"
     : isProcessing
@@ -148,7 +150,7 @@ export function HomeScreen() {
       label: "建立知识库",
       detail: isReady ? "可提问" : needsReview ? "待确认" : "未开始",
       state: thirdStepState,
-      target: isReady ? "book" : primaryTarget
+      target: isReady ? "study" : primaryTarget
     }
   ];
 

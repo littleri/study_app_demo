@@ -634,7 +634,7 @@ async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixtu
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
   await page.goto("/?embedded=device-preview");
-  await page.locator(".nav-upload").click();
+  await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
 }
 
@@ -875,7 +875,7 @@ test.describe("responsive smoke", () => {
       expect(Math.round(shellBounds.left), "1210px touch viewport is flush with the viewport edge").toBe(0);
     }
 
-    await page.getByRole("button", { name: "上传", exact: true }).click();
+    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
     await expect(uploadHeading, `${project.name}: app remains interactive after resize`).toBeVisible();
 
     await page.setViewportSize(project.initialViewport);
@@ -990,7 +990,8 @@ test.describe("responsive smoke", () => {
     expect(railSafeArea.contentPaddingLeft, "tablet content reserves the rail and left safe area").toBeGreaterThanOrEqual(99);
     expect(railSafeArea.contentPaddingRight, "tablet content avoids the right safe area").toBeGreaterThanOrEqual(13);
 
-    await page.getByRole("button", { name: "上传", exact: true }).click();
+    await page.getByRole("button", { name: "首页", exact: true }).click();
+    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
     await expect(page.getByRole("navigation", { name: "主导航" }), "hideNav removes primary navigation").toHaveCount(0);
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expectNavigationMode(page, { width: 834, height: 1194 }, `${project.name}: navigation returns after hideNav`);
@@ -2039,6 +2040,47 @@ test.describe("responsive smoke", () => {
       await expect(orb, `${project.name}: ${viewport.width}x${viewport.height} orb is available`).toBeVisible();
       await orb.click();
       await expectAiDialogButtonTargets(page, `${project.name}: ${viewport.width}x${viewport.height}`);
+      if (viewport.width < 768 && viewport.height >= 600 && viewport.height > viewport.width) {
+        const geometry = await page.locator(".ai-overlay").evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const scrollRegion = element.querySelector<HTMLElement>(".ai-dialog-scroll");
+          if (!scrollRegion) throw new Error("The AI dialog scroll region is missing.");
+          const scrollStyle = getComputedStyle(scrollRegion);
+          const webkitScrollbarStyle = getComputedStyle(scrollRegion, "::-webkit-scrollbar");
+          return {
+            bottomGap: window.innerHeight - bounds.bottom,
+            height: bounds.height,
+            left: bounds.left,
+            overflowY: scrollStyle.overflowY,
+            rightGap: window.innerWidth - bounds.right,
+            scrollbarWidth: scrollStyle.scrollbarWidth,
+            webkitScrollbarDisplay: webkitScrollbarStyle.display,
+            webkitScrollbarWidth: webkitScrollbarStyle.width
+          };
+        });
+        expect(geometry.left, `${project.name}: phone AI sheet keeps the compact left gutter`).toBeCloseTo(8, 1);
+        expect(geometry.rightGap, `${project.name}: phone AI sheet keeps the compact right gutter`).toBeCloseTo(8, 1);
+        expect(geometry.bottomGap, `${project.name}: phone AI sheet reaches the viewport bottom`).toBeCloseTo(0, 1);
+        expect(geometry.height, `${project.name}: phone AI sheet uses the expanded 80vh proportion`).toBeCloseTo(
+          Math.min(viewport.height * 0.8, 700),
+          1
+        );
+        expect(geometry.overflowY, `${project.name}: AI content remains vertically scrollable`).toBe("auto");
+        expect(geometry.scrollbarWidth, `${project.name}: Firefox-style scrollbar chrome is hidden`).toBe("none");
+        expect(geometry.webkitScrollbarDisplay, `${project.name}: WebKit scrollbar chrome is hidden`).toBe("none");
+        expect(geometry.webkitScrollbarWidth, `${project.name}: hidden WebKit scrollbar consumes no width`).toBe("0px");
+        const scrollState = await page.locator(".ai-dialog-scroll").evaluate((scrollRegion) => {
+          const maxScrollTop = scrollRegion.scrollHeight - scrollRegion.clientHeight;
+          scrollRegion.scrollTop = Math.min(40, maxScrollTop);
+          return {
+            clientHeight: scrollRegion.clientHeight,
+            scrollHeight: scrollRegion.scrollHeight,
+            scrollTop: scrollRegion.scrollTop
+          };
+        });
+        expect(scrollState.scrollHeight, `${project.name}: AI content still has a real scroll range`).toBeGreaterThan(scrollState.clientHeight);
+        expect(scrollState.scrollTop, `${project.name}: hidden scrollbar does not disable scrolling`).toBeGreaterThan(0);
+      }
       await page.locator(".ai-close").click();
       await expect(orb, `${project.name}: ${viewport.width}x${viewport.height} orb returns after close`).toBeVisible();
     }

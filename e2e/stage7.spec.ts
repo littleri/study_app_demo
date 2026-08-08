@@ -289,7 +289,7 @@ async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixtu
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
   await page.goto("/?embedded=device-preview");
-  await page.locator(".nav-upload").click();
+  await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }

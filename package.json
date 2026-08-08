@@ -16,6 +16,7 @@
     "test:responsive": "playwright test e2e/responsive.spec.ts",
     "demo:validate": "node scripts/validate-fixtures.mjs",
     "demo:content": "node scripts/build-demo-content.mjs",
+    "demo:directory": "node scripts/sync-demo-directory.mjs",
     "demo:mineru": "node scripts/ingest-pdf.mjs"
   },
   "dependencies": {

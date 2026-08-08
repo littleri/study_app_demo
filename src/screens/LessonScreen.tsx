@@ -352,7 +352,7 @@ export function LessonScreen() {
         <Button variant="secondary" icon={<ClipboardCheck size={18} aria-hidden="true" />} onClick={() => go("assignment")}>做练习</Button>
         </div>
         <div className="lesson-bottom-actions">
-        <Button variant="secondary" onClick={() => go("book")}>回课程主页</Button>
+        <Button variant="secondary" onClick={() => go("study")}>返回学习目录</Button>
         <Button icon={<CheckCircle2 size={18} aria-hidden="true" />} onClick={() => go("report")}>完成章节</Button>
         </div>
       </aside>
