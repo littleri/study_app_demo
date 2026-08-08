@@ -1,81 +1,100 @@
 :root {
   color-scheme: light;
-  --color-primary: #7f74ff;
-  --color-primary-pressed: #6458f4;
-  --color-primary-soft: #eceaff;
-  --color-primary-light: #a6d8ff;
-  --color-bg: #f8fcff;
-  --color-bg-wash: #edf5ff;
+
+  /* P2 foundation — neutral reading surfaces with the navigation purple as the shared accent. */
+  --color-primary: #7c3aed;
+  --color-primary-pressed: #5b21b6;
+  --color-primary-soft: #f3e8ff;
+  --color-primary-light: #ddd6fe;
+  --color-on-primary: #ffffff;
+  --color-bg: #f6f8fb;
+  --color-bg-wash: #eef2f7;
   --color-surface: #ffffff;
-  --color-surface-soft: #f3f8ff;
+  --color-surface-soft: #f3f6fb;
+  --color-surface-tint: #edf1f7;
   --color-text: #20263a;
-  --color-text-muted: #73819b;
-  --color-border: #dce8f8;
-  --color-chip-bg: #eef5ff;
-  --color-info: #1887ff;
-  --color-info-soft: #e7f4ff;
-  --color-warning: #ff914d;
-  --color-warning-soft: #fff0df;
-  --color-danger: #ff6b88;
-  --color-danger-soft: #ffeaf0;
-  --color-orange: #ff9a3c;
-  --color-orange-soft: #fff2df;
-  --color-yellow: #ffd66b;
+  --color-text-secondary: #4f5e75;
+  --color-text-muted: #596780;
+  --color-text-placeholder: #596780;
+  --color-border: #d7dee8;
+  --color-border-strong: #b8c3d2;
+  --color-chip-bg: #edf1f7;
+  --color-info: #176caa;
+  --color-info-soft: #e7f2fb;
+  --color-warning: #985014;
+  --color-warning-soft: #fff1e3;
+  --color-danger: #b4233c;
+  --color-danger-soft: #fff0f2;
+  --color-orange: #985014;
+  --color-orange-soft: #fff1e3;
+  --color-yellow: #8a6214;
   --color-yellow-soft: #fff7dd;
-  --color-mint: #62dcb5;
-  --color-sky: #8fd0ff;
+  --color-mint: #1e765d;
+  --color-sky: #176caa;
   --color-white: #ffffff;
-  --app-bg-image: url("/assets/brand/cloud-mascot-success.png");
+  --color-focus: #5b21b6;
+
+  /* Legacy aliases stay intentionally quiet so existing page JSX migrates safely. */
+  --macaron-lemon: var(--color-surface);
+  --macaron-rose: var(--color-surface);
+  --macaron-sky: var(--color-surface);
+  --macaron-mint: var(--color-surface);
+  --macaron-peach: var(--color-surface);
+  --macaron-lilac: var(--color-primary);
+  --macaron-lavender: var(--color-surface);
+  --macaron-aqua: var(--color-surface);
+  --surface-tint: var(--color-surface);
+
+  /* C is reserved for explicit brand moments; it is never the page background. */
+  --app-bg-image: none;
   --brand-cloud-home: url("/assets/brand/cloud-mascot-home.png");
   --brand-daily-task-cloud: url("/assets/brand/daily-task-cloud-bg.png");
   --brand-cloud-parsing: url("/assets/brand/cloud-mascot-parsing.png");
   --brand-cloud-success: url("/assets/brand/cloud-mascot-success.png");
   --brand-cloud-report: url("/assets/brand/cloud-mascot-report.png");
-  --brand-community-hero: url("/assets/brand/community-hero-bg.png");
-  --gradient-primary: linear-gradient(100deg, #8f79ff 0%, #7bbcff 100%);
-  --gradient-primary-strong: linear-gradient(112deg, #947cff 0%, #72bffc 58%, #aee5ff 100%);
-  --gradient-cloud: radial-gradient(circle at 78% 18%, rgba(200, 223, 255, 0.92), transparent 34%),
-    radial-gradient(circle at 8% 28%, rgba(255, 255, 255, 0.94), transparent 31%),
-    linear-gradient(160deg, #fafdff 0%, #eef6ff 58%, #eaf2ff 100%);
-  --glass-surface: rgba(255, 255, 255, 0.78);
-  --glass-surface-strong: rgba(255, 255, 255, 0.92);
-  --glass-surface-subtle: rgba(255, 255, 255, 0.58);
-  --glass-border: rgba(255, 255, 255, 0.86);
-  --glass-border-tint: rgba(126, 151, 255, 0.22);
-  --glass-highlight: rgba(255, 255, 255, 0.94);
-  --glass-tint-primary: rgba(140, 121, 255, 0.16);
-  --glass-tint-primary-strong: rgba(140, 121, 255, 0.34);
-  --glass-shadow: 0 22px 50px rgba(88, 111, 160, 0.18);
-  --glass-shadow-soft: 0 12px 30px rgba(88, 111, 160, 0.12);
-  /* Navigation-specific Liquid Glass tokens. Keep the tab bar as one glass
-     surface; item tokens are only for interaction and selection states. */
-  --glass-nav-surface: rgba(184, 216, 255, 0.24);
-  --glass-nav-surface-opaque: rgba(245, 250, 255, 0.98);
+  --brand-community-hero: none;
+
+  /* Keep old declaration sites solid while the card system is migrated. */
+  --gradient-primary: var(--color-primary);
+  --gradient-primary-strong: var(--color-primary);
+  --gradient-cloud: var(--color-surface);
+  --glass-surface: var(--color-surface);
+  --glass-surface-strong: var(--color-surface);
+  --glass-surface-subtle: var(--color-surface-soft);
+  --glass-border: var(--color-border);
+  --glass-border-tint: var(--color-border);
+  --glass-highlight: transparent;
+  --glass-tint-primary: transparent;
+  --glass-tint-primary-strong: transparent;
+  --glass-shadow: 0 4px 8px rgba(32, 38, 58, 0.14);
+  --glass-shadow-soft: 0 2px 6px rgba(32, 38, 58, 0.1);
+  --glass-nav-surface: #ffffff;
+  --glass-nav-surface-opaque: #ffffff;
   --glass-nav-border: rgba(255, 255, 255, 0.48);
   --glass-nav-border-strong: rgba(255, 255, 255, 0.78);
   --glass-nav-highlight: rgba(255, 255, 255, 0.62);
   --glass-nav-press: rgba(255, 255, 255, 0.12);
   --glass-nav-press-border: rgba(255, 255, 255, 0.3);
-  --glass-nav-selection: transparent;
-  --glass-nav-selection-border: transparent;
-  --glass-nav-selection-shadow: none;
+  --glass-nav-selection: var(--color-primary);
+  --glass-nav-selection-border: rgba(255, 255, 255, 0.34);
+  --glass-nav-selection-shadow: 0 10px 24px rgba(91, 33, 182, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.38);
   --glass-nav-shadow: 0 14px 32px rgba(54, 78, 126, 0.12), 0 4px 12px rgba(54, 78, 126, 0.06);
   --glass-nav-shadow-opaque: 0 12px 26px rgba(54, 78, 126, 0.14);
   --glass-nav-blur: 24px;
   --glass-nav-saturate: 1.8;
-  --glass-nav-radius: 32px;
-  --glass-nav-item-radius: 18px;
-  --glass-nav-focus: rgba(95, 51, 225, 0.58);
-  --card-shadow: 0 10px 28px rgba(82, 105, 153, 0.12);
-  --card-border: 1px solid rgba(214, 228, 245, 0.86);
-  --glass-blur: 20px;
-  --glass-blur-strong: 26px;
-  --glass-saturate: 1.42;
-  --scrim-modal: rgba(32, 38, 58, 0.34);
+  --glass-nav-radius: 999px;
+  --glass-nav-item-radius: 999px;
+  --glass-nav-focus: rgba(124, 58, 237, 0.58);
+  --card-shadow: none;
+  --shadow-card: none;
+  --card-border: 1px solid var(--color-border);
+  --glass-blur: 0px;
+  --glass-blur-strong: 0px;
+  --glass-saturate: 1;
+  --scrim-modal: rgba(32, 38, 58, 0.46);
+
   --font-app: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Lexend Deca", -apple-system,
     BlinkMacSystemFont, sans-serif;
-  /* iOS logical layout zones: the real device inset can still take precedence. */
-  /* Matches the 402 × 62 iPhone status-bar reference in education1. */
   --ios-status-bar-height: 62px;
   --ios-home-indicator-height: 34px;
   --status-bar-height: 0px;
@@ -91,10 +110,11 @@
   --space-inline: clamp(16px, 4vw, 32px);
   --space-layout: clamp(12px, 2.5vw, 28px);
   --touch-target-min: 44px;
+  --touch-target-primary: 48px;
   --sheet-max-width: 402px;
-  --radius-card: 20px;
-  --radius-large: 26px;
-  --radius-glass: 30px;
+  --radius-card: 14px;
+  --radius-large: 16px;
+  --radius-glass: 16px;
   --motion-duration-press: 90ms;
   --motion-duration-fast: 140ms;
   --motion-duration-base: 180ms;

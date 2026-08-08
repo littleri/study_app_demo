@@ -153,7 +153,7 @@ export function ProcessingScreen() {
   return (
     <div className="screen-stack processing-flow-screen">
       <div className="processing-flow-primary">
-        <Card className="processing-card">
+        <Card surface="celebration" className="processing-card">
           <WandSparkles size={32} aria-hidden="true" />
           <h2>正在构建 RAG 知识库</h2>
           <p>{uploadedFile?.name ?? "后端解析任务"}</p>

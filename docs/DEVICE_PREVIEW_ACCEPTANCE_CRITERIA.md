@@ -19,11 +19,11 @@
 
 ### AC-01 入口与递归保护（P0）
 
-- `/` 渲染普通应用，不出现预览工具栏。
-- `/?preview=devices` 渲染设备预览工作台。
+- `/` 渲染设备预览工作台，并且只创建一个 iframe。
+- 公开 URL 不依赖 `preview=devices`；旧参数会从工作台 URL 中清理。
 - 工作台 iframe 的地址固定为 `/?embedded=device-preview`。
 - `/?embedded=device-preview` 渲染普通应用内容，不嵌套工作台。
-- 同时存在两个参数时以 embedded 应用为准，页面不会递归创建 iframe。
+- embedded 内部入口始终以应用内容为准，页面不会递归创建 iframe。
 - 非法设备、方向或质量参数安全回退至默认值，不白屏、不抛出未捕获错误。
 
 ### AC-02 精确逻辑视口（P1）
@@ -167,7 +167,7 @@ npm run test:state-motion
 
 ### E2E 最低覆盖
 
-- 普通 `/` 无工作台。
+- 公开 `/` 直接进入工作台。
 - 工作台无递归 iframe。
 - 四种逻辑视口的内层尺寸。
 - 切换前后 iframe identity、加载计数和页面状态。
@@ -187,7 +187,7 @@ npm run test:state-motion
 - URL 更新不会污染浏览器历史栈。
 - TypeScript 无 `any` 逃逸；导出类型与函数职责清晰。
 - CSS 使用项目 token，控制栏有窄屏和 reduced-motion 处理。
-- 普通入口的现有 E2E selector 和可访问性语义未被无理由破坏。
+- 内部 embedded 应用的现有 E2E selector 和可访问性语义未被无理由破坏。
 - 对复杂尺寸计算有注释说明“为什么”，不重复代码本身。
 
 ## 7. 回派与复审流程

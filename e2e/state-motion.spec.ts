@@ -27,7 +27,7 @@ async function installPreparedCourse(page: Page, bookCourseApi: BookCourseApiFix
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
 }
 
 async function installStageSixCourse(page: Page, bookCourseApi: BookCourseApiFixture) {
@@ -35,7 +35,7 @@ async function installStageSixCourse(page: Page, bookCourseApi: BookCourseApiFix
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
 }
 
 test.describe("state feedback primitives", () => {

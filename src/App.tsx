@@ -120,6 +120,7 @@ export default function App() {
   const sheetTriggerRef = useRef<HTMLElement | null>(null);
   const sheetRestoreFocusRef = useRef(true);
   const mainRef = useRef<HTMLElement | null>(null);
+  const screenScrollPositionsRef = useRef(new Map<Screen, number>());
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastIdRef = useRef(0);
   const toastTimerRef = useRef<number | undefined>(undefined);
@@ -162,6 +163,11 @@ export default function App() {
     if (mainRef.current?.isConnected) mainRef.current.focus({ preventScroll: true });
   }, []);
 
+  const saveCurrentScreenScrollPosition = useCallback((current: NavigationSnapshot, next: NavigationSnapshot) => {
+    if (current.nonce === next.nonce || !mainRef.current?.isConnected) return;
+    screenScrollPositionsRef.current.set(current.screen, mainRef.current.scrollTop);
+  }, []);
+
   const restoreSheetFocus = useCallback(() => {
     if (!sheetRestoreFocusRef.current) return;
     sheetRestoreFocusRef.current = false;
@@ -192,31 +198,35 @@ export default function App() {
   const go = useCallback((next: Screen) => {
     const current = navigationRef.current;
     const nextNavigation = navigate(current, { type: "go", screen: next });
+    saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
-  }, [commitNavigation, requestSheetCloseForNavigation]);
+  }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const back = useCallback(() => {
     const current = navigationRef.current;
     const nextNavigation = navigate(current, { type: "back" });
+    saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
-  }, [commitNavigation, requestSheetCloseForNavigation]);
+  }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const openSourcePage = useCallback((target: SourcePageTarget) => {
     const current = navigationRef.current;
     const nextNavigation = navigate(current, { type: "source" });
+    saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     setSourcePageTarget(target);
     commitNavigation(() => nextNavigation);
-  }, [commitNavigation, requestSheetCloseForNavigation]);
+  }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const replaceScreen = useCallback((next: Screen) => {
     const current = navigationRef.current;
     const nextNavigation = navigate(current, { type: "replace", screen: next });
+    saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
-  }, [commitNavigation, requestSheetCloseForNavigation]);
+  }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const openSheet = useCallback((nextSheet: SheetState) => {
     if (!nextSheet) {
@@ -291,7 +301,15 @@ export default function App() {
   }, [refreshCourses]);
 
   useEffect(() => {
-    if (parseJobId) return;
+    // A locally chosen or freshly uploaded file is an explicit user decision.
+    // Do not let an older resumable job from the course list replace it while
+    // the learner is selecting or confirming the new upload.
+    if (
+      parseJobId ||
+      uploadedFile ||
+      navigationRef.current.screen === "upload" ||
+      navigationRef.current.screen === "parseReady"
+    ) return;
     const resumable = courseSummaries.find(
       (course) => course.parse_job_id && ["pending", "processing", "failed"].includes(course.parse_job_status ?? "")
     );
@@ -314,7 +332,7 @@ export default function App() {
       message: resumable.parse_job_message,
       error: resumable.parse_job_error
     });
-  }, [courseSummaries, parseJobId]);
+  }, [courseSummaries, parseJobId, uploadedFile]);
 
   useEffect(() => {
     if (!parseJobId || !uploadedFile || completedParseJobRef.current === parseJobId) return;
@@ -627,12 +645,17 @@ export default function App() {
     mainRef.current = element;
   }, []);
 
+  const contentScrollTop = navigation.direction === "back"
+    ? screenScrollPositionsRef.current.get(screen) ?? 0
+    : 0;
+
   return (
     <AppProvider value={sharedProps}>
       <AppShell
         active={screen}
         motionReduced={reducedMotion}
         focusMainNonce={navigation.nonce}
+        contentScrollTop={contentScrollTop}
         onMainElement={setMainElement}
         onClickCapture={captureSheetTrigger}
         overlays={(

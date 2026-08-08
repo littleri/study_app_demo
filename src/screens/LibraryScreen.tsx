@@ -289,7 +289,7 @@ export function LibraryScreen() {
             <FolderOpen size={34} aria-hidden="true" />
             <h2>课程库暂无真实课程</h2>
             <p>上传教材并完成解析后，后端课程会显示在这里；前端不会再补充样例书籍。</p>
-            <Button icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传新教材</Button>
+            <Button variant="secondary" icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传新教材</Button>
           </Card>
         ) : (
           <section className="library-course-grid" aria-label="课程列表">
@@ -383,7 +383,7 @@ export function LibraryScreen() {
           </section>
         )}
       </SkeletonReveal>
-      <Button icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传新教材</Button>
+      <Button variant="secondary" icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传新教材</Button>
     </div>
   );
 }

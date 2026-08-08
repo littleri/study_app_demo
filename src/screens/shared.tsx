@@ -7,7 +7,7 @@ import type { Chapter, UploadedCourseFile } from "../types/app";
 import { Button, ProgressBar } from "../components/ui";
 
 
-export const ragPipelineSteps = ["Parser Router 选择 Marker/MinerU/OCR", "PostgreSQL 保存页面、章节与 chunk", "BGE-M3 生成 embedding", "pgvector 建库，BM25 + reranker 精排"];
+export const coursePreparationSteps = ["阅读文件内容和版面", "整理章节与知识点", "生成可学习的课程内容"];
 
 
 export function backendAssetUrl(url?: string | null, fallback = textbookAssets.illustration) {
@@ -52,8 +52,16 @@ export function chapterConcepts(chapter: ApiChapter | null, chunk?: ApiChunk | n
 }
 
 
+const BIOLOGY_BOOK_DISPLAY_NAME = "人教版高中生物必修二遗传与进化";
+
+function isBiologyGeneticsBookTitle(value: string) {
+  const normalized = value.replace(/\s+/g, "");
+  return normalized.includes("人教版高中生物必修") && normalized.includes("遗传与进化");
+}
+
 export function liveBookTitle(uploadedFile?: UploadedCourseFile | null, scan?: ScanResult | null) {
-  return uploadedFile?.name ?? scan?.filename ?? "未选择教材";
+  const title = uploadedFile?.name ?? scan?.filename ?? "未选择教材";
+  return isBiologyGeneticsBookTitle(title) ? BIOLOGY_BOOK_DISPLAY_NAME : title;
 }
 
 
@@ -105,8 +113,7 @@ export const supportedCourseExtensions = [
   ".pdf", ".png", ".jpg", ".jpeg", ".jp2", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".docx", ".pptx", ".xlsx"
 ] as const;
 
-export const acceptedCourseFileTypes = [
-  ...supportedCourseExtensions,
+export const supportedCourseMimeTypes = [
   "application/pdf",
   "image/png",
   "image/jpeg",
@@ -120,7 +127,26 @@ export const acceptedCourseFileTypes = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+] as const;
+
+export const acceptedCourseFileTypes = [
+  ...supportedCourseExtensions,
+  ...supportedCourseMimeTypes
 ].join(",");
+
+export function validateCourseFile(file: Pick<File, "name" | "size" | "type">) {
+  const normalizedName = file.name.trim().toLowerCase();
+  const normalizedType = file.type.trim().toLowerCase();
+  const hasSupportedExtension = supportedCourseExtensions.some((extension) => normalizedName.endsWith(extension));
+  const hasSupportedMimeType = supportedCourseMimeTypes.some((type) => normalizedType === type);
+
+  if (!file.name.trim()) return "请选择一个有文件名的学习资料";
+  if (file.size <= 0) return "这个文件为空，请重新选择";
+  if (!hasSupportedExtension && !hasSupportedMimeType) {
+    return "请选择 PDF、图片、Word、PowerPoint 或 Excel 文件";
+  }
+  return null;
+}
 
 
 export function formatFileSize(sizeBytes: number) {

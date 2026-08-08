@@ -229,7 +229,7 @@
 }
 
 .primary-nav .nav-item {
-  transition-duration: var(--motion-duration-fast);
+  transition-duration: var(--motion-duration-surface);
   transition-property: color, box-shadow;
   transition-timing-function: var(--motion-ease-standard);
 }
@@ -241,7 +241,7 @@
 }
 
 .primary-nav .nav-item.active .nav-icon {
-  transform: scale(1.14);
+  transform: scale(1.08);
 }
 
 .primary-nav .nav-item:active .nav-icon,
@@ -1161,6 +1161,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .nav-item,
+  .nav-selection,
   .nav-item .nav-icon,
   .nav-item .nav-icon-motion svg,
   .sheet,
@@ -1171,6 +1172,10 @@
   .ai-orb {
     animation: none !important;
     transition: none !important;
+  }
+
+  .nav-selection {
+    will-change: auto;
   }
 
   .upload-status-feedback,

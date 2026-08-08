@@ -2,12 +2,12 @@
 
 ## 1. 目标与本轮边界
 
-本轮在不改变普通应用入口行为的前提下，增加一个用于演示和录制的设备预览工作台，并为后续分别设计 iPhone 与 iPad 界面建立稳定的布局分层。
+本轮将用于演示和录制的设备预览工作台设为唯一公开入口，并为后续分别设计 iPhone 与 iPad 界面建立稳定的布局分层。
 
 本轮必须完成：
 
-1. 普通入口 `/` 保持现有应用行为与响应式测试契约。
-2. 新增设备工作台入口 `/?preview=devices`。
+1. 公开入口 `/` 直接渲染设备预览工作台。
+2. 实际应用仅通过工作台 iframe 的内部地址 `/?embedded=device-preview` 渲染。
 3. 在同一个工作台中切换 iPhone 17 Pro 与 iPad Pro 11 英寸的竖屏/横屏逻辑视口。
 4. 切换设备、方向或输出清晰度时不重载内嵌应用，不丢失当前页面、输入和学习状态。
 5. 提供自适应、HD 2x、Retina 3x 与 4K 录制画布模式。
@@ -37,15 +37,14 @@
 
 切换变体时，承载当前页面的 `<main>` 和页面子树必须保持稳定 identity。不得使用设备名作为页面或 iframe 的 React `key`，不得通过重建 `AppProvider` 切换布局。
 
-### 2.3 保持入口兼容
+### 2.3 单一公开入口
 
-入口优先级固定为：
+入口规则固定为：
 
-1. 查询参数存在 `embedded=device-preview` 时渲染普通应用内容；
-2. 否则存在 `preview=devices` 时渲染设备预览工作台；
-3. 其他情况渲染当前普通应用。
+1. 查询参数存在 `embedded=device-preview` 时渲染内部应用内容；
+2. 其他所有公开地址均渲染设备预览工作台。
 
-因此 iframe 的固定地址为 `/?embedded=device-preview`，不会递归渲染工作台。普通 `/` 不增加录制工具栏或设备边框。
+因此 iframe 的固定地址为 `/?embedded=device-preview`，不会递归渲染工作台。公开 URL 不再依赖 `preview=devices`，工作台同步 URL 时会移除该旧参数。
 
 ## 3. 设备与输出规格
 
@@ -105,7 +104,7 @@ e2e/
    - 获取 1x/2x/3x 输出宽高；
    - 获取 4K 画布与内容缩放；
    - 解析并校验 URL 参数，非法值回退至默认值。
-4. 在 `main.tsx` 做最小入口分流；普通入口仍渲染原 `App`。
+4. 在 `main.tsx` 做最小入口分流；仅内部 embedded 地址渲染原 `App`，其余地址渲染工作台。
 5. iframe 的 `src` 使用固定常量 `/?embedded=device-preview`，并设置有意义的 `title`。
 
 ### 阶段 B：设备预览工作台
@@ -142,7 +141,7 @@ e2e/
 2. HD/Retina 模式输出严格的倍数画布，并隐藏不必要的设备阴影以避免采集边界不确定。
 3. 4K 模式输出固定 2160 × 3840 或 3840 × 2160 画布，设备内容等比居中。
 4. 增加“隐藏控制栏/录制模式”能力，可通过 URL 参数复现，例如：
-   `/?preview=devices&device=iphone-17-pro&orientation=portrait&quality=retina-3x&chrome=0`
+   `/?device=iphone-17-pro&orientation=portrait&quality=retina-3x&chrome=0`
 5. 控制栏隐藏后仍提供明确恢复方式：URL 改回 `chrome=1`，并允许 `Escape` 恢复；不能形成无法退出的页面状态。
 6. 页面背景、设备边界和 iframe 不应出现子像素抖动；输出宽高和偏移尽量取整数。
 
@@ -181,7 +180,7 @@ e2e/
 - 不用 User-Agent 猜设备，统一按逻辑视口决定布局族。
 - 不通过复制整套 Screen 来制造 Phone/Pad 差异。
 - 不删除或重写现有响应式、motion 与 safe-area 契约；若必须调整，需先增加针对性测试。
-- 普通 `/` 的 DOM、默认尺寸和行为变化视为回归，除非是实现显式布局标记所需的最小兼容改动。
+- 公开 `/` 必须稳定渲染工作台；原应用 DOM 与行为通过内部 embedded 入口维持现有测试契约。
 
 ## 8. 提交顺序
 

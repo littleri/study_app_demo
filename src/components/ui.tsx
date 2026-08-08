@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
+import { useGSAP } from "@gsap/react";
+import gsap from "gsap";
 import {
   ArrowLeft,
   BookOpenCheck,
@@ -21,6 +23,8 @@ import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
 import { useDeviceLayout } from "../layouts/useDeviceLayout";
 import { IosStatusBar } from "./IosStatusBar";
+
+gsap.registerPlugin(useGSAP);
 
 export const actionSheetAnimationNames = [
   "motion-sheet-phone-in",
@@ -124,8 +128,23 @@ export function IconButton({
   );
 }
 
-export function Card({ children, className = "", ...props }: ComponentPropsWithoutRef<"section"> & { children: ReactNode }) {
-  return <section className={`card ${className}`} {...props}>{children}</section>;
+export type CardSurface = "default" | "elevated" | "celebration";
+
+export function Card({
+  children,
+  className = "",
+  surface = "default",
+  ...props
+}: ComponentPropsWithoutRef<"section"> & { children: ReactNode; surface?: CardSurface }) {
+  return (
+    <section
+      className={`card card-surface-${surface} ${className}`}
+      data-surface={surface}
+      {...props}
+    >
+      {children}
+    </section>
+  );
 }
 
 export function Section({
@@ -158,8 +177,16 @@ export function ProgressBar({ value, label }: { value: number; label?: string })
   const clampedValue = Math.max(0, Math.min(100, value));
 
   return (
-    <div className="progress-wrap" aria-label={label ?? `进度 ${value}%`}>
-      <div className="progress-track">
+    <div
+      className="progress-wrap"
+      role="progressbar"
+      aria-label={label ?? `进度 ${clampedValue}%`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={clampedValue}
+      aria-valuetext={label}
+    >
+      <div className="progress-track" aria-hidden="true">
         <div className="progress-fill" style={{ transform: `scaleX(${clampedValue / 100})` }} />
       </div>
       {label ? <span>{label}</span> : null}
@@ -201,8 +228,19 @@ export function HeaderBar({
 }
 
 export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen) => void }) {
+  const navRef = useRef<HTMLElement>(null);
+  const selectionRef = useRef<HTMLSpanElement>(null);
+  const previousActiveIndexRef = useRef<number | null>(null);
+  const previousLayoutVersionRef = useRef(0);
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const reducedMotion = useReducedMotion();
   const items = [
-    { screen: "home" as Screen, label: "首页", icon: Home, active: active === "home" },
+    {
+      screen: "home" as Screen,
+      label: "首页",
+      icon: Home,
+      active: active === "home" || active === "library" || active === "book"
+    },
     {
       screen: "community" as Screen,
       label: "社区",
@@ -222,17 +260,76 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
     },
     { screen: "profile" as Screen, label: "我的", icon: User, active: active === "profile" }
   ];
+  const activeIndex = Math.max(0, items.findIndex((item) => item.active));
+
+  useLayoutEffect(() => {
+    const navigation = navRef.current;
+    if (!navigation || typeof ResizeObserver === "undefined") return;
+
+    let hasMeasured = false;
+    const resizeObserver = new ResizeObserver(() => {
+      if (!hasMeasured) {
+        hasMeasured = true;
+        return;
+      }
+      setLayoutVersion((version) => version + 1);
+    });
+    resizeObserver.observe(navigation);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useGSAP(() => {
+    const navigation = navRef.current;
+    const selection = selectionRef.current;
+    const target = navigation?.querySelector<HTMLElement>(`[data-nav-index="${activeIndex}"]`);
+    if (!navigation || !selection || !target) return;
+
+    const layoutChanged = previousLayoutVersionRef.current !== layoutVersion;
+    const canAnimate = previousActiveIndexRef.current !== null
+      && previousActiveIndexRef.current !== activeIndex
+      && !layoutChanged
+      && !reducedMotion;
+    const targetPosition = { x: target.offsetLeft, y: target.offsetTop };
+
+    gsap.killTweensOf(selection);
+    gsap.set(selection, {
+      width: target.offsetWidth,
+      height: target.offsetHeight
+    });
+
+    if (canAnimate) {
+      gsap.to(selection, {
+        ...targetPosition,
+        duration: 0.5,
+        ease: "back.out(1.2)",
+        overwrite: "auto"
+      });
+    } else {
+      gsap.set(selection, targetPosition);
+    }
+
+    previousActiveIndexRef.current = activeIndex;
+    previousLayoutVersionRef.current = layoutVersion;
+  }, { dependencies: [activeIndex, layoutVersion, reducedMotion], scope: navRef });
 
   return (
-    <nav className="primary-nav glass-nav" data-lg-variant="prominent" aria-label="主导航">
-      {items.map((item) => {
+    <nav
+      ref={navRef}
+      className="primary-nav glass-nav"
+      data-active-index={activeIndex}
+      data-lg-variant="prominent"
+      aria-label="主导航"
+    >
+      <span ref={selectionRef} className="nav-selection" aria-hidden="true" />
+      {items.map((item, index) => {
         const Icon = item.icon;
         return (
           <button
-            key={item.label}
+            key={item.screen}
             className={`nav-item ${item.active ? "active" : ""} ${item.screen === "upload" ? "nav-upload" : ""}`}
             type="button"
             aria-current={item.active ? "page" : undefined}
+            data-nav-index={index}
             data-motion-active={item.active ? "true" : "false"}
             data-motion-nav-kind={item.screen === "upload" ? "upload" : "standard"}
             onClick={() => go(item.screen)}
@@ -242,7 +339,7 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
                 <Icon size={22} aria-hidden="true" />
               </span>
             </span>
-            <span>{item.label}</span>
+            <span className="nav-label">{item.label}</span>
           </button>
         );
       })}
@@ -262,6 +359,7 @@ export function AppShell({
   active,
   motionReduced,
   focusMainNonce,
+  contentScrollTop,
   onMainElement,
   onClickCapture,
   overlays,
@@ -276,6 +374,7 @@ export function AppShell({
   active: Screen;
   motionReduced: boolean;
   focusMainNonce: number;
+  contentScrollTop: number;
   onMainElement?: (element: HTMLElement | null) => void;
   onClickCapture?: (event: MouseEvent<HTMLDivElement>) => void;
   overlays?: ReactNode;
@@ -333,8 +432,20 @@ export function AppShell({
 
   useLayoutEffect(() => {
     if (focusMainNonce === 0) return;
-    mainRef.current?.focus({ preventScroll: true });
-  }, [focusMainNonce]);
+    const main = mainRef.current;
+    if (!main) return;
+
+    // The content element survives screen swaps. Set its destination position
+    // in the layout phase, before moving focus, so a new screen never paints
+    // at the previous screen's scroll position. Back navigation receives its
+    // own recorded snapshot from App; every other entry starts at the top.
+    const inlineScrollBehavior = main.style.scrollBehavior;
+    main.style.scrollBehavior = "auto";
+    main.scrollTop = contentScrollTop;
+    main.scrollLeft = 0;
+    main.style.scrollBehavior = inlineScrollBehavior;
+    main.focus({ preventScroll: true });
+  }, [contentScrollTop, focusMainNonce]);
 
   // Only the device-only chrome changes with the media query. PrimaryNav is a
   // stable sibling of that replaceable layer so rapid boundary resizes never
