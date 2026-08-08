@@ -4,7 +4,7 @@ test.describe("local DemoRepository P0 flow", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
   test("opens the grounded meiosis lesson and blocks an empty diagnosis submission", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     await expect(page.getByRole("button", { name: "继续学习", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "继续学习", exact: true }).click();
@@ -16,7 +16,7 @@ test.describe("local DemoRepository P0 flow", () => {
     await page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
     await expect(page.getByRole("heading", { name: "同源染色体先分离", exact: true })).toBeVisible();
-    await expect(page.getByText("教材第 18-18 页 · PDF 第 13-13 页", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "来自教材第 18 页", exact: true }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "做练习", exact: true }).click();
     await expect(page.locator(".assignment-screen")).toBeVisible();
@@ -34,7 +34,7 @@ test.describe("local DemoRepository P0 flow", () => {
       observedRequests.push(request.url());
     });
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     appOrigin = new URL(page.url()).origin;
     await page.locator(".nav-upload").click();
     await expect(page.locator(".upload-sheet-screen")).toBeVisible();
@@ -44,6 +44,8 @@ test.describe("local DemoRepository P0 flow", () => {
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 local demo fixture")
     });
+    await expect(page.locator(".upload-selection-summary")).toBeVisible();
+    await page.getByRole("button", { name: "上传并继续", exact: true }).click();
     await expect(page.locator(".parse-ready-screen")).toBeVisible();
 
     await page.locator(".parse-actions .button").first().click();

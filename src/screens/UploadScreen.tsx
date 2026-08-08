@@ -16,59 +16,54 @@ import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
 import {
   QuickAction,
-  acceptedCourseFileTypes
+  acceptedCourseFileTypes,
+  formatFileSize,
+  getFileKind,
+  validateCourseFile
 } from "./shared";
+import { uploadConfirmedCourseFile } from "./uploadFlow";
 
 export function UploadScreen() {
   const { go, setParseJobId, setParseJobStatus, setActiveChapterId, setCurrentStudyPlan, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLatestDiagnosis, setLessonBuildJobId, setLessonBuildJobStatus, setParsedAssets, setParsedChapters, setParsedChunks, setParsedScanResult, setSelectedUpload, setUploadedFile, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  async function uploadSelectedFile(file: File) {
+  function resetCourseGenerationState() {
+    setParseJobId(null);
+    setParseJobStatus(null);
+    setActiveChapterId(null);
+    setCurrentStudyPlan(null);
+    setLatestDiagnosis(null);
+    setParsedAssets(null);
+    setParsedChapters(null);
+    setParsedChunks(null);
+    setParsedScanResult(null);
+    setGeneratedLessons(null);
+    setGeneratedFlashcards(null);
+    setGeneratedQuizzes(null);
+    setLessonBuildJobId(null);
+    setLessonBuildJobStatus(null);
+  }
+
+  function chooseFile() {
+    if (!uploading) fileInputRef.current?.click();
+  }
+
+  async function uploadSelectedFile() {
+    if (!selectedFile) {
+      chooseFile();
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
-      const init = await bookcourseApi.initUpload({
-        filename: file.name,
-        content_type: file.type || "application/octet-stream",
-        size_bytes: file.size
-      });
-      await bookcourseApi.uploadFile(init.book_id, file);
-      setParseJobId(null);
-      setParseJobStatus(null);
-      setActiveChapterId(null);
-      setCurrentStudyPlan(null);
-      setLatestDiagnosis(null);
-      setParsedAssets(null);
-      setParsedChapters(null);
-      setParsedChunks(null);
-      setParsedScanResult(null);
-      setGeneratedLessons(null);
-      setGeneratedFlashcards(null);
-      setGeneratedQuizzes(null);
-      setLessonBuildJobId(null);
-      setLessonBuildJobStatus(null);
-      setUploadedFile({
-        bookId: init.book_id,
-        name: file.name,
-        sizeBytes: file.size,
-        contentType: file.type || "application/octet-stream",
-        uploadedAt: Date.now()
-      });
+      const uploadedFile = await uploadConfirmedCourseFile(selectedFile, bookcourseApi);
+      resetCourseGenerationState();
+      setUploadedFile(uploadedFile);
       setSelectedUpload(true);
-      const job = await bookcourseApi.startParse(init.book_id);
-      setParseJobId(job.job_id);
-      setParseJobStatus({
-        job_id: job.job_id,
-        book_id: init.book_id,
-        status: "pending",
-        stage: "queued",
-        progress: 1,
-        message: "后台 OCR/解析任务已创建",
-        error: null
-      });
-      showToast("文件已上传，后台 OCR/解析已启动");
+      showToast("文件已上传。你可以确认后再开始后台解析");
       go("parseReady");
     } catch (err) {
       const message = err instanceof Error ? err.message : "文件上传失败";
@@ -83,7 +78,13 @@ export function UploadScreen() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    void uploadSelectedFile(file);
+    const validationError = validateCourseFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+    setSelectedFile(file);
+    setUploadError(null);
   }
 
   return (
@@ -101,19 +102,24 @@ export function UploadScreen() {
           className="hidden-file-input"
         />
         <button
-          className={`upload-add-tile ${uploading ? "is-loading" : ""}`}
+          className={`upload-add-tile ${uploading ? "is-loading" : ""} ${selectedFile ? "has-selection" : ""}`}
           type="button"
           disabled={uploading}
-          onClick={() => fileInputRef.current?.click()}
-          aria-label="选择学习资料"
+          onClick={chooseFile}
+          aria-label={selectedFile ? "替换学习资料" : "选择学习资料"}
         >
           <span className="upload-add-icon">{uploading ? <Upload size={36} aria-hidden="true" /> : <Plus size={38} aria-hidden="true" />}</span>
         </button>
         <div className="upload-source-copy">
           {uploading ? (
             <div key="upload-status:uploading" className="upload-status-feedback" aria-live="polite">
-              <h3>选择学习资料</h3>
-              <p>正在上传文件，请稍候</p>
+              <h3>正在上传文件</h3>
+              <p>上传完成后，你可以自行决定何时开始解析。</p>
+            </div>
+          ) : selectedFile ? (
+            <div key={`upload-status:selected:${selectedFile.name}`} className="upload-status-feedback" aria-live="polite">
+              <h3>已选择学习资料</h3>
+              <p>确认无误后上传；上传不会自动开始解析。</p>
             </div>
           ) : (
             <>
@@ -122,19 +128,36 @@ export function UploadScreen() {
             </>
           )}
         </div>
+        {selectedFile ? (
+          <div className="upload-selection-summary" aria-label="已选文件信息">
+            <FileText size={22} aria-hidden="true" />
+            <div className="upload-selection-details">
+              <strong>{selectedFile.name}</strong>
+              <span>{getFileKind(selectedFile.name, selectedFile.type)} · {formatFileSize(selectedFile.size)}</span>
+              <small>确认上传后会进入解析确认页；你可安全离开，稍后再开始后台解析。</small>
+            </div>
+            <div className="upload-selection-actions">
+              <Button variant="secondary" disabled={uploading} onClick={chooseFile}>替换文件</Button>
+              <Button variant="text" disabled={uploading} onClick={() => {
+                setSelectedFile(null);
+                setUploadError(null);
+              }}>取消选择</Button>
+            </div>
+          </div>
+        ) : null}
         <span className="upload-privacy-pill">
           <ShieldCheck size={14} aria-hidden="true" />
-          内容仅用于生成你的 AI 课程
+          选中文件前不会上传；内容仅用于生成你的 AI 课程
         </span>
-        <Button icon={<FolderOpen size={18} aria-hidden="true" />} loading={uploading} disabled={uploading} onClick={() => fileInputRef.current?.click()}>
-          {uploading ? "上传中" : "选择文件"}
+        <Button icon={selectedFile ? <Upload size={18} aria-hidden="true" /> : <FolderOpen size={18} aria-hidden="true" />} loading={uploading} disabled={uploading} onClick={() => void uploadSelectedFile()}>
+          {uploading ? "上传中" : selectedFile ? uploadError ? "重试上传" : "上传并继续" : "选择文件"}
         </Button>
       </section>
 
       <aside className="upload-flow-support" aria-label="上传支持信息">
         <div className="upload-mini-actions">
-          <QuickAction icon={<Microscope size={19} aria-hidden="true" />} title="拍照导入" helper="PNG/JPG" onClick={() => fileInputRef.current?.click()} />
-          <QuickAction icon={<FileText size={19} aria-hidden="true" />} title="本地文档" helper="PDF/Office" onClick={() => fileInputRef.current?.click()} />
+          <QuickAction icon={<Microscope size={19} aria-hidden="true" />} title="拍照导入" helper="PNG/JPG" onClick={chooseFile} />
+          <QuickAction icon={<FileText size={19} aria-hidden="true" />} title="本地文档" helper="PDF/Office" onClick={chooseFile} />
         </div>
 
         {uploadError ? (
@@ -146,7 +169,7 @@ export function UploadScreen() {
 
         <Card className="privacy-card">
           <ShieldCheck size={20} aria-hidden="true" />
-          <p>文件会先上传到后端课程空间，确认后再开始 OCR、版面解析和 RAG 索引构建。</p>
+          <p>先在本地检查文件名、类型和大小。只有点击“上传并继续”才会上传；解析需要你在下一步明确开始。</p>
         </Card>
       </aside>
     </div>

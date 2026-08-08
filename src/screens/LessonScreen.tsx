@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   Brain,
@@ -20,7 +20,7 @@ import {
 } from "../components/ui";
 import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
-import { useLocalMotionItem } from "../motion";
+import { CollapsibleRegion, useLocalMotionItem } from "../motion";
 import {
   isLessonBuildTerminal,
   lessonBuildSummary,
@@ -29,14 +29,20 @@ import {
 import {
   backendAssetUrl,
   chapterConcepts,
-  liveBookTitle,
-  sourcePageLabel
+  liveBookTitle
 } from "./shared";
+import {
+  collectLessonEvidenceSources,
+  detailedCitationPageLabel,
+  learnerCitationPageLabel
+} from "./lessonEvidence";
 
 export function LessonScreen() {
   const { activeChapterId, generatedFlashcards, generatedLessons, generatedQuizzes, go, lessonBuildJobStatus, openSourcePage, openSheet, parsedAssets, parsedChapters, parsedChunks, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLessonBuildJobId, setLessonBuildJobStatus, setParsedAssets, showToast, uploadedFile } = useAppContext();
   const [generatingFigure, setGeneratingFigure] = useState(false);
   const [buildingLesson, setBuildingLesson] = useState(false);
+  const [evidenceExpanded, setEvidenceExpanded] = useState(false);
+  const evidenceToggleRef = useRef<HTMLButtonElement | null>(null);
   const liveChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId) ?? parsedChapters?.[0] ?? null;
   const lesson = liveChapter
     ? generatedLessons?.find((item) => item.chapter_id === liveChapter.chapter_id) ?? null
@@ -53,14 +59,23 @@ export function LessonScreen() {
   const pages = lesson ? `第 ${lesson.page_start}-${lesson.page_end} 页` : liveChapter ? `第 ${liveChapter.page_start}-${liveChapter.page_end} 页` : "等待页码";
   const sourceImage = backendAssetUrl(displayAsset?.image_url);
   const lessonBlocks = lesson?.blocks ?? [];
-  const evidence = lessonBlocks.flatMap((block) => block.citations.map((citation) => ({ ...citation, blockTitle: block.title }))).slice(0, 6);
+  const evidenceSources = collectLessonEvidenceSources(lessonBlocks);
   const activeCards = generatedFlashcards?.filter((card) => !liveChapter || card.chapter_id === liveChapter.chapter_id) ?? [];
   const activeQuizzes = generatedQuizzes?.filter((quiz) => !liveChapter || quiz.chapter_id === liveChapter.chapter_id) ?? [];
   const lessonMotionKey = `${uploadedFile?.bookId ?? "empty"}:${liveChapter?.chapter_id ?? "empty"}:${lesson?.lesson_id ?? "pending"}`;
+  const evidenceRegionId = `lesson-evidence-${lessonMotionKey}`;
+  const evidenceToggleId = `${evidenceRegionId}-toggle`;
+  const evidenceLessonKeyRef = useRef(lessonMotionKey);
   const emptyMotion = useLocalMotionItem(`lesson:${lessonMotionKey}:empty`);
   const titleMotion = useLocalMotionItem(`lesson:${lessonMotionKey}:title`);
   const primaryMotion = useLocalMotionItem(`lesson:${lessonMotionKey}:primary`);
   const conceptsMotion = useLocalMotionItem(`lesson:${lessonMotionKey}:concepts`);
+
+  useEffect(() => {
+    if (evidenceLessonKeyRef.current === lessonMotionKey) return;
+    evidenceLessonKeyRef.current = lessonMotionKey;
+    setEvidenceExpanded(false);
+  }, [lessonMotionKey]);
 
   if (!uploadedFile || !liveChapter) {
     return (
@@ -80,12 +95,30 @@ export function LessonScreen() {
   const activeLiveChapter = liveChapter;
 
   function openPrimaryEvidence() {
-    const primaryEvidence = evidence[0];
+    const primaryEvidence = evidenceSources[0];
     openSourcePage({
       bookId: activeUploadedFile.bookId,
-      title: primaryEvidence?.blockTitle ?? sourceTitle,
-      pageStart: primaryEvidence?.page_start ?? activeLiveChapter.page_start,
-      pageEnd: primaryEvidence?.page_end ?? activeLiveChapter.page_end
+      title: primaryEvidence?.blockTitles[0] ?? sourceTitle,
+      pageStart: primaryEvidence?.citation.page_start ?? activeLiveChapter.page_start,
+      pageEnd: primaryEvidence?.citation.page_end ?? activeLiveChapter.page_end
+    });
+  }
+
+  function openCitationSource(blockTitle: string, citation: typeof evidenceSources[number]["citation"]) {
+    if (uploadedFile) {
+      openSourcePage({
+        bookId: uploadedFile.bookId,
+        title: blockTitle,
+        pageStart: citation.page_start,
+        pageEnd: citation.page_end
+      });
+      return;
+    }
+    openSheet({
+      type: "source",
+      title: blockTitle,
+      page: detailedCitationPageLabel(citation),
+      image: sourceImage
     });
   }
 
@@ -202,73 +235,61 @@ export function LessonScreen() {
             <h3>{block.title}</h3>
           </div>
           <p>{block.content}</p>
-          {block.citations.length > 0 ? (
-            <div className="lesson-evidence-list">
-              {block.citations.slice(0, 3).map((citation, citationIndex) => (
-                <button
-                  type="button"
-                  key={`${block.block_id}_${citation.chunk_id}_${citationIndex}`}
-                  onClick={() => uploadedFile
-                    ? openSourcePage({
-                        bookId: uploadedFile.bookId,
-                        title: block.title,
-                        pageStart: citation.page_start,
-                        pageEnd: citation.page_end
-                      })
-                    : openSheet({
-                        type: "source",
-                        title: block.title,
-                        page: sourcePageLabel(citation.page_start, citation.page_end),
-                        image: sourceImage
-                      })}
-                >
-                  <strong>{citation.chunk_id}</strong>
-                  <span>
-                    {citation.printed_page_start
-                      ? `教材第 ${citation.printed_page_start}-${citation.printed_page_end ?? citation.printed_page_start} 页 · PDF 第 ${citation.page_start}-${citation.page_end} 页`
-                      : `PDF 第 ${citation.page_start}-${citation.page_end} 页`}
-                  </span>
-                  {citation.quote ? <small>{citation.quote}</small> : null}
-                </button>
-              ))}
-            </div>
+          {block.citations[0] ? (
+            <button
+              className="lesson-source-link"
+              type="button"
+              onClick={() => openCitationSource(block.title, block.citations[0])}
+            >
+              来自{learnerCitationPageLabel(block.citations[0])}
+            </button>
           ) : null}
         </Card>
       ))}
 
-      <Card className="source-fragment-card">
+      <Card className="source-fragment-card lesson-evidence-summary">
         <div className="lesson-card-title">
           <FileText size={18} aria-hidden="true" />
-          <h3>原文证据</h3>
+          <h3>本节来源</h3>
         </div>
-        {evidence.length > 0 ? (
-          <div className="lesson-evidence-list">
-            {evidence.map((item, itemIndex) => (
-              <button
-                type="button"
-                key={`${item.blockTitle}_${item.chunk_id}_${itemIndex}`}
-                onClick={() => uploadedFile
-                  ? openSourcePage({
-                      bookId: uploadedFile.bookId,
-                      title: item.blockTitle,
-                      pageStart: item.page_start,
-                      pageEnd: item.page_end
-                    })
-                  : openSheet({
-                      type: "source",
-                      title: item.blockTitle,
-                      page: sourcePageLabel(item.page_start, item.page_end),
-                      image: sourceImage
-                    })}
-              >
-                <strong>{item.blockTitle}</strong>
-                <span>{item.chunk_id} / 第 {item.page_start}-{item.page_end} 页</span>
-                {item.quote ? <small>{item.quote}</small> : null}
-              </button>
-            ))}
-          </div>
+        {evidenceSources.length > 0 ? (
+          <>
+            <button
+              ref={evidenceToggleRef}
+              className="lesson-evidence-toggle"
+              type="button"
+              id={evidenceToggleId}
+              aria-expanded={evidenceExpanded}
+              aria-controls={evidenceRegionId}
+              onClick={() => setEvidenceExpanded((current) => !current)}
+            >
+              <span>本节 {evidenceSources.length} 个来源</span>
+              <span aria-hidden="true">{evidenceExpanded ? "收起" : "展开"}</span>
+            </button>
+            <CollapsibleRegion
+              expanded={evidenceExpanded}
+              id={evidenceRegionId}
+              labelledBy={evidenceToggleId}
+              focusFallbackRef={evidenceToggleRef}
+              className="lesson-evidence-region"
+            >
+              <div className="lesson-evidence-list">
+                {evidenceSources.map((item) => (
+                  <button
+                    className="lesson-evidence-source"
+                    type="button"
+                    key={item.key}
+                    onClick={() => openCitationSource(item.blockTitles[0] ?? sourceTitle, item.citation)}
+                  >
+                    <strong>{item.blockTitles.join("、")}</strong>
+                    <span>{detailedCitationPageLabel(item.citation)}</span>
+                  </button>
+                ))}
+              </div>
+            </CollapsibleRegion>
+          </>
         ) : (
-          <p>生成课程后会在这里显示可点击的 chunk 与页码证据。</p>
+          <p>生成课程后会在这里显示可点击的教材页来源。</p>
         )}
       </Card>
 
@@ -328,7 +349,7 @@ export function LessonScreen() {
         <div className="lesson-action-grid">
         <Button variant="secondary" icon={<MessageCircle size={18} aria-hidden="true" />} onClick={() => openSheet({ type: "chat" })}>问 AI</Button>
         <Button variant="secondary" icon={<BookOpen size={18} aria-hidden="true" />} onClick={() => go("flashcards")}>背闪卡</Button>
-        <Button icon={<ClipboardCheck size={18} aria-hidden="true" />} onClick={() => go("assignment")}>做练习</Button>
+        <Button variant="secondary" icon={<ClipboardCheck size={18} aria-hidden="true" />} onClick={() => go("assignment")}>做练习</Button>
         </div>
         <div className="lesson-bottom-actions">
         <Button variant="secondary" onClick={() => go("book")}>回课程主页</Button>

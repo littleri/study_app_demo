@@ -106,7 +106,7 @@ export function CourseReadyScreen() {
 
   return (
     <div className="screen-stack centered-flow parse-complete-screen course-ready-screen">
-      <div className="course-ready-primary">
+      <div className="course-ready-primary" data-brand-moment="course-ready">
       <CourseReadyHeroImage key={`course-ready-image:${uploadedFile.bookId}:${lessonBuildJobId ?? "current"}`} />
       <div className="course-ready-success-heading">
         <h1>生成成功</h1>

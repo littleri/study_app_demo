@@ -1,5 +1,5 @@
 :root {
-  --header-block-size: 42px;
+  --header-block-size: 48px;
   --primary-nav-height: 72px;
   --overlay-visual-top: 0px;
   --overlay-visual-height: 100dvh;
@@ -102,8 +102,8 @@ body {
   height: var(--primary-nav-height);
   min-height: var(--primary-nav-height);
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: center;
-  padding: 5px 10px;
+  align-items: stretch;
+  padding: var(--primary-nav-padding-block) var(--primary-nav-padding-inline);
 }
 
 .primary-nav .nav-item {

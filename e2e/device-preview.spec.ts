@@ -5,26 +5,36 @@ test.describe("device preview studio", () => {
     test.skip(testInfo.project.name !== "iphone-17-pro", "The device studio matrix runs once in the canonical iPhone project.");
   });
 
-  test("keeps the ordinary and embedded entries free of recursive studio chrome", async ({ page }) => {
+  test("uses the workbench as the only public entry and reserves the embedded entry for the inner app", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator(".device-preview-studio")).toHaveCount(0);
-    await expect(page.locator("iframe")).toHaveCount(0);
-    await expect(page.locator(".app-shell")).toHaveAttribute("data-device-layout", "phone");
-    await expect.poll(() => page.evaluate(() => {
-      const mainInteractive = document.querySelector<HTMLElement>("main button:not([disabled]), main a[href], main input:not([disabled])");
-      const firstNavigationButton = document.querySelector<HTMLElement>(".primary-nav button");
-      if (!mainInteractive || !firstNavigationButton) return false;
-      return Boolean(mainInteractive.compareDocumentPosition(firstNavigationButton) & Node.DOCUMENT_POSITION_FOLLOWING);
-    })).toBe(true);
+    await expect(page.locator(".device-preview-studio")).toBeVisible();
+    await expect(page.locator("iframe.device-preview-iframe")).toHaveCount(1);
+    await expect(page.locator(".app-shell")).toHaveCount(0);
+    await expect.poll(() => {
+      const url = new URL(page.url());
+      return {
+        chrome: url.searchParams.get("chrome"),
+        device: url.searchParams.get("device"),
+        hasLegacyPreview: url.searchParams.has("preview"),
+        orientation: url.searchParams.get("orientation"),
+        quality: url.searchParams.get("quality")
+      };
+    }).toEqual({
+      chrome: "1",
+      device: "iphone-17-pro",
+      hasLegacyPreview: false,
+      orientation: "portrait",
+      quality: "fit"
+    });
 
-    await page.goto("/?embedded=device-preview&preview=devices");
+    await page.goto("/?embedded=device-preview");
     await expect(page.locator(".device-preview-studio")).toHaveCount(0);
     await expect(page.locator("iframe")).toHaveCount(0);
     await expect(page.locator(".app-shell")).toBeVisible();
   });
 
   test("uses one iframe and preserves inner page, dialog, input, and main identity", async ({ page }) => {
-    await page.goto("/?preview=devices&device=iphone-17-pro&orientation=portrait&quality=fit");
+    await page.goto("/?device=iphone-17-pro&orientation=portrait&quality=fit");
     const iframe = page.locator("iframe.device-preview-iframe");
     await expect(iframe).toHaveAttribute("src", "/?embedded=device-preview");
     await expect(iframe).toHaveAttribute("title", "BookCourse AI 设备预览内层应用");
@@ -179,7 +189,7 @@ test.describe("device preview studio", () => {
   });
 
   test("uses the Phone chrome for a short landscape viewport and keeps the app inside its width", async ({ page }) => {
-    await page.goto("/?preview=devices&device=iphone-17-pro&orientation=landscape");
+    await page.goto("/?device=iphone-17-pro&orientation=landscape");
     const embeddedFrame = page.frameLocator("iframe.device-preview-iframe");
 
     await expect.poll(async () => {
@@ -197,7 +207,7 @@ test.describe("device preview studio", () => {
   });
 
   test("renders the iPhone 17 Pro bezel and Dynamic Island only in portrait", async ({ page }) => {
-    await page.goto("/?preview=devices&device=iphone-17-pro&orientation=portrait&quality=fit");
+    await page.goto("/?device=iphone-17-pro&orientation=portrait&quality=fit");
 
     const frame = page.getByTestId("device-preview-frame");
     const bezel = page.getByTestId("device-preview-bezel");
@@ -377,7 +387,7 @@ test.describe("device preview studio", () => {
 
   test("keeps Fit inside the dynamic viewport and announces the final resized geometry", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 903 });
-    await page.goto("/?preview=devices&quality=fit");
+    await page.goto("/?quality=fit");
 
     await expect.poll(async () => page.evaluate(() => {
       const studio = document.querySelector<HTMLElement>(".device-preview-studio");
@@ -439,7 +449,7 @@ test.describe("device preview studio", () => {
 
   test("uses a side control rail on wide workspaces and stacks controls on narrow screens", async ({ page }) => {
     await page.setViewportSize({ width: 603, height: 903 });
-    await page.goto("/?preview=devices&quality=fit");
+    await page.goto("/?quality=fit");
 
     await expect.poll(() => page.evaluate(() => {
       const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
@@ -477,7 +487,7 @@ test.describe("device preview studio", () => {
   test("makes chrome-free HD output an exact viewport canvas and restores chrome with Escape", async ({ page }) => {
     const output = { width: 804, height: 1748 };
     await page.setViewportSize(output);
-    await page.goto("/?preview=devices&device=iphone-17-pro&orientation=portrait&quality=hd-2x&chrome=0");
+    await page.goto("/?device=iphone-17-pro&orientation=portrait&quality=hd-2x&chrome=0");
     const iframe = page.locator("iframe.device-preview-iframe");
     const iframeHandle = await iframe.elementHandle();
     if (!iframeHandle) throw new Error("The chrome-free device preview iframe did not mount");
@@ -529,7 +539,7 @@ test.describe("device preview studio", () => {
   });
 
   test("updates output geometry and recording URL without changing the logical viewport", async ({ page }) => {
-    await page.goto("/?preview=devices");
+    await page.goto("/");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", /\d+/);
 
     await page.getByTestId("device-preview-quality-hd-2x").click();
@@ -640,7 +650,7 @@ test.describe("device preview studio", () => {
   });
 
   test("supports parameterized chrome hiding and Escape recovery", async ({ page }) => {
-    await page.goto("/?preview=devices&device=ipad-pro-11&orientation=landscape&quality=retina-3x&chrome=0");
+    await page.goto("/?device=ipad-pro-11&orientation=landscape&quality=retina-3x&chrome=0");
     await expect(page.locator(".device-preview-toolbar")).toHaveCount(0);
     await expect(page.getByTestId("device-preview-summary")).toHaveCount(0);
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", "3582");
@@ -655,7 +665,7 @@ test.describe("device preview studio", () => {
   });
 
   test("exposes labeled groups, pressed state, focus rings, and minimum hit targets", async ({ page }) => {
-    await page.goto("/?preview=devices");
+    await page.goto("/");
     await expect(page.getByRole("group", { name: "设备" })).toBeVisible();
     await expect(page.getByRole("group", { name: "方向" })).toBeVisible();
     await expect(page.getByRole("group", { name: "输出清晰度" })).toBeVisible();

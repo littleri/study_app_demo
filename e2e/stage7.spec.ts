@@ -220,7 +220,7 @@ async function loadStageFiveCourse(
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, session);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy .button").first()).toBeVisible();
 }
 
@@ -229,7 +229,7 @@ async function loadStageSixCourse(page: Page, bookCourseApi: BookCourseApiFixtur
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy .button").first()).toBeVisible();
 }
 
@@ -288,7 +288,7 @@ async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixtu
   await page.addInitScript(() => {
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await page.locator(".nav-upload").click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
@@ -301,6 +301,8 @@ async function openStageFourChapterConfirm(page: Page, bookCourseApi: BookCourse
     mimeType: "application/pdf",
     buffer: Buffer.from("stage seven visual fixture")
   });
+  await expect(page.locator(".upload-selection-summary")).toBeVisible();
+  await page.getByRole("button", { name: "上传并继续", exact: true }).click();
   await expect(page.locator(".parse-ready-screen")).toBeVisible();
   await page.locator(".parse-flow-actions .button").first().click();
   await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 10_000 });
@@ -411,7 +413,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
 
   test("records the Home visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await expect(page.locator(".home-screen")).toBeVisible();
     await expectVisualBaseline(page, "home.png");
     await expectSurfaceContract(page, "Home", ".daily-task-copy .button");
@@ -525,7 +527,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
 
   test("records the AI chat visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const orb = page.locator(".ai-orb");
     await expect(orb).toBeVisible();
     await orb.click();
@@ -535,14 +537,14 @@ test.describe("Stage 7 final responsive acceptance", () => {
   });
 
   test("enforces shell, navigation, overflow, visibility, and touch contracts at exact breakpoint and paired sizes", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     for (const viewport of [...breakpointViewports, ...targetViewports]) {
       await expectViewportShellContract(page, viewport, `Stage 7 ${viewport.width}x${viewport.height}`);
     }
   });
 
   test("audits viewport-fit and safe-area layout rules without pretending desktop WebKit has a hardware inset", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit\s*=\s*cover/);
 
     const desktopWebKitSafeAreas = await page.evaluate(() => {
@@ -621,7 +623,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
   test("keeps critical home and assignment flows usable under an effective 150 percent text scale", async ({ page, bookCourseApi }) => {
     const scale = 1.5;
     await page.setViewportSize({ width: 402, height: 681 });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const homeAction = page.locator(".daily-task-copy .button").first();
     const homeBefore = await homeAction.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     const homeScale = await applyVisibleTextScale(page, scale);
@@ -661,7 +663,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await expect(sheetTrigger, "closing the chat ActionSheet restores trigger focus").toBeFocused();
 
     await page.setViewportSize({ width: 402, height: 681 });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const orb = page.locator(".ai-orb");
     await orb.focus();
     await page.keyboard.press("Enter");

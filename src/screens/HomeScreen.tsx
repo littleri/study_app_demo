@@ -208,7 +208,7 @@ export function HomeScreen() {
         </span>
       </header>
 
-      <section className={`home-focus-panel is-${courseStatus}`} aria-labelledby="home-focus-title">
+      <section className={`home-focus-panel is-${courseStatus}`} data-brand-moment="home-task" aria-labelledby="home-focus-title">
         <div className="home-focus-content">
           <div className="home-focus-label">
             <CalendarDays size={16} aria-hidden="true" />
@@ -219,7 +219,7 @@ export function HomeScreen() {
           <p className="home-focus-description">{focusDescription}</p>
           {isProcessing ? (
             <div className="home-focus-progress" aria-label={`解析进度 ${parseProgress}%`}>
-              <span style={{ width: `${parseProgress}%` }} />
+              <span style={{ transform: `scaleX(${parseProgress / 100})` }} />
             </div>
           ) : null}
           <button className="home-primary-action" type="button" onClick={() => go(primaryTarget)}>

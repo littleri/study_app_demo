@@ -77,7 +77,7 @@ async function loadPreparedCourse(page: Page, bookCourseApi: BookCourseApiFixtur
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "prepared fixture finishes the real parse flow").toBeVisible();
 }
 
@@ -90,7 +90,7 @@ async function loadStageFiveCourse(
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "Stage 5 fixture finishes the real parse flow").toBeVisible();
 }
 
@@ -103,7 +103,7 @@ async function loadStageSixCourse(
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "Stage 6 fixture finishes the real parse flow").toBeVisible();
 }
 
@@ -633,7 +633,7 @@ async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixtu
   await page.addInitScript(() => {
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await page.locator(".nav-upload").click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
 }
@@ -822,7 +822,7 @@ test.describe("responsive smoke", () => {
       "http://localhost:8000/api/probe"
     ];
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const fixtureResponse = await page.evaluate(async () => {
       const response = await fetch("/api/books");
       return { status: response.status, body: await response.json() };
@@ -856,7 +856,7 @@ test.describe("responsive smoke", () => {
     const uploadHeading = page.getByRole("heading", { name: "上传一本书", exact: true });
 
     expect(page.viewportSize(), `${project.name}: initial CSS viewport is configured`).toEqual(project.initialViewport);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await expect(app, `${project.name}: app loads at the initial viewport`).toBeVisible();
     await expect(homeHeading, `${project.name}: home loads at the initial viewport`).toBeVisible();
     await expectNavigationMode(page, project.initialViewport, `${project.name}: initial viewport`);
@@ -916,7 +916,7 @@ test.describe("responsive smoke", () => {
       { width: 1024, height: 600 }
     ];
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     for (const viewport of [...widthCases, ...heightCases]) {
       await page.setViewportSize(viewport);
       await expectNavigationMode(page, viewport, `${project.name}: ${viewport.width}x${viewport.height}`);
@@ -926,7 +926,7 @@ test.describe("responsive smoke", () => {
   test("respects injected non-zero safe areas and preserves hideNav", async ({ page }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.addStyleTag({
       content: `:root {
         --safe-area-top: 47px !important;
@@ -998,7 +998,7 @@ test.describe("responsive smoke", () => {
 
   test("rejects Stage 4 chapters outside their parent page range", async ({ page, bookCourseApi }) => {
     bookCourseApi.useStageFourFlow();
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const rejection = await page.evaluate(async () => {
       const response = await fetch("/api/books/book_stage4/chapters/confirm", {
@@ -1049,7 +1049,7 @@ test.describe("responsive smoke", () => {
 
   test("accepts Stage 4 chapters with an empty parent ID as top-level", async ({ page, bookCourseApi }) => {
     bookCourseApi.useStageFourFlow();
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const result = await page.evaluate(async () => {
       type ConfirmedChapter = { chapter_id: string; parent_id: string | null; status: string };
@@ -1717,7 +1717,7 @@ test.describe("responsive smoke", () => {
 
   test("checks Stage 6 empty, loading, and error states with local fixtures", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await page.locator(".profile-settings-list .settings-row").nth(2).click();
     await expect(page.locator(".notes-screen .parse-empty-card"), `${project.name}: notes keeps its no-course empty state`).toBeVisible();
@@ -1779,7 +1779,7 @@ test.describe("responsive smoke", () => {
     const project = getResponsiveProject(testInfo.project.name);
     const viewport = { width: 834, height: 1194 };
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.setViewportSize(viewport);
     const orb = page.getByRole("button", { name: "打开 AI 助手" });
     await expect(orb, `${project.name}: AI orb is available before the drag`).toBeVisible();
@@ -1888,7 +1888,7 @@ test.describe("responsive smoke", () => {
 
   test("keeps the AI dialog accessible across drag, rotation, and iPhone keyboard height", async ({ page }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.setViewportSize({ width: 402, height: 681 });
     const orb = page.getByRole("button", { name: "打开 AI 助手" });
     await orb.click();
@@ -1934,7 +1934,7 @@ test.describe("responsive smoke", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await installVisualViewportShim(page);
     await page.setViewportSize({ width: 834, height: 1194 });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await expectNavigationMode(page, { width: 834, height: 1194 }, `${project.name}: iPad layout viewport`);
     const orb = page.getByRole("button", { name: "打开 AI 助手" });
     await orb.click();
@@ -1961,7 +1961,7 @@ test.describe("responsive smoke", () => {
 
     await installVisualViewportShim(page);
     await page.setViewportSize(layoutViewport);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const homeRailBounds = await getRailBounds(page);
     await setVisualViewport(page, shrunkViewport);
     await expectOverlayViewportVariables(page, shrunkViewport, "iPad home shrunk viewport");
@@ -2032,7 +2032,7 @@ test.describe("responsive smoke", () => {
     const project = getResponsiveProject(testInfo.project.name);
     const viewports = [project.initialViewport, project.pairedViewport, { width: 402, height: 430 }];
 
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     for (const viewport of viewports) {
       await page.setViewportSize(viewport);
       const orb = page.locator(".ai-orb");
@@ -2045,7 +2045,7 @@ test.describe("responsive smoke", () => {
   });
 
   test("opens the AI assistant after a cancelled drag and one keyboard activation", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.setViewportSize({ width: 402, height: 430 });
     const orb = page.locator(".ai-orb");
     const screen = page.locator(".motion-screen-transition");
@@ -2089,7 +2089,7 @@ test.describe("responsive smoke", () => {
   test("honors reduced motion for global overlays", async ({ page }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.getByRole("button", { name: "打开 AI 助手" }).click();
     const motion = await page.evaluate(() => {
       const panel = document.querySelector<HTMLElement>(".ai-overlay");

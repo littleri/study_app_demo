@@ -11,12 +11,11 @@ import "./styles/responsive.css";
 import "./styles/home.css";
 import "./styles/motion.css";
 import "./styles/device-preview.css";
+import "./styles/card-system.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isEmbeddedPreview = searchParams.get("embedded") === "device-preview";
-const Root = !isEmbeddedPreview && searchParams.get("preview") === "devices"
-  ? DevicePreviewStudio
-  : App;
+const Root = isEmbeddedPreview ? App : DevicePreviewStudio;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

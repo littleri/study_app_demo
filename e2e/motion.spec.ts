@@ -224,7 +224,7 @@ test.describe("Stage 1 motion foundations", () => {
 
   test("exposes the locked normal tokens and root preference", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     await expect(page.locator(".app-shell")).toHaveAttribute("data-motion-reduced", "false");
     expect(await readTokens(page)).toEqual(normalTokens);
@@ -232,7 +232,7 @@ test.describe("Stage 1 motion foundations", () => {
 
   test("keeps real Button and IconButton press feedback transform-only without changing layout bounds", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await installMotionProbe(page);
 
     const iconButton = page.locator("#motion-stage-one-probe .icon-button");
@@ -316,7 +316,7 @@ test.describe("Stage 1 motion foundations", () => {
 
   test("updates the root and Stage 1 controls synchronously for reduced motion", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await installMotionProbe(page);
 
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -532,7 +532,7 @@ test.describe("Stage 3A Processing progress and first-play motion", () => {
     });
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     await startProcessingMotionJob(page, "processing-motion-a.pdf");
     await expect(page.locator(".stage-list")).toHaveAttribute("aria-label");
@@ -625,7 +625,7 @@ test.describe("Stage 3A Processing progress and first-play motion", () => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     await startProcessingMotionJob(page, "processing-motion-reduced.pdf");
     await expect(page.locator(".app-shell")).toHaveAttribute("data-motion-reduced", "true");
@@ -655,7 +655,7 @@ test.describe("Stage 3A Processing progress and first-play motion", () => {
     fixture.useProcessingMotionFlow({ jobIds: [jobA], progressSequence: [0, 1, 50, 50] });
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await startProcessingMotionJob(page, "processing-motion-runtime-reduce.pdf");
     await page.clock.fastForward(2500);
     const stagePause = await page.addStyleTag({
@@ -841,7 +841,7 @@ async function openStageThreeB1Upload(
   await page.addInitScript(() => {
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await settleCurrentScreenTransition(page);
   await page.locator(".nav-upload").click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
@@ -878,7 +878,7 @@ async function prepareStageThreeB2AChapterConfirm(page: Page, fixture: StageThre
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
   await installStageThreeB1CoverRoute(page);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await startProcessingMotionJob(page, "chapter-confirm-motion-fixture.pdf");
   await expect.poll(() => stageThreeB1JobReadCount(fixture, "job_stage4")).toBe(1);
 }
@@ -1172,7 +1172,7 @@ test.describe("Stage 3B1 upload, parse-ready, and library status feedback", () =
       window.localStorage.removeItem("bookcourse-active-parse-session");
     });
     await installStageThreeB1CoverRoute(page);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await startProcessingMotionJob(page, "stage-three-b1-same-status.pdf");
     await expect.poll(() => stageThreeB1JobReadCount(fixture, "job_processing_motion_a")).toBe(1);
     const feedbackPause = await page.addStyleTag({ content: ".library-status-feedback { animation-play-state: paused !important; }" });
@@ -1772,7 +1772,7 @@ async function prepareStageThreeB2BLibrary(page: Page, fixture: StageThreeB2BIma
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true })).toBeVisible();
 }
 
@@ -2050,7 +2050,7 @@ async function openPausedReplaceTransition(page: Page, bookCourseApi: { useStage
   await page.addInitScript(() => {
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   const pause = await page.addStyleTag({ content: ".motion-screen-transition { animation-play-state: paused !important; }" });
   const root = page.locator(".motion-screen-transition");
 
@@ -2094,7 +2094,7 @@ test.describe("Stage 2A navigation and page roots", () => {
 
   test("keeps initial and same-screen navigation static while preserving one page root", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const root = page.locator(".motion-screen-transition");
     const main = page.locator("main.screen-content");
@@ -2116,7 +2116,7 @@ test.describe("Stage 2A navigation and page roots", () => {
 
   test("uses a single atomic root for forward and back navigation and focuses the new main", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const root = page.locator(".motion-screen-transition");
     const viewport = page.viewportSize();
@@ -2152,7 +2152,7 @@ test.describe("Stage 2A navigation and page roots", () => {
 
     for (const viewport of [project.initialViewport, project.pairedViewport]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
+      await page.goto("/?embedded=device-preview");
       const pause = await page.addStyleTag({ content: ".motion-screen-transition { animation-play-state: paused !important; }" });
       const root = page.locator(".motion-screen-transition");
 
@@ -2203,7 +2203,7 @@ test.describe("Stage 2A navigation and page roots", () => {
 
   test("settles rapid navigation at the final screen without retaining another content tree", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const root = page.locator(".motion-screen-transition");
     await page.getByRole("button", { name: "社区", exact: true }).click();
@@ -2223,7 +2223,7 @@ test.describe("Stage 2A navigation and page roots", () => {
     void bookCourseApi;
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const pause = await page.addStyleTag({ content: ".motion-screen-transition { animation-play-state: paused !important; }" });
     const root = page.locator(".motion-screen-transition");
     const viewport = page.viewportSize();
@@ -2287,7 +2287,7 @@ test.describe("Stage 2A navigation and page roots", () => {
   test("settles page roots synchronously under reduced motion", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const root = page.locator(".motion-screen-transition");
     await page.getByRole("button", { name: "我的", exact: true }).click();
@@ -2470,7 +2470,7 @@ async function openPreparedChapterConfirm(page: Page, bookCourseApi: { usePrepar
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   const animationPause = await pauseNavAnimations(page);
   const screen = page.locator(".motion-screen-transition");
   const continueLearning = page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true });
@@ -2505,7 +2505,7 @@ test.describe("Stage 2B PrimaryNav motion", () => {
 
     for (const viewport of [project.initialViewport, project.pairedViewport]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
+      await page.goto("/?embedded=device-preview");
       await expectNavPresentation(page, viewport, `${project.name} ${viewport.width}x${viewport.height} standard navigation`);
       const before = await readNavFootprint(page);
       await pauseNavAnimations(page);
@@ -2681,7 +2681,7 @@ test.describe("Stage 2B PrimaryNav motion", () => {
 
     for (const viewport of [project.initialViewport, project.pairedViewport]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
+      await page.goto("/?embedded=device-preview");
       await expectNavPresentation(page, viewport, `${project.name} ${viewport.width}x${viewport.height} reduced navigation`);
       const before = await readNavFootprint(page);
       await page.getByRole("button", { name: "社区", exact: true }).click();
@@ -2934,7 +2934,7 @@ async function openPreparedLessonForMotion(page: Page, bookCourseApi: { usePrepa
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
   await page.getByRole("button", { name: "进入课程", exact: true }).first().click();
   await page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }).click();
@@ -2947,7 +2947,7 @@ async function openPreparedChapterEditorForMotion(page: Page, bookCourseApi: { u
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
   await expect(page.locator(".library-course-grid"), "prepared fixture opens its course library before editing a course").toBeVisible();
   await page.getByRole("button", { name: "编辑 阶段 3 测试教材", exact: true }).first().click();
@@ -3307,7 +3307,7 @@ test.describe("Stage 2C ActionSheet and Toast motion", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.locator(".nav-item").nth(3).click();
     await settleScreenTransition(page);
     const toastPause = await page.addStyleTag({ content: ".toast { animation-play-state: paused !important; }" });
@@ -3379,7 +3379,7 @@ test.describe("Stage 2C ActionSheet and Toast motion", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.locator(".nav-item").nth(3).click();
     await settleScreenTransition(page);
     const toastPause = await page.addStyleTag({ content: ".toast { animation-play-state: paused !important; }" });
@@ -3779,7 +3779,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
   test("maps the AI dialog and scrim to the locked device motion across all eight viewports", async ({ page, bookCourseApi }, testInfo) => {
     void bookCourseApi;
     const project = getResponsiveProject(testInfo.project.name);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const orb = page.locator(".ai-orb");
 
     for (const viewport of [project.initialViewport, project.pairedViewport]) {
@@ -3812,7 +3812,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await page.clock.install({ time: new Date("2026-01-01T00:00:00.000Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:00.000Z"));
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const orb = page.locator(".ai-orb");
     const entryPause = await openPausedAiDialog(page, orb);
     await finishAiDialogAnimation(page);
@@ -3908,7 +3908,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
     void bookCourseApi;
     const project = getResponsiveProject(testInfo.project.name);
     await installControllableRaf(page);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.setViewportSize(project.initialViewport);
     const orb = page.locator(".ai-orb");
     await expect(orb).toBeVisible();
@@ -4051,7 +4051,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await installVisualViewportShim(page);
     await page.setViewportSize(project.initialViewport);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     const orb = page.locator(".ai-orb");
     const entryPause = await openPausedAiDialog(page, orb);
     const dialog = page.locator(".ai-overlay");
@@ -4193,7 +4193,7 @@ test.describe("Stage 4A Home and Library course-card lifecycle", () => {
     fixture.useStageFiveFlow();
     const arrivingBooks = Array.from({ length: 4 }, () => fixture.appendPreparedCourse());
     await installStageFourACourseCardPause(page);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const newestBookId = arrivingBooks.at(-1)?.book_id;
     if (!newestBookId) throw new Error("Stage 4A needs an arriving course id.");
@@ -4268,7 +4268,7 @@ test.describe("Stage 4A Home and Library course-card lifecycle", () => {
     fixture.useStageFiveFlow();
     const arrivingBook = fixture.appendPreparedCourse();
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
 
     const homeCard = page.locator(`.home-screen .book-mini[data-motion-course-card-key="course-card:${arrivingBook.book_id}"]`);
     await expectDirectStageFourACourseCard(homeCard, `${testInfo.project.name}: reduced Home course`);
@@ -4644,7 +4644,7 @@ async function loadStageFourBCourse(page: Page, fixture: BookCourseApiFixture) {
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, stageFourBPreparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy .button"), "Stage 4B fixture reaches the existing real-home action").toBeVisible();
   await settleCurrentScreenTransition(page);
 }
@@ -5120,7 +5120,7 @@ async function loadStageFourCCourse(
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, stageFourBPreparedCourseSession);
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await expect(page.locator(".daily-task-copy .button"), "Stage 4C fixture reaches the existing home action").toBeVisible();
   await settleCurrentScreenTransition(page);
 }
@@ -5249,7 +5249,7 @@ async function expectStageFourCImageIdle(locator: Locator, label: string) {
 }
 
 async function openStageFourCCommunity(page: Page) {
-  await page.goto("/");
+  await page.goto("/?embedded=device-preview");
   await settleCurrentScreenTransition(page);
   await page.locator(".primary-nav .nav-item").nth(1).click();
   await expect(page.locator(".community-screen"), "Stage 4C Community opens through its existing primary navigation").toBeVisible();
@@ -5355,7 +5355,7 @@ test.describe("Stage 4C remaining local motion", () => {
 
   test("uses direct final MistakeBook and Notes states under reduced motion", async ({ page, bookCourseApi }, testInfo) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen")).toBeVisible();
     await page.locator(".profile-settings-list .settings-row").nth(2).click();
@@ -5852,7 +5852,7 @@ test.describe("Stage 5 stress, performance, and final acceptance", () => {
   test("settles rapid navigation, all ActionSheet variants, Toast replacement, and the AI Orb", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
     bookCourseApi.useStageSixFlow();
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await settleCurrentScreenTransition(page);
     await expectNavPresentation(page, project.initialViewport, `${project.name}: Stage 5 initial navigation`);
 
@@ -5932,7 +5932,7 @@ test.describe("Stage 5 stress, performance, and final acceptance", () => {
     }
 
     bookCourseApi.useStageSixFlow();
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await settleCurrentScreenTransition(page);
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen"), `${project.name}: Profile remains reachable for the Toast flow`).toBeVisible();
@@ -5999,7 +5999,7 @@ test.describe("Stage 5 stress, performance, and final acceptance", () => {
       window.localStorage.removeItem("bookcourse-active-parse-session");
     });
     await installStageThreeB1CoverRoute(page);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await startProcessingMotionJob(page, "stage-five-same-status.pdf");
     await expect.poll(() => stageThreeB1JobReadCount(fixture, "job_processing_motion_a")).toBe(1);
     await activateStageThreeB1Control(page.locator(".processing-flow-actions .button"));
@@ -6097,7 +6097,7 @@ test.describe("Stage 5 stress, performance, and final acceptance", () => {
     await expect.poll(() => page.evaluate(() => window.matchMedia("(prefers-contrast: more)").matches), {
       message: `${project.name}: contrast preference is observable for the static readability audit`
     }).toBe(true);
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await settleCurrentScreenTransition(page);
     const contrastNav = page.locator(".primary-nav .nav-item").first();
     await expect(contrastNav, `${project.name}: existing navigation remains readable and keyboard reachable under contrast preference`).toBeVisible();
@@ -6135,7 +6135,7 @@ test.describe("Stage 5 stress, performance, and final acceptance", () => {
   });
 
   test("audits CSS keyframes, transition scope, and settled compositor residue", async ({ page, bookCourseApi }, testInfo) => {
-    await page.goto("/");
+    await page.goto("/?embedded=device-preview");
     await settleCurrentScreenTransition(page);
     const audit = await auditStageFiveCssPerformance(page);
     const allowedPathKeyframeProperties = new Set(["motion-course-ready-check-path", "motion-checkbox-check-in"]);

@@ -15,10 +15,11 @@ import {
 import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
 import {
+  coursePreparationSteps,
   formatFileSize,
-  getFileKind,
-  ragPipelineSteps
+  getFileKind
 } from "./shared";
+import { startConfirmedCourseParse } from "./uploadFlow";
 
 export function ParseReadyScreen() {
   const { go, parseJobId, parseJobStatus, selectedUpload, uploadedFile, setActiveChapterId, setCurrentStudyPlan, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLatestDiagnosis, setLessonBuildJobId, setLessonBuildJobStatus, setParseJobId, setParseJobStatus, setParsedAssets, setParsedChapters, setParsedChunks, setParsedScanResult, setUploadedFile, setSelectedUpload, showToast } = useAppContext();
@@ -33,7 +34,7 @@ export function ParseReadyScreen() {
     setParsing(true);
     setParseError(null);
     try {
-      const job = await bookcourseApi.startParse(uploadedFile.bookId);
+      const job = await startConfirmedCourseParse(uploadedFile, bookcourseApi);
       setParseJobId(job.job_id);
       setParseJobStatus({
         job_id: job.job_id,
@@ -56,7 +57,7 @@ export function ParseReadyScreen() {
       setGeneratedQuizzes(null);
       setLessonBuildJobId(null);
       setLessonBuildJobStatus(null);
-      showToast("解析任务已创建");
+      showToast("后台解析已开始；你可以安全离开，进度会保留");
       go("processing");
     } catch (err) {
       const message = err instanceof Error ? err.message : "解析任务创建失败";
@@ -91,7 +92,7 @@ export function ParseReadyScreen() {
   const jobMessage = parseError
     ?? (parseJobStatus?.status === "failed"
       ? parseJobStatus.error ?? parseJobStatus.message ?? "解析失败，请检查文件后重试"
-      : parseJobStatus?.message ?? (parseJobId ? "后台 OCR/解析正在运行，完成后会自动生成目录" : "文件已上传，等待启动后台解析"));
+      : parseJobStatus?.message ?? (parseJobId ? "后台正在整理教材，完成后会自动生成目录。你可以安全离开，稍后回来查看。" : "文件已上传。点击下方按钮后才会开始后台解析；开始后可以安全离开。"));
   const parseStatus = parseError
     ? "start-error"
     : parseJobStatus?.status === "failed"
@@ -108,8 +109,8 @@ export function ParseReadyScreen() {
       ? "解析失败"
       : parseJobId
         ? "后台处理中"
-        : "待启动";
-  const primaryActionText = parseJobStatus?.status === "done" ? "查看目录" : parseJobId ? "查看后台进度" : "启动后台解析";
+      : "等待你开始";
+  const primaryActionText = parseJobStatus?.status === "done" ? "查看目录" : parseJobId ? "查看后台进度" : "开始后台解析";
 
   return (
     <div className="screen-stack parse-ready-screen parse-flow-screen">
@@ -120,7 +121,7 @@ export function ParseReadyScreen() {
         </span>
         <div>
           <div className="parse-upload-heading">
-            <Pill tone="sky">已上传</Pill>
+            <Pill tone="sky">已上传，待确认</Pill>
             {selectedUpload ? <span className="upload-success-mark" aria-hidden="true"><CheckCircle2 size={16} /></span> : null}
           </div>
           <h2>{uploadedFile.name}</h2>
@@ -133,16 +134,17 @@ export function ParseReadyScreen() {
       <div className="parse-info-grid">
         <Metric label="文件类型" value={fileKind} />
         <Metric label="文件大小" value={formatFileSize(uploadedFile.sizeBytes)} />
-        <Metric label="课程 ID" value={uploadedFile.bookId.replace("book_", "").slice(0, 8)} />
+        <Metric label="下一步" value="后台解析" />
       </div>
 
       <div className="parse-checklist">
-        {ragPipelineSteps.map((item, index) => (
+        {coursePreparationSteps.map((item, index) => (
           <div className="parse-check-row" key={item}>
             <span>{index === 0 ? <CheckCircle2 size={18} aria-hidden="true" /> : index + 1}</span>
             <strong>{item}</strong>
           </div>
         ))}
+        <p className="helper-text">这些步骤会在你明确开始后在后台完成，不必停留在这个页面等待。</p>
       </div>
 
       <div
@@ -183,7 +185,7 @@ export function ParseReadyScreen() {
           {primaryActionText}
         </Button>
         <Button variant="secondary" disabled={parsing} onClick={() => go("home")}>
-          先去首页
+          稍后开始
         </Button>
         <Button
           variant="secondary"
@@ -203,7 +205,7 @@ export function ParseReadyScreen() {
             go("upload");
           }}
         >
-          重新选择
+          更换文件
         </Button>
       </div>
       </div>

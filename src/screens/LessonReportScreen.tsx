@@ -14,7 +14,7 @@ export function LessonReportScreen() {
     <div className="screen-stack report-screen">
       <div className="report-workspace">
         <div className="report-summary-column">
-      <Card {...summaryMotion.attributes} className="report-card">
+      <Card {...summaryMotion.attributes} surface="celebration" className="report-card">
         <p className="eyebrow">章节学习报告</p>
         <h2>太棒了！</h2>
         <p>第 2 章 基因和染色体的关系</p>

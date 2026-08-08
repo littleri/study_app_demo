@@ -182,7 +182,7 @@ export function parsePreviewSettings(search: string): PreviewSettings {
 
 export function buildPreviewSearch(settings: PreviewSettings, currentSearch = "") {
   const params = new URLSearchParams(currentSearch);
-  params.set("preview", "devices");
+  params.delete("preview");
   params.set("device", settings.device);
   params.set("orientation", settings.orientation);
   params.set("quality", settings.quality);

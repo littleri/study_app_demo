@@ -160,14 +160,16 @@
 
 .home-focus-progress span {
   display: block;
+  width: 100%;
   height: 100%;
   border-radius: inherit;
   background: #6f72f5;
-  transition: width var(--motion-duration-progress) var(--motion-ease-enter);
+  transform-origin: left center;
+  transition: transform var(--motion-duration-progress) var(--motion-ease-enter);
 }
 
 .home-primary-action {
-  min-height: 40px;
+  min-height: var(--touch-target-primary);
   max-width: 100%;
   display: inline-flex;
   align-items: center;
@@ -337,7 +339,7 @@
 }
 
 .home-section-heading button {
-  min-height: 30px;
+  min-height: var(--touch-target-min);
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -442,7 +444,7 @@
 }
 
 .home-course-error button {
-  min-height: 34px;
+  min-height: var(--touch-target-min);
   padding: 7px 11px;
   border: 0;
   border-radius: 999px;

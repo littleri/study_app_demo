@@ -67,7 +67,7 @@ export function BookCourseScreen() {
           <p>{`${parsedChunks?.length ?? 0} 个 RAG 片段 · ${parsedAssets?.length ?? 0} 个课程插图 · ${currentStudyPlan?.tasks.length ?? 0} 个学习任务`}</p>
         </div>
       </Card>
-      <div {...actionsMotion.attributes} className="course-action-grid">
+      <div {...actionsMotion.attributes} className="course-action-grid" role="group" aria-label="课程工具">
         <QuickAction icon={<CalendarDays size={19} aria-hidden="true" />} title="学习计划" helper={`${currentStudyPlan?.tasks.length ?? 14} 项`} onClick={() => go("plan")} />
         <QuickAction icon={<BookOpen size={19} aria-hidden="true" />} title="RAG 片段" helper={`${parsedChunks?.length ?? 0} 条`} onClick={() => go("lesson")} />
         <QuickAction icon={<CircleAlert size={19} aria-hidden="true" />} title="本书错题" helper="实时诊断" onClick={() => go("mistakes")} />
