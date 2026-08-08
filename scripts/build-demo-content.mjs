@@ -332,9 +332,9 @@ const updatedChapters = (curated.chapters ?? []).map((chapter) => chapter.chapte
       ...chapter,
       page_start: 11,
       page_end: 21,
-      confidence: 94,
-      status: "匹配良好",
-      source: "mineru"
+      confidence: 100,
+      status: "已确认",
+      source: "manual_toc_reference+mineru"
     }
   : chapter);
 
@@ -466,7 +466,7 @@ const provenance = {
     })),
     citation_policy: "每条课程引用必须保留原始 OCR 文本、PDF 页、教材印刷页、content_list 条目索引与哈希。"
   },
-  fixture_policy: "P0 course fixtures are generated from MinerU content_list/middle output; non-P0 navigation remains a visual baseline until its own source pass."
+  fixture_policy: "完整目录由教材目录参考图人工确认；第 2 章第 1 节的课程正文与引用继续使用 MinerU OCR 证据。"
 };
 
 const updatedAssignment = {

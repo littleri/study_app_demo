@@ -62,6 +62,8 @@ export type ApiChapter = {
   ai_title: string;
   page_start: number;
   page_end: number;
+  printed_page_start?: number | null;
+  printed_page_end?: number | null;
   confidence: number;
   status: string;
   source: string;
@@ -390,6 +392,7 @@ export type StudyTask = {
   title: string;
   task_type: string;
   minutes: number;
+  chapter_id?: string | null;
   lesson_id?: string | null;
   review_target?: string | null;
   status: string;

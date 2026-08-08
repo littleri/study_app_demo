@@ -42,7 +42,7 @@ export function CommunityImportScreen() {
       </div>
 
       <div className="community-import-actions">
-      <Button onClick={() => go("book")}>进入学习</Button>
+      <Button onClick={() => go("study")}>进入学习</Button>
       <Button variant="secondary" onClick={() => go("library")}>查看我的课程</Button>
       </div>
     </div>

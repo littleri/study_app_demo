@@ -10,7 +10,6 @@ import {
   Home,
   Loader2,
   MessageCircle,
-  PlusCircle,
   SendHorizontal,
   Upload,
   User,
@@ -239,7 +238,7 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       screen: "home" as Screen,
       label: "首页",
       icon: Home,
-      active: active === "home" || active === "library" || active === "book"
+      active: active === "home" || active === "library"
     },
     {
       screen: "community" as Screen,
@@ -248,15 +247,10 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       active: active === "community" || active === "communityBook" || active === "communityImport"
     },
     {
-      screen: "upload" as Screen,
-      label: "上传",
-      icon: PlusCircle,
-      active:
-        active === "upload" ||
-        active === "parseReady" ||
-        active === "processing" ||
-        active === "chapterConfirm" ||
-        active === "courseReady"
+      screen: "study" as Screen,
+      label: "学习",
+      icon: BookOpenCheck,
+      active: active === "study" || active === "book"
     },
     { screen: "profile" as Screen, label: "我的", icon: User, active: active === "profile" }
   ];
@@ -300,8 +294,8 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
     if (canAnimate) {
       gsap.to(selection, {
         ...targetPosition,
-        duration: 0.5,
-        ease: "back.out(1.2)",
+        duration: 0.24,
+        ease: "power2.out",
         overwrite: "auto"
       });
     } else {
@@ -326,12 +320,12 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
         return (
           <button
             key={item.screen}
-            className={`nav-item ${item.active ? "active" : ""} ${item.screen === "upload" ? "nav-upload" : ""}`}
+            className={`nav-item ${item.active ? "active" : ""} ${item.screen === "study" ? "nav-study" : ""}`}
             type="button"
             aria-current={item.active ? "page" : undefined}
             data-nav-index={index}
             data-motion-active={item.active ? "true" : "false"}
-            data-motion-nav-kind={item.screen === "upload" ? "upload" : "standard"}
+            data-motion-nav-kind="standard"
             onClick={() => go(item.screen)}
           >
             <span className="nav-icon">
@@ -465,7 +459,9 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
+        {active !== "study" && active !== "book" ? (
+          <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
+        ) : null}
         {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
         {overlays}
       </div>

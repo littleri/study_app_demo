@@ -634,7 +634,7 @@ async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixtu
     window.localStorage.removeItem("bookcourse-active-parse-session");
   });
   await page.goto("/?embedded=device-preview");
-  await page.locator(".nav-upload").click();
+  await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
 }
 
@@ -875,7 +875,7 @@ test.describe("responsive smoke", () => {
       expect(Math.round(shellBounds.left), "1210px touch viewport is flush with the viewport edge").toBe(0);
     }
 
-    await page.getByRole("button", { name: "上传", exact: true }).click();
+    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
     await expect(uploadHeading, `${project.name}: app remains interactive after resize`).toBeVisible();
 
     await page.setViewportSize(project.initialViewport);
@@ -990,7 +990,8 @@ test.describe("responsive smoke", () => {
     expect(railSafeArea.contentPaddingLeft, "tablet content reserves the rail and left safe area").toBeGreaterThanOrEqual(99);
     expect(railSafeArea.contentPaddingRight, "tablet content avoids the right safe area").toBeGreaterThanOrEqual(13);
 
-    await page.getByRole("button", { name: "上传", exact: true }).click();
+    await page.getByRole("button", { name: "首页", exact: true }).click();
+    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
     await expect(page.getByRole("navigation", { name: "主导航" }), "hideNav removes primary navigation").toHaveCount(0);
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expectNavigationMode(page, { width: 834, height: 1194 }, `${project.name}: navigation returns after hideNav`);

@@ -13,7 +13,7 @@ import type {
   ScanResult,
   StudyPlan,
 } from "../types/api";
-import type { AppActions, SourcePageTarget, UploadedCourseFile } from "../types/app";
+import type { AppActions, SourcePageTarget, StudyLocation, UploadedCourseFile } from "../types/app";
 
 export type CourseSummariesLoadState = "loading" | "ready" | "error";
 export type CourseSummariesReadyKind = "content" | "empty";
@@ -32,6 +32,7 @@ export type AppContextValue = AppActions & {
   courseSummariesReadyKind: CourseSummariesReadyKind;
   courseSummariesError: string | null;
   courseSummariesRefreshing: boolean;
+  courseSelectionLoadingId: string | null;
   refreshCourses: () => Promise<void>;
   parsedScanResult: ScanResult | null;
   setParsedScanResult: (value: ScanResult | null) => void;
@@ -62,6 +63,7 @@ export type AppContextValue = AppActions & {
   savedNoteCount: number;
   setSavedNoteCount: (fn: (count: number) => number) => void;
   sourcePageTarget: SourcePageTarget | null;
+  studyLocations: Record<string, StudyLocation>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);

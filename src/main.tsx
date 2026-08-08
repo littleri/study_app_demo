@@ -9,6 +9,7 @@ import "./styles/glass.css";
 import "./styles/base.css";
 import "./styles/responsive.css";
 import "./styles/home.css";
+import "./styles/study.css";
 import "./styles/motion.css";
 import "./styles/device-preview.css";
 import "./styles/card-system.css";

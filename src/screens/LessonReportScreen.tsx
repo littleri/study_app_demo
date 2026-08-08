@@ -55,7 +55,7 @@ export function LessonReportScreen() {
         </div>
       </div>
       <div className="report-actions">
-      <Button onClick={() => go("book")}>返回课程主页·继续下一章</Button>
+      <Button onClick={() => go("study")}>返回学习目录·继续下一章</Button>
       <Button variant="secondary" onClick={() => go("mistakes")}>查看错题复习</Button>
       </div>
     </div>

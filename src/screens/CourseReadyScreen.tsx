@@ -128,7 +128,7 @@ export function CourseReadyScreen() {
       <div className="course-ready-actions">
       <Button onClick={() => {
         setActiveChapterId(generatedLessons?.[0]?.chapter_id ?? null);
-        go("book");
+        go("study");
       }}>进入学习</Button>
       <Button variant="secondary" onClick={() => go("plan")}>查看学习计划</Button>
       </div>
