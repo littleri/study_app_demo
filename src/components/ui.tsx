@@ -44,8 +44,8 @@ const aiDialogAnimationNames = [
   "motion-dialog-ai-phone-out",
   "motion-dialog-ai-short-in",
   "motion-dialog-ai-short-out",
-  "motion-panel-tablet-in",
-  "motion-panel-tablet-out"
+  "motion-dialog-ai-tablet-in",
+  "motion-dialog-ai-tablet-out"
 ] as const;
 
 const toastAnimationNames = ["motion-toast-in", "motion-toast-out"] as const;
@@ -760,7 +760,7 @@ function GlobalAIAssistant({
       !open &&
       dialogCloseEpochRef.current === dialogEpochRef.current &&
       orbRef.current?.isConnected &&
-      !orbRef.current.hidden
+      orbRef.current.dataset.aiOrbHidden !== "true"
     ) {
       orbRef.current.focus({ preventScroll: true });
     }
@@ -921,7 +921,8 @@ function GlobalAIAssistant({
         aria-controls="ai-assistant-dialog"
         aria-expanded={dialogVisible}
         aria-haspopup="dialog"
-        hidden={dialogVisible}
+        aria-hidden={dialogVisible ? true : undefined}
+        data-ai-orb-hidden={dialogVisible ? "true" : "false"}
         tabIndex={dialogVisible ? -1 : undefined}
         style={orbStyle}
         onClick={() => {
@@ -942,6 +943,7 @@ function GlobalAIAssistant({
           visible={dialogVisible}
           state={dialogPresence.state}
           presenceId={dialogPresence.presenceId}
+          originRef={orbRef}
           input={input}
           messages={messages}
           onClose={requestDialogClose}
@@ -958,6 +960,7 @@ function AIAssistantDialog({
   visible,
   state,
   presenceId,
+  originRef,
   input,
   messages,
   onClose,
@@ -969,6 +972,7 @@ function AIAssistantDialog({
   visible: boolean;
   state: MotionState;
   presenceId: number;
+  originRef: RefObject<HTMLButtonElement | null>;
   input: string;
   messages: { role: "ai" | "user"; text: string }[];
   onClose: () => void;
@@ -977,6 +981,9 @@ function AIAssistantDialog({
   setInput: (value: string) => void;
   submitMessage: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const layerRef = useRef<HTMLDivElement | null>(null);
+  const sharedSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const sharedIconRef = useRef<HTMLSpanElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const titleId = useId();
@@ -1020,11 +1027,88 @@ function AIAssistantDialog({
     return () => dialog.removeEventListener("animationcancel", handleAnimationCancel);
   }, [onAnimationCancel, state, visible]);
 
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    const dialog = dialogRef.current;
+    const origin = originRef.current;
+    const sharedSurface = sharedSurfaceRef.current;
+    const sharedIcon = sharedIconRef.current;
+    if (!layer || !dialog || !origin || !sharedSurface || !sharedIcon || !visible) return;
+
+    sharedSurface.removeAttribute("data-motion-ready");
+    sharedIcon.removeAttribute("data-motion-ready");
+    if (state === "idle") return;
+
+    const layerBounds = layer.getBoundingClientRect();
+    const dialogBounds = dialog.getBoundingClientRect();
+    const originBounds = origin.getBoundingClientRect();
+    if (
+      dialogBounds.width <= 0 ||
+      dialogBounds.height <= 0 ||
+      originBounds.width <= 0 ||
+      originBounds.height <= 0
+    ) return;
+
+    const targetLeft = dialogBounds.left - layerBounds.left;
+    const targetTop = dialogBounds.top - layerBounds.top;
+    const sourceLeft = originBounds.left - layerBounds.left;
+    const sourceTop = originBounds.top - layerBounds.top;
+    const deltaX = sourceLeft - targetLeft;
+    const deltaY = sourceTop - targetTop;
+    const scaleX = originBounds.width / dialogBounds.width;
+    const scaleY = originBounds.height / dialogBounds.height;
+    const dialogStyle = getComputedStyle(dialog);
+
+    Object.assign(sharedSurface.style, {
+      left: `${targetLeft}px`,
+      top: `${targetTop}px`,
+      width: `${dialogBounds.width}px`,
+      height: `${dialogBounds.height}px`
+    });
+    sharedSurface.style.setProperty("--ai-shared-delta-x", `${deltaX}px`);
+    sharedSurface.style.setProperty("--ai-shared-delta-y", `${deltaY}px`);
+    sharedSurface.style.setProperty("--ai-shared-scale-x", String(scaleX));
+    sharedSurface.style.setProperty("--ai-shared-scale-y", String(scaleY));
+    sharedSurface.style.setProperty("--ai-shared-target-radius", dialogStyle.borderRadius || "16px");
+    sharedSurface.style.setProperty("--ai-shared-target-background", dialogStyle.backgroundColor || "#ffffff");
+    sharedSurface.style.setProperty("--ai-shared-target-border", dialogStyle.borderColor || "transparent");
+
+    Object.assign(sharedIcon.style, {
+      left: `${sourceLeft}px`,
+      top: `${sourceTop}px`,
+      width: `${originBounds.width}px`,
+      height: `${originBounds.height}px`
+    });
+
+    // Restarting the proxy is intentional when a Presence generation changes.
+    // Layout geometry is committed first; only transform, color, radius, and
+    // opacity participate in the visible transition.
+    void sharedSurface.offsetWidth;
+    sharedSurface.setAttribute("data-motion-ready", "true");
+    sharedIcon.setAttribute("data-motion-ready", "true");
+  }, [originRef, presenceId, state, visible]);
+
   if (!visible) return null;
 
   return (
-    <div className="ai-overlay-layer">
+    <div ref={layerRef} className="ai-overlay-layer">
       <button className="ai-overlay-scrim" data-motion-state={state} type="button" aria-label="关闭 AI 助手背景" onClick={closeFromScrim} />
+      <div
+        key={`ai-shared-surface:${presenceId}`}
+        ref={sharedSurfaceRef}
+        className="ai-shared-surface"
+        data-motion-state={state}
+        aria-hidden="true"
+      />
+      <span
+        key={`ai-shared-icon:${presenceId}`}
+        ref={sharedIconRef}
+        className="ai-shared-origin-icon"
+        data-motion-state={state}
+        aria-hidden="true"
+      >
+        <MessageCircle size={24} aria-hidden="true" />
+      </span>
       <aside
         key={panelKey}
         ref={dialogRef}

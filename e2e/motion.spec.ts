@@ -3497,37 +3497,37 @@ function expectedAiDialogMotion(viewport: CssViewport): AiDialogExpectation {
   if (shortLandscape) {
     return {
       enterName: "motion-dialog-ai-short-in",
-      enterDuration: "0.18s",
-      enterTransform: { scale: 1, x: 0, y: 6 },
+      enterDuration: "0.24s",
+      enterTransform: { scale: 1, x: 0, y: 0 },
       closeName: "motion-dialog-ai-short-out",
-      closeDuration: "0.14s",
-      closeTransform: { scale: 1, x: 0, y: 6 }
+      closeDuration: "0.18s",
+      closeTransform: { scale: 1, x: 0, y: 0 }
     };
   }
 
   if (viewport.width >= 768 && viewport.height >= 600) {
     return {
-      enterName: "motion-panel-tablet-in",
-      enterDuration: "0.24s",
-      enterTransform: { scale: 1, x: 20, y: 0 },
-      closeName: "motion-panel-tablet-out",
-      closeDuration: "0.18s",
-      closeTransform: { scale: 1, x: 16, y: 0 }
+      enterName: "motion-dialog-ai-tablet-in",
+      enterDuration: "0.34s",
+      enterTransform: { scale: 1, x: 0, y: 0 },
+      closeName: "motion-dialog-ai-tablet-out",
+      closeDuration: "0.25s",
+      closeTransform: { scale: 1, x: 0, y: 0 }
     };
   }
 
   return {
     enterName: "motion-dialog-ai-phone-in",
-    enterDuration: "0.24s",
-    enterTransform: { scale: 1, x: 0, y: 14 },
+    enterDuration: "0.38s",
+    enterTransform: { scale: 1, x: 0, y: 0 },
     closeName: "motion-dialog-ai-phone-out",
-    closeDuration: "0.18s",
-    closeTransform: { scale: 1, x: 0, y: 10 }
+    closeDuration: "0.28s",
+    closeTransform: { scale: 1, x: 0, y: 0 }
   };
 }
 
 async function pauseAiDialogAnimations(page: Page) {
-  return page.addStyleTag({ content: ".ai-overlay, .ai-overlay-scrim { animation-play-state: paused !important; }" });
+  return page.addStyleTag({ content: ".ai-overlay, .ai-overlay-scrim, .ai-shared-surface, .ai-shared-origin-icon { animation-play-state: paused !important; }" });
 }
 
 async function finishAiDialogAnimation(page: Page) {
@@ -3539,7 +3539,10 @@ async function finishAiDialogAnimation(page: Page) {
 async function readAiDialogMotion(page: Page) {
   return page.locator(".ai-overlay").evaluate((panel) => {
     const scrim = document.querySelector<HTMLElement>(".ai-overlay-scrim");
+    const sharedSurface = document.querySelector<HTMLElement>(".ai-shared-surface");
+    const origin = document.querySelector<HTMLElement>(".ai-orb");
     if (!scrim) throw new Error("AI dialog scrim is missing.");
+    if (!sharedSurface || !origin) throw new Error("AI dialog shared surface or origin is missing.");
     const keyframeProperties = (element: Element) => {
       const ignored = new Set(["composite", "computedOffset", "easing", "offset"]);
       const properties = new Set<string>();
@@ -3563,6 +3566,16 @@ async function readAiDialogMotion(page: Page) {
       }
       return transforms;
     };
+    const keyframeBackgroundColors = (element: Element) => {
+      const colors: string[] = [];
+      for (const animation of element.getAnimations()) {
+        const effect = animation.effect as KeyframeEffect | null;
+        for (const frame of effect?.getKeyframes?.() ?? []) {
+          if (typeof frame.backgroundColor === "string") colors.push(frame.backgroundColor);
+        }
+      }
+      return colors;
+    };
     const readLayout = (element: HTMLElement) => {
       const style = getComputedStyle(element);
       return {
@@ -3582,8 +3595,12 @@ async function readAiDialogMotion(page: Page) {
     };
     const panelStyle = getComputedStyle(panel);
     const scrimStyle = getComputedStyle(scrim);
+    const sharedStyle = getComputedStyle(sharedSurface);
+    const sharedBounds = sharedSurface.getBoundingClientRect();
+    const originBounds = origin.getBoundingClientRect();
     return {
       layout: readLayout(panel),
+      originBounds: { height: originBounds.height, left: originBounds.left, top: originBounds.top, width: originBounds.width },
       scrimAnimationDuration: scrimStyle.animationDuration,
       scrimAnimationName: scrimStyle.animationName,
       scrimAnimationProperties: keyframeProperties(scrim),
@@ -3595,7 +3612,13 @@ async function readAiDialogMotion(page: Page) {
       surfaceAnimationProperties: keyframeProperties(panel),
       surfaceAnimationTimingFunction: panelStyle.animationTimingFunction,
       surfaceKeyframeTransforms: keyframeTransforms(panel),
-      surfaceTransform: panelStyle.transform
+      surfaceTransform: panelStyle.transform,
+      sharedAnimationDuration: sharedStyle.animationDuration,
+      sharedAnimationName: sharedStyle.animationName,
+      sharedAnimationProperties: keyframeProperties(sharedSurface),
+      sharedBackgroundColor: sharedStyle.backgroundColor,
+      sharedKeyframeBackgroundColors: keyframeBackgroundColors(sharedSurface),
+      sharedBounds: { height: sharedBounds.height, left: sharedBounds.left, top: sharedBounds.top, width: sharedBounds.width }
     };
   });
 }
@@ -3634,6 +3657,25 @@ function expectAiDialogState(
   );
   expect(motion.scrimTransform, `${label}: scrim only animates opacity`).toBe("none");
   expectNoLayoutMotionProperties(motion.surfaceAnimationProperties, label);
+  expect(motion.sharedAnimationName, `${label}: shared surface animation name`).toBe(
+    phase === "entering" ? "motion-dialog-ai-shared-in" : "motion-dialog-ai-shared-out"
+  );
+  expect(motion.sharedAnimationDuration, `${label}: shared surface duration follows the dialog`).toBe(duration);
+  expectNoLayoutMotionProperties(motion.sharedAnimationProperties, `${label}: shared surface`);
+  if (phase === "entering") {
+    const expectSharedOriginCoordinate = (actual: number, expectedValue: number, axis: string) => {
+      expect(Math.abs(actual - expectedValue), `${label}: shared surface starts at the Orb ${axis}`).toBeLessThan(0.5);
+    };
+    expect(motion.sharedKeyframeBackgroundColors, `${label}: opening shared surface keyframes are present`).not.toHaveLength(0);
+    expect(
+      [...new Set(motion.sharedKeyframeBackgroundColors)],
+      `${label}: opening shared surface stays white instead of flashing the brand purple`
+    ).toEqual([motion.sharedBackgroundColor]);
+    expectSharedOriginCoordinate(motion.sharedBounds.left, motion.originBounds.left, "x");
+    expectSharedOriginCoordinate(motion.sharedBounds.top, motion.originBounds.top, "y");
+    expectSharedOriginCoordinate(motion.sharedBounds.width, motion.originBounds.width, "width");
+    expectSharedOriginCoordinate(motion.sharedBounds.height, motion.originBounds.height, "height");
+  }
   expect(motion.scrimAnimationProperties, `${label}: scrim keyframes only expose opacity`).toEqual(["opacity"]);
 }
 
@@ -3699,6 +3741,8 @@ async function readOrbMotion(page: Page) {
       dragX: style.getPropertyValue("--ai-orb-drag-x").trim(),
       dragY: style.getPropertyValue("--ai-orb-drag-y").trim(),
       dragging: button.classList.contains("dragging"),
+      dataHidden: button.getAttribute("data-ai-orb-hidden"),
+      disabled: button.disabled,
       hidden: button.hidden,
       hitTestable: hitTarget !== null && button.contains(hitTarget),
       inline: { left: button.style.left, right: button.style.right, top: button.style.top },
@@ -3711,22 +3755,26 @@ async function readOrbMotion(page: Page) {
       transitionDuration: style.transitionDuration,
       transitionTimingFunction: style.transitionTimingFunction,
       transitionProperty: style.transitionProperty,
-      transform: style.transform
+      transform: style.transform,
+      visibility: style.visibility
     };
   });
 }
 
 async function expectAiOrbUnavailableDuringDialog(page: Page, label: string) {
   const orb = page.locator(".ai-orb");
-  expect(await readOrbMotion(page), `${label}: hidden Orb has no rendered or hit-testable box`).toMatchObject({
-    computedDisplay: "none",
-    hidden: true,
+  expect(await readOrbMotion(page), `${label}: visually hidden Orb retains geometry for the shared transition`).toMatchObject({
+    computedDisplay: "grid",
+    dataHidden: "true",
+    disabled: false,
+    hidden: false,
     hitTestable: false,
-    rect: { height: 0, width: 0 },
-    tabIndex: -1
+    rect: { height: 58, width: 58 },
+    tabIndex: -1,
+    visibility: "hidden"
   });
   await expect(orb, `${label}: hidden Orb is not visible or clickable`).toBeHidden();
-  expect(await orb.boundingBox(), `${label}: hidden Orb has no Playwright click target`).toBeNull();
+  expect(await orb.boundingBox(), `${label}: hidden Orb preserves its FLIP geometry`).not.toBeNull();
 }
 
 async function expectAiOrbRestoredAfterDialog(page: Page, label: string) {
@@ -3734,7 +3782,10 @@ async function expectAiOrbRestoredAfterDialog(page: Page, label: string) {
   await expect(orb, `${label}: completed dialog restores the Orb`).toBeVisible();
   const motion = await readOrbMotion(page);
   expect(motion.hidden, `${label}: restored Orb clears the hidden attribute`).toBe(false);
+  expect(motion.dataHidden, `${label}: restored Orb clears the visual hidden state`).toBe("false");
+  expect(motion.disabled, `${label}: restored Orb is enabled`).toBe(false);
   expect(motion.computedDisplay, `${label}: restored Orb restores grid display`).toBe("grid");
+  expect(motion.visibility, `${label}: restored Orb restores visibility`).toBe("visible");
   expect(motion.rect.width, `${label}: restored Orb restores a rendered box`).toBeGreaterThan(0);
   expect(motion.rect.height, `${label}: restored Orb restores a rendered box`).toBeGreaterThan(0);
   expect(motion.hitTestable, `${label}: restored Orb is hit-testable`).toBe(true);
@@ -3789,7 +3840,19 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
       const dialog = page.locator(".ai-overlay");
       const entryMotion = await readAiDialogMotion(page);
       expectAiDialogState(entryMotion, expectedAiDialogMotion(viewport), "entering", `${project.name} ${viewport.width}x${viewport.height} AI entry`);
-      expect(await orb.evaluate((button) => ({ expanded: button.getAttribute("aria-expanded"), hidden: (button as HTMLButtonElement).hidden, tabIndex: (button as HTMLButtonElement).tabIndex })), `${project.name} ${viewport.width}x${viewport.height}: Orb is hidden for the entire dialog Presence`).toEqual({ expanded: "true", hidden: true, tabIndex: -1 });
+      expect(await orb.evaluate((button) => ({
+        dataHidden: button.getAttribute("data-ai-orb-hidden"),
+        disabled: (button as HTMLButtonElement).disabled,
+        expanded: button.getAttribute("aria-expanded"),
+        hidden: (button as HTMLButtonElement).hidden,
+        tabIndex: (button as HTMLButtonElement).tabIndex
+      })), `${project.name} ${viewport.width}x${viewport.height}: Orb is visually hidden for the entire dialog Presence`).toEqual({
+        dataHidden: "true",
+        disabled: false,
+        expanded: "true",
+        hidden: false,
+        tabIndex: -1
+      });
       await expectAiOrbUnavailableDuringDialog(page, `${project.name} ${viewport.width}x${viewport.height}: AI entry`);
       await finishAiDialogAnimation(page);
       await expect(dialog).toHaveAttribute("data-motion-state", "idle");
@@ -3835,7 +3898,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
     await expect(dialog).toHaveAttribute("aria-busy", "true");
     await expect(dialog).not.toHaveAttribute("aria-hidden");
     await expect(dialog).not.toHaveAttribute("inert");
-    expect(await readOrbMotion(page), `${project.name}: Orb remains unavailable while the dialog exits`).toMatchObject({ hidden: true, tabIndex: -1 });
+    expect(await readOrbMotion(page), `${project.name}: Orb remains unavailable while the dialog exits`).toMatchObject({ dataHidden: "true", disabled: false, tabIndex: -1 });
 
     await last.focus();
     await page.keyboard.press("Tab");
@@ -3875,7 +3938,7 @@ test.describe("Stage 2D Global AI dialog and Orb motion", () => {
     const reopenedPresence = Number(await rapidPanel.getAttribute("data-motion-presence"));
     expect(reopenedPresence, `${project.name}: reopening increments AI Presence generation`).toBeGreaterThan(closingPresence);
     expect(await stalePanel.evaluate((element) => element.isConnected), `${project.name}: stale AI panel is detached`).toBe(false);
-    expect(await readOrbMotion(page), `${project.name}: stale close cannot reveal or focus the Orb`).toMatchObject({ hidden: true, tabIndex: -1 });
+    expect(await readOrbMotion(page), `${project.name}: stale close cannot reveal or focus the Orb`).toMatchObject({ dataHidden: "true", disabled: false, tabIndex: -1 });
     await stalePanel.evaluate((element, animationName) => element.dispatchEvent(new AnimationEvent("animationcancel", { animationName, bubbles: true })), expectedAiDialogMotion(project.initialViewport).closeName);
     await expect(rapidPanel, `${project.name}: detached stale close event cannot settle reopening`).toHaveAttribute("data-motion-state", "entering");
     await rapidPanel.evaluate((element, animationName) => element.dispatchEvent(new AnimationEvent("animationcancel", { animationName, bubbles: true })), expectedAiDialogMotion(project.initialViewport).closeName);

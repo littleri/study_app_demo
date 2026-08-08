@@ -738,6 +738,12 @@ button:disabled {
   box-shadow: none;
 }
 
+@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+  .ai-overlay {
+    border-radius: 28px 28px 0 0;
+  }
+}
+
 @media (max-width: 480px) {
   .header-bar {
     left: calc(var(--safe-area-left) + 12px);

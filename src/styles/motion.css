@@ -452,14 +452,15 @@
 }
 
 .ai-overlay[data-motion-state="entering"] {
-  animation-duration: var(--motion-duration-surface);
+  animation-duration: var(--ai-dialog-enter-duration);
   animation-fill-mode: both;
   animation-name: motion-dialog-ai-phone-in;
   animation-timing-function: var(--motion-ease-enter);
 }
 
 .ai-overlay[data-motion-state="closing"] {
-  animation-duration: var(--motion-duration-base);
+  z-index: 2;
+  animation-duration: var(--ai-dialog-exit-duration);
   animation-fill-mode: both;
   animation-name: motion-dialog-ai-phone-out;
   animation-timing-function: var(--motion-ease-exit);
@@ -470,50 +471,225 @@
 }
 
 @keyframes motion-dialog-ai-phone-in {
-  from {
+  0%,
+  22% {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translate3d(0, 0, 0);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes motion-dialog-ai-phone-out {
-  from {
+  0% {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 
-  to {
+  35%,
+  100% {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes motion-dialog-ai-short-in {
-  from {
+  0%,
+  14% {
     opacity: 0;
-    transform: translateY(var(--motion-distance-small));
+    transform: translate3d(0, 0, 0);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes motion-dialog-ai-short-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  35%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes motion-dialog-ai-tablet-in {
+  0%,
+  18% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes motion-dialog-ai-tablet-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  35%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ai-shared-surface,
+.ai-shared-origin-icon {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ai-shared-surface {
+  --ai-shared-delta-x: 0px;
+  --ai-shared-delta-y: 0px;
+  --ai-shared-scale-x: 1;
+  --ai-shared-scale-y: 1;
+  --ai-shared-target-radius: 16px;
+  --ai-shared-target-background: var(--color-surface);
+  --ai-shared-target-border: var(--color-border);
+  z-index: 2;
+  transform-origin: top left;
+  border: 1px solid transparent;
+  background-color: var(--ai-shared-target-background);
+  box-shadow: 0 4px 8px rgba(32, 38, 58, 0.14);
+}
+
+.ai-shared-surface[data-motion-state="closing"] {
+  z-index: 1;
+}
+
+.ai-shared-surface[data-motion-ready="true"][data-motion-state="entering"] {
+  visibility: visible;
+  will-change: transform, opacity, border-radius, background-color;
+  animation: motion-dialog-ai-shared-in var(--ai-dialog-enter-duration) var(--motion-ease-enter) both;
+}
+
+.ai-shared-surface[data-motion-ready="true"][data-motion-state="closing"] {
+  visibility: visible;
+  will-change: transform, border-radius, background-color;
+  animation: motion-dialog-ai-shared-out var(--ai-dialog-exit-duration) var(--motion-ease-exit) both;
+}
+
+.ai-shared-origin-icon {
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  transform-origin: center;
+}
+
+.ai-shared-origin-icon[data-motion-ready="true"][data-motion-state="entering"] {
+  visibility: visible;
+  animation: motion-dialog-ai-origin-icon-in var(--ai-dialog-enter-duration) var(--motion-ease-enter) both;
+}
+
+.ai-shared-origin-icon[data-motion-ready="true"][data-motion-state="closing"] {
+  visibility: visible;
+  animation: motion-dialog-ai-origin-icon-out var(--ai-dialog-exit-duration) var(--motion-ease-exit) both;
+}
+
+@keyframes motion-dialog-ai-shared-in {
   from {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(var(--ai-shared-delta-x), var(--ai-shared-delta-y), 0)
+      scale(var(--ai-shared-scale-x), var(--ai-shared-scale-y));
+    border-color: transparent;
+    border-radius: 999px;
+    background-color: var(--ai-shared-target-background);
+  }
+
+  28% {
+    border-color: transparent;
+    border-radius: 40px;
+    background-color: var(--ai-shared-target-background);
+  }
+
+  58% {
+    opacity: 1;
+    border-color: var(--ai-shared-target-border);
+    border-radius: var(--ai-shared-target-radius);
+    background-color: var(--ai-shared-target-background);
   }
 
   to {
     opacity: 0;
-    transform: translateY(var(--motion-distance-small));
+    transform: translate3d(0, 0, 0) scale(1, 1);
+    border-color: var(--ai-shared-target-border);
+    border-radius: var(--ai-shared-target-radius);
+    background-color: var(--ai-shared-target-background);
+  }
+}
+
+@keyframes motion-dialog-ai-shared-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1);
+    border-color: var(--ai-shared-target-border);
+    border-radius: var(--ai-shared-target-radius);
+    background-color: var(--ai-shared-target-background);
+  }
+
+  46% {
+    border-color: var(--ai-shared-target-border);
+    border-radius: var(--ai-shared-target-radius);
+    background-color: var(--ai-shared-target-background);
+  }
+
+  74% {
+    border-color: transparent;
+    border-radius: 40px;
+    background-color: var(--color-primary-light);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(var(--ai-shared-delta-x), var(--ai-shared-delta-y), 0)
+      scale(var(--ai-shared-scale-x), var(--ai-shared-scale-y));
+    border-color: transparent;
+    border-radius: 999px;
+    background-color: var(--color-primary);
+  }
+}
+
+@keyframes motion-dialog-ai-origin-icon-in {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  35%,
+  to {
+    opacity: 0;
+    transform: scale(.78);
+  }
+}
+
+@keyframes motion-dialog-ai-origin-icon-out {
+  from,
+  68% {
+    opacity: 0;
+    transform: scale(.78);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -571,6 +747,11 @@
 
 .ai-orb[hidden] {
   display: none;
+}
+
+.ai-orb[data-ai-orb-hidden="true"] {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .ai-orb.dragging,
@@ -1003,16 +1184,24 @@
     --motion-local-item-y: 0px;
   }
 
-  .sheet[data-sheet-type="chat"][data-motion-state="entering"],
-  .ai-overlay[data-motion-state="entering"] {
+  .sheet[data-sheet-type="chat"][data-motion-state="entering"] {
     animation-duration: var(--motion-duration-surface);
     animation-name: motion-panel-tablet-in;
   }
 
-  .sheet[data-sheet-type="chat"][data-motion-state="closing"],
-  .ai-overlay[data-motion-state="closing"] {
+  .sheet[data-sheet-type="chat"][data-motion-state="closing"] {
     animation-duration: var(--motion-duration-base);
     animation-name: motion-panel-tablet-out;
+  }
+
+  .ai-overlay[data-motion-state="entering"] {
+    animation-duration: var(--ai-dialog-enter-duration);
+    animation-name: motion-dialog-ai-tablet-in;
+  }
+
+  .ai-overlay[data-motion-state="closing"] {
+    animation-duration: var(--ai-dialog-exit-duration);
+    animation-name: motion-dialog-ai-tablet-out;
   }
 
   .sheet[data-sheet-type="source"][data-motion-state="entering"] {
@@ -1145,12 +1334,12 @@
   }
 
   .ai-overlay[data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-base);
+    animation-duration: var(--ai-dialog-enter-duration);
     animation-name: motion-dialog-ai-short-in;
   }
 
   .ai-overlay[data-motion-state="closing"] {
-    animation-duration: var(--motion-duration-fast);
+    animation-duration: var(--ai-dialog-exit-duration);
     animation-name: motion-dialog-ai-short-out;
   }
 
@@ -1168,6 +1357,8 @@
   .sheet-scrim,
   .ai-overlay,
   .ai-overlay-scrim,
+  .ai-shared-surface,
+  .ai-shared-origin-icon,
   .toast,
   .ai-orb {
     animation: none !important;
