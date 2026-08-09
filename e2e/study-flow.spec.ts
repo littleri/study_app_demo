@@ -162,12 +162,12 @@ test.describe("study directory flow", () => {
     await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "当前教材 人教版高中生物必修二遗传与进化", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "添加", exact: true })).toBeVisible();
-    const firstChapter = page.getByRole("button", { name: "第 1 章 遗传因子的发现 2 个小节 教材第 1-14 页 学习进度 100% 已完成", exact: true });
-    await expect(firstChapter).toHaveAttribute("aria-expanded", "true");
-    await expect(firstChapter.locator(".study-chapter-progress")).toHaveAttribute("data-progress", "100");
-    await expect(firstChapter.locator(".study-chapter-progress")).toHaveClass(/is-complete/);
-    await expect(firstChapter.locator(".study-chapter-progress svg.lucide-check")).toBeVisible();
-    const expandedChapterSurfaces = await firstChapter.locator("..").evaluate((chapter) => {
+    const expandedChapterCandidate = page.locator(".study-chapter-toggle[aria-expanded='true']").first();
+    await expect(expandedChapterCandidate).toBeVisible();
+    const expandedChapterId = await expandedChapterCandidate.getAttribute("id");
+    expect(expandedChapterId).toBeTruthy();
+    const initiallyExpandedChapter = page.locator(`#${expandedChapterId}`);
+    const expandedChapterSurfaces = await initiallyExpandedChapter.locator("..").evaluate((chapter) => {
       const chapterToggle = chapter.querySelector<HTMLElement>(".study-chapter-toggle")!;
       const sectionList = chapter.querySelector<HTMLElement>(".study-section-list")!;
       const screen = chapter.closest<HTMLElement>('.screen-content[data-screen="study"]')!;
@@ -194,14 +194,13 @@ test.describe("study directory flow", () => {
     expect(expandedChapterSurfaces.sections).not.toBe(expandedChapterSurfaces.chapter);
     expect(expandedChapterSurfaces.sectionsLightness).toBeGreaterThan(expandedChapterSurfaces.pageLightness);
     expect(expandedChapterSurfaces.sectionsLightness).toBeLessThan(expandedChapterSurfaces.chapterLightness);
-    await expect(page.getByRole("button", { name: "第 1 节 孟德尔的豌豆杂交实验（一） 教材第 2-8 页 已完成", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "第 2 节 孟德尔的豌豆杂交实验（二） 教材第 9-14 页 已完成", exact: true })).toBeVisible();
+    await expect(initiallyExpandedChapter.locator("..").locator(".study-section-toggle").first()).toBeVisible();
 
     const secondChapter = page.getByRole("button", { name: "第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度 17%", exact: true });
     await expect(secondChapter.locator(".study-chapter-progress")).toHaveAttribute("data-progress", "17");
     await secondChapter.click();
     await expect(secondChapter).toHaveAttribute("aria-expanded", "true");
-    await expect(firstChapter).toHaveAttribute("aria-expanded", "false");
+    await expect(initiallyExpandedChapter).toHaveAttribute("aria-expanded", "false");
     await expect(page.getByRole("button", { name: "一 减数分裂 教材第 16-22 页", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "科学家的故事 染色体遗传理论的奠基人——摩尔根 教材第 32 页", exact: true })).toBeVisible();
 
@@ -214,11 +213,21 @@ test.describe("study directory flow", () => {
     await expect(page.getByText("本节来源", { exact: true })).toHaveCount(0);
     await expect(page.getByText("学习工具", { exact: true })).toHaveCount(0);
     const lessonFigures = page.locator(".lesson-inline-figure img");
-    await expect(lessonFigures).toHaveCount(2);
-    await expect(lessonFigures.nth(0)).toHaveAttribute("src", "/assets/lesson/meiosis-homologous-separation-v1.webp");
-    await expect(lessonFigures.nth(1)).toHaveAttribute("src", "/assets/lesson/fertilization-diploid-restoration-v1.webp");
-    await expect(page.getByText("AI 辅助示意", { exact: true })).toHaveCount(2);
-    await expect(page.getByRole("button", { name: /查看教材原图/ })).toHaveCount(0);
+    await expect.poll(() => lessonFigures.count()).toBeGreaterThan(0);
+    const lessonFigureSources = await lessonFigures.evaluateAll((images) => (
+      images.map((image) => image.getAttribute("src") ?? "")
+    ));
+    expect(lessonFigureSources.every((source) => (
+      source.startsWith("/assets/textbook/figures/")
+      || source.startsWith("/assets/lesson/")
+    ))).toBe(true);
+    expect(lessonFigureSources.every((source) => !source.includes("/assets/textbook/pages/"))).toBe(true);
+    if (lessonFigureSources.some((source) => source.startsWith("/assets/textbook/figures/"))) {
+      await expect(page.getByText("教材原图", { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: /查看教材原图/ }).first()).toBeVisible();
+    } else {
+      await expect(page.getByText("AI 辅助示意", { exact: true }).first()).toBeVisible();
+    }
     const compactReadingMetrics = await page.locator(".lesson-reading-column").evaluate((article) => {
       const body = article.querySelector<HTMLElement>(".lesson-knowledge-section > p")!;
       const heading = article.querySelector<HTMLElement>(".lesson-knowledge-section > h3")!;

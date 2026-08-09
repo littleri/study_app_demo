@@ -34,6 +34,12 @@ import {
   buildLessonReadingSections
 } from "./lessonReading";
 
+function assetPrintedPage(asset: ApiAsset) {
+  if (asset.source_type !== "extracted") return null;
+  const printedPage = Number(asset.metadata?.printed_page);
+  return Number.isFinite(printedPage) && printedPage > 0 ? printedPage : null;
+}
+
 function LessonFigure({
   asset,
   citation,
@@ -47,10 +53,11 @@ function LessonFigure({
   const image = backendAssetUrl(asset.image_url);
   if (!image || imageFailed) return null;
 
+  const printedPage = assetPrintedPage(asset);
   const sourceLabel = citation
     ? learnerCitationPageLabel(citation)
     : asset.source_type === "extracted"
-      ? `教材${sourcePageLabel(asset.page)}`
+      ? `教材${sourcePageLabel(printedPage ?? asset.page)}`
       : null;
   const media = (
     <img
@@ -121,7 +128,14 @@ export function LessonScreen() {
       .filter((chunk) => chunk.content_type !== "ocr_pending")
       .map((chunk) => chunk.chunk_id);
   const liveAssets = liveChapter
-    ? parsedAssets?.filter((asset) => asset.chapter_id === liveChapter.chapter_id) ?? []
+    ? parsedAssets?.filter((asset) => (
+        asset.chapter_id === liveChapter.chapter_id
+        || (
+          asset.source_type === "extracted"
+          && liveChapter.page_start <= asset.page
+          && asset.page <= liveChapter.page_end
+        )
+      )) ?? []
     : [];
   const concepts = lesson?.key_concepts.length
     ? lesson.key_concepts
@@ -179,11 +193,14 @@ export function LessonScreen() {
       return;
     }
     if (asset.source_type !== "extracted") return;
+    const printedPage = assetPrintedPage(asset);
     openSourcePage({
       bookId: activeUploadedFile.bookId,
       title: asset.caption,
       pageStart: asset.page,
       pageEnd: asset.page,
+      printedPageStart: printedPage ?? undefined,
+      printedPageEnd: printedPage ?? undefined,
       from: "lesson"
     });
   }
