@@ -1,7 +1,7 @@
 {
   "provenance": {
-    "content_scope": "人教版高中生物必修 2《遗传与进化》完整原文目录",
-    "fixture_policy": "完整目录由教材目录参考图人工确认；第 2 章第 1 节的课程正文与引用继续使用 MinerU OCR 证据。",
+    "content_scope": "人教版高中生物必修 2《遗传与进化》当前 PDF 可用原文目录（源文件缺第 1 章正文）",
+    "fixture_policy": "目录按当前 PDF 实际页核验；源文件缺少第 1 章印刷页 1–14，第 2 章起使用 MinerU OCR 证据。",
     "source_file": "人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所, 生物课程教材研究开发中心.pdf",
     "source_sha256": "d35ca6844f22e87bef5cd3deb286c7965f386ba13924a8195eddaefa41db533a",
     "parser": "mineru",
@@ -1866,62 +1866,6 @@
     "days": 14,
     "daily_minutes": 30,
     "tasks": [
-      {
-        "task_id": "task_01",
-        "user_id": "local_user",
-        "day": 1,
-        "title": "孟德尔实验导读",
-        "chapter_id": "c1s1",
-        "task_type": "导读 + 小测",
-        "minutes": 25,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 88,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_02",
-        "user_id": "local_user",
-        "day": 2,
-        "title": "分离定律",
-        "chapter_id": "c1s1",
-        "task_type": "课程 + 练习",
-        "minutes": 30,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 82,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_03",
-        "user_id": "local_user",
-        "day": 3,
-        "title": "自由组合定律",
-        "chapter_id": "c1s2",
-        "task_type": "作业诊断",
-        "minutes": 35,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 78,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_04",
-        "user_id": "local_user",
-        "day": 4,
-        "title": "错题复习：遗传图解",
-        "chapter_id": "c1s2",
-        "task_type": "薄弱点复习",
-        "minutes": 20,
-        "lesson_id": null,
-        "review_target": "遗传图解",
-        "status": "done",
-        "score": 80,
-        "weak_points": []
-      },
       {
         "task_id": "task_05",
         "user_id": "local_user",

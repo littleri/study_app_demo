@@ -1,45 +1,17 @@
 [
   {
-    "chapter_id": "c1",
+    "chapter_id": "frontmatter",
     "level": 1,
-    "source_title": "第 1 章 遗传因子的发现",
-    "ai_title": "课程 1：理解孟德尔遗传规律",
+    "source_title": "封面、编者信息、目录与科学家访谈",
+    "ai_title": "教材前置页",
     "page_start": 1,
     "page_end": 9,
-    "printed_page_start": 1,
-    "printed_page_end": 14,
+    "printed_page_start": null,
+    "printed_page_end": null,
     "confidence": 100,
     "status": "已确认",
-    "source": "manual_toc_reference",
+    "source": "verified_pdf_page_map",
     "parent_id": null
-  },
-  {
-    "chapter_id": "c1s1",
-    "level": 2,
-    "source_title": "第 1 节 孟德尔的豌豆杂交实验（一）",
-    "ai_title": "课程 1.1：从实验设计理解分离定律",
-    "page_start": 1,
-    "page_end": 3,
-    "printed_page_start": 2,
-    "printed_page_end": 8,
-    "confidence": 100,
-    "status": "已确认",
-    "source": "manual_toc_reference",
-    "parent_id": "c1"
-  },
-  {
-    "chapter_id": "c1s2",
-    "level": 2,
-    "source_title": "第 2 节 孟德尔的豌豆杂交实验（二）",
-    "ai_title": "课程 1.2：用概率解释自由组合",
-    "page_start": 4,
-    "page_end": 9,
-    "printed_page_start": 9,
-    "printed_page_end": 14,
-    "confidence": 100,
-    "status": "已确认",
-    "source": "manual_toc_reference",
-    "parent_id": "c1"
   },
   {
     "chapter_id": "c2",
@@ -383,9 +355,9 @@
     "source_title": "第 1 节 杂交育种与诱变育种",
     "ai_title": "课程 6.1：比较杂交与诱变育种",
     "page_start": 93,
-    "page_end": 95,
+    "page_end": 96,
     "printed_page_start": 98,
-    "printed_page_end": 100,
+    "printed_page_end": 101,
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
@@ -393,7 +365,7 @@
   },
   {
     "chapter_id": "c6career1",
-    "level": 2,
+    "level": 3,
     "source_title": "与生物学有关的职业 育种工作者",
     "ai_title": "职业拓展：育种工作者",
     "page_start": 96,
@@ -403,7 +375,7 @@
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
-    "parent_id": "c6"
+    "parent_id": "c6s1"
   },
   {
     "chapter_id": "c6s2",
@@ -411,9 +383,9 @@
     "source_title": "第 2 节 基因工程及其应用",
     "ai_title": "课程 6.2：理解基因工程的应用",
     "page_start": 97,
-    "page_end": 100,
+    "page_end": 103,
     "printed_page_start": 102,
-    "printed_page_end": 105,
+    "printed_page_end": 108,
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
@@ -421,7 +393,7 @@
   },
   {
     "chapter_id": "c6career2",
-    "level": 2,
+    "level": 3,
     "source_title": "与生物学有关的职业 生物技术产业的研发人员",
     "ai_title": "职业拓展：生物技术产业研发",
     "page_start": 101,
@@ -431,7 +403,7 @@
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
-    "parent_id": "c6"
+    "parent_id": "c6s2"
   },
   {
     "chapter_id": "c7",
@@ -467,9 +439,9 @@
     "source_title": "第 2 节 现代生物进化理论的主要内容",
     "ai_title": "课程 7.2：理解现代进化理论",
     "page_start": 109,
-    "page_end": 125,
+    "page_end": 121,
     "printed_page_start": 114,
-    "printed_page_end": 130,
+    "printed_page_end": 126,
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
@@ -533,7 +505,7 @@
   },
   {
     "chapter_id": "c7sts1",
-    "level": 3,
+    "level": 2,
     "source_title": "科学·技术·社会 理想的“地质时钟”",
     "ai_title": "拓展：理想的地质时钟",
     "page_start": 122,
@@ -543,6 +515,6 @@
     "confidence": 100,
     "status": "已确认",
     "source": "manual_toc_reference",
-    "parent_id": "c7s2"
+    "parent_id": "c7"
   }
 ]

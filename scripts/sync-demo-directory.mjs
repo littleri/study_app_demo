@@ -39,7 +39,7 @@ assert(formalSectionCount === curated.book.sectionCount, "Directory section coun
 assert(chapters.every((chapter) => !chapter.parent_id || ids.has(chapter.parent_id)), "Directory contains an unknown parent ID.");
 assert(chapters.every((chapter) => chapter.page_start <= chapter.page_end), "Directory contains an invalid PDF page range.");
 assert(chapters.every((chapter) => chapter.printed_page_start <= chapter.printed_page_end), "Directory contains an invalid printed page range.");
-const directoryPolicy = "完整目录由教材目录参考图人工确认；第 2 章第 1 节的课程正文与引用继续使用 MinerU OCR 证据。";
+const directoryPolicy = "目录按当前 PDF 实际页核验；源文件缺少第 1 章印刷页 1–14，第 2 章起使用 MinerU OCR 证据。";
 const provenance = {
   ...demoState.provenance,
   content_scope: curated.provenance.content_scope,

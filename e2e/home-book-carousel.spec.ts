@@ -287,7 +287,7 @@ test.describe("home book carousel", () => {
     await toolGrid.locator('[data-tool="flashcards"]').click();
 
     expect(await page.evaluate(() => window.__homeBookCarouselHarness?.getWorkspaceActions())).toEqual([
-      { destination: "study", bookId: "book-a", chapterId: "chapter-book-a" },
+      { destination: "lesson", bookId: "book-a", chapterId: "chapter-book-a" },
       { destination: "source", bookId: "book-a", chapterId: "chapter-book-a" },
       { destination: "assignment", bookId: "book-a", chapterId: "chapter-book-a" },
       { destination: "flashcards", bookId: "book-a", chapterId: "chapter-book-a" }
@@ -798,13 +798,14 @@ test.describe("default homepage visual regression", () => {
     await expect(workspace.locator(".study-tool-grid")).toHaveCount(0);
   });
 
-  test("opens source and study as distinct destinations for the same resolved chapter", async ({ page }) => {
+  test("opens source and lesson as distinct destinations for the same resolved chapter", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     const workspace = page.locator('.home-book-workspace[data-loaded="true"]');
     await expect(workspace).toBeVisible();
     const bookId = await workspace.getAttribute("data-book-id");
     const chapterId = await workspace.getAttribute("data-chapter-id");
     const chapterTitle = (await workspace.locator("h2").textContent())?.trim();
+    const lessonTitle = chapterTitle?.replace(/^第\s*\d+\s*节\s*/, "");
     expect(bookId).toBeTruthy();
     expect(chapterId).toBeTruthy();
     expect(chapterTitle).toBeTruthy();
@@ -822,9 +823,8 @@ test.describe("default homepage visual regression", () => {
       workspace.getByRole("button", { name: "继续学习", exact: true }),
       "continue current Home chapter"
     );
-    await expect(page.locator(".study-screen")).toBeVisible();
-    const chapterToggle = page.locator(".study-section-toggle, .study-chapter-toggle").filter({ hasText: chapterTitle ?? "" }).first();
-    await expect(chapterToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator(".lesson-screen")).toBeVisible();
+    await expect(page.locator(".lesson-title-card h2")).toHaveText(lessonTitle ?? "");
   });
 
   test("opens assignment and flashcards with the same homepage chapter context", async ({ page }) => {
@@ -838,7 +838,7 @@ test.describe("default homepage visual regression", () => {
 
     await clickAfterMotionAndScrollSettle(page, workspace.locator('[data-tool="assignment"]'), "open Home assignment tool");
     await expect(page.locator(".assignment-screen")).toBeVisible();
-    await expect(page.locator(".assignment-screen .citation-card")).toContainText(chapterTitle);
+    await expect(page.locator(".assignment-progress-heading h2")).toHaveText(chapterTitle);
 
     await clickAfterMotionAndScrollSettle(page, page.getByRole("button", { name: "返回", exact: true }), "return from Home assignment");
     await expect(workspace).toHaveAttribute("data-chapter-id", chapterId ?? "");

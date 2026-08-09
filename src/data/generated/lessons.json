@@ -96,7 +96,7 @@
           "chunk_c2s1_11"
         ],
         "asset_ids": [
-          "asset_meiosis_30"
+          "mineru_a7e5d24146a9ca0a14b3"
         ],
         "ai_generated": false
       },
@@ -273,8 +273,7 @@
           "chunk_c2s1_13"
         ],
         "asset_ids": [
-          "asset_meiosis_30",
-          "asset_meiosis_35"
+          "mineru_b6a6a15c934c4270f692"
         ],
         "ai_generated": false
       },
@@ -343,7 +342,7 @@
           "chunk_c2s1_13"
         ],
         "asset_ids": [
-          "asset_meiosis_35"
+          "mineru_b6a6a15c934c4270f692"
         ],
         "ai_generated": false
       },
@@ -473,7 +472,10 @@
         "source_chunk_ids": [
           "chunk_c2s1_19"
         ],
-        "asset_ids": [],
+        "asset_ids": [
+          "mineru_db28492a3c9815f534bb",
+          "mineru_db4fb512f8f72bb7cb6f"
+        ],
         "ai_generated": false
       }
     ],
@@ -484,8 +486,31 @@
       "chunk_c2s1_20"
     ],
     "asset_ids": [
-      "asset_meiosis_30",
-      "asset_meiosis_35"
+      "mineru_a7e5d24146a9ca0a14b3",
+      "mineru_0cc7ff9d41faad932879",
+      "mineru_94606ac0afe67675b498",
+      "mineru_b6a6a15c934c4270f692",
+      "mineru_bba517febf6c0ce4ed99",
+      "mineru_6f7c8826fbe4382c95d2",
+      "mineru_c08e583d818fd7bfe092",
+      "mineru_a409c9280f33f6f02772",
+      "mineru_271ca58a71a10532ef99",
+      "mineru_03596ef95ed36a701db3",
+      "mineru_580f33cfdc9c6f551e0c",
+      "mineru_0c7b08251a1f22e582c5",
+      "mineru_c3946aee23117eb22936",
+      "mineru_4833a8d93ba869ba8ac8",
+      "mineru_8c719a7d72525c3df38e",
+      "mineru_8f05cd52a3afc6933a7f",
+      "mineru_26f751df90c62167648d",
+      "mineru_db28492a3c9815f534bb",
+      "mineru_db4fb512f8f72bb7cb6f",
+      "mineru_c6cdc2f2ea8ce40e9552",
+      "mineru_55e1d1cf35d670ece741",
+      "mineru_cb243d8828fbe7c87dd4",
+      "mineru_c529e476b631ad583b0b",
+      "mineru_8bb9e7f0e7acdf5c03da",
+      "mineru_380c46e5fe749422b846"
     ],
     "warnings": [
       "部分 OCR 文字存在识别噪声；课程讲解使用人工校订表述，引用保留原始 OCR 文本。"

@@ -35,21 +35,11 @@ test.describe("local DemoRepository P0 flow", () => {
     const continueLearning = page.getByRole("button", { name: "继续学习", exact: true });
     await clickUniqueAction(page, continueLearning, "continue the current chapter");
 
-    await expectScreenReady(page, ".book-course-screen", "study directory");
-    const secondChapter = page.getByRole("button", { name: "第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度 17%", exact: true });
-    if (await secondChapter.getAttribute("aria-expanded") !== "true") {
-      await clickUniqueAction(page, secondChapter, "expand the meiosis chapter");
-    }
-    const meiosisToggle = page.locator('.study-section-toggle[aria-label="第 1 节 减数分裂和受精作用 教材第 16-26 页"]');
-    await expect(meiosisToggle).toHaveCount(1);
-    await expect(meiosisToggle).toBeVisible();
-    if (await meiosisToggle.getAttribute("aria-expanded") !== "true") {
-      await clickUniqueAction(page, meiosisToggle, "expand the meiosis section");
-    }
-    const meiosisSection = page.locator(".study-section", { has: meiosisToggle });
+    const lesson = await expectScreenReady(page, ".lesson-screen", "current chapter lesson");
+    await expect(lesson.locator(".lesson-title-card h2")).toHaveText("减数分裂和受精作用");
     await clickUniqueAction(
       page,
-      meiosisSection.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }),
+      lesson.getByRole("button", { name: "做练习", exact: true }),
       "open assignment diagnosis"
     );
     await expectScreenReady(page, ".assignment-screen", "assignment");
@@ -81,11 +71,11 @@ test.describe("local DemoRepository P0 flow", () => {
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 local demo fixture")
     });
-    await expect(page.locator(".upload-selection-summary")).toBeVisible();
+    await expect(page.locator(".upload-add-tile.has-selection")).toContainText("文件一");
     await clickUniqueAction(page, page.getByRole("button", { name: "上传并继续", exact: true }), "confirm the selected upload");
     await expectScreenReady(page, ".parse-ready-screen", "parse ready");
 
-    await clickUniqueAction(page, page.getByRole("button", { name: "开始后台解析", exact: true }), "start parsing");
+    await clickUniqueAction(page, page.getByRole("button", { name: "开始解析", exact: true }), "start parsing");
     await expectScreenReady(page, ".processing-flow-screen", "processing");
     for (const progress of [18, 46, 74]) {
       await expect.poll(

@@ -14,7 +14,7 @@ type DirectoryEntry = {
 };
 
 const expectedChapterTitles = [
-  "第 1 章 遗传因子的发现",
+  "封面、编者信息、目录与科学家访谈",
   "第 2 章 基因和染色体的关系",
   "第 3 章 基因的本质",
   "第 4 章 基因的表达",
@@ -27,12 +27,12 @@ describe("demo textbook directory", () => {
   const curated = curatedContent.chapters as DirectoryEntry[];
   const generated = generatedChapters as DirectoryEntry[];
 
-  it("matches the seven chapters and nineteen formal sections in the reference contents", () => {
+  it("matches the seven available top-level units and seventeen formal sections in the source PDF", () => {
     expect(curated.filter((entry) => entry.level === 1).map((entry) => entry.source_title))
       .toEqual(expectedChapterTitles);
-    expect(curated.filter((entry) => /^第\s*\d+\s*节/.test(entry.source_title))).toHaveLength(19);
+    expect(curated.filter((entry) => /^第\s*\d+\s*节/.test(entry.source_title))).toHaveLength(17);
     expect(curatedContent.book.chapterCount).toBe(7);
-    expect(curatedContent.book.sectionCount).toBe(19);
+    expect(curatedContent.book.sectionCount).toBe(17);
   });
 
   it("preserves nested subtopics and their parent relationships", () => {
@@ -44,9 +44,9 @@ describe("demo textbook directory", () => {
       "一 种群基因频率的改变与生物进化",
       "二 隔离与物种的形成",
       "与生物学有关的职业 化石标本的制作",
-      "三 共同进化与生物多样性的形成",
-      "科学·技术·社会 理想的“地质时钟”"
+      "三 共同进化与生物多样性的形成"
     ]);
+    expect(curated.find((entry) => entry.chapter_id === "c7sts1")?.parent_id).toBe("c7");
   });
 
   it("keeps printed textbook pages separate from PDF source pages", () => {
@@ -58,9 +58,15 @@ describe("demo textbook directory", () => {
     });
     expect(curated.find((entry) => entry.chapter_id === "c7s2")).toMatchObject({
       page_start: 109,
-      page_end: 125,
+      page_end: 121,
       printed_page_start: 114,
-      printed_page_end: 130
+      printed_page_end: 126
+    });
+    expect(curated.find((entry) => entry.chapter_id === "frontmatter")).toMatchObject({
+      page_start: 1,
+      page_end: 9,
+      printed_page_start: null,
+      printed_page_end: null
     });
   });
 

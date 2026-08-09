@@ -17,6 +17,9 @@
     "demo:validate": "node scripts/validate-fixtures.mjs",
     "demo:content": "node scripts/build-demo-content.mjs",
     "demo:directory": "node scripts/sync-demo-directory.mjs",
+    "demo:pages": "node scripts/sync-source-pages.mjs",
+    "demo:assets": "node scripts/sync-formal-assets.mjs",
+    "demo:refresh": "npm run demo:directory && npm run demo:pages && npm run demo:assets",
     "demo:mineru": "node scripts/ingest-pdf.mjs"
   },
   "dependencies": {

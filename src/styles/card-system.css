@@ -680,12 +680,6 @@ button:disabled {
   background: linear-gradient(90deg, #f2f5fb 0%, rgba(242, 245, 251, 0.92) 40%, transparent 78%);
 }
 
-.screen-content .processing-card[data-surface="celebration"] {
-  background: #f1f3fb var(--brand-cloud-parsing) center top / min(300px, 100%) auto no-repeat;
-  border-color: var(--color-primary-light);
-  box-shadow: none;
-}
-
 .screen-content .report-card[data-surface="celebration"] {
   background: #f1f4fb var(--brand-cloud-report) right 16px top 16px / min(165px, 42%) auto no-repeat;
   border-color: var(--color-primary-light);
@@ -693,8 +687,7 @@ button:disabled {
 }
 
 .course-ready-primary[data-brand-moment="course-ready"] {
-  border-radius: var(--radius-large);
-  background: #f1f4fb;
+  background: transparent;
 }
 
 /* No mascot or decorative gradient leaks into community or ordinary study pages. */

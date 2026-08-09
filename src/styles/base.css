@@ -3046,7 +3046,6 @@ html {
   box-shadow: 0 16px 32px rgba(126, 116, 255, 0.28);
 }
 
-.processing-card,
 .centered-flow.community-import-success {
   min-height: 360px;
   border: 0;
@@ -3528,24 +3527,23 @@ html {
 
 .success-hero-image,
 .success-hero-image-fallback {
-  width: 100%;
-  height: 310px;
-  border-radius: 0 0 30px 30px;
-  margin: -58px calc(var(--content-x) * -1) 8px;
+  width: min(220px, 58vw);
+  margin: 18px auto 12px;
 }
 
 .success-hero-image {
   display: block;
-  object-fit: cover;
-  box-shadow: 0 20px 42px rgba(98, 122, 179, 0.18);
+  height: auto;
+  object-fit: contain;
 }
 
 .success-hero-image-fallback {
+  height: 160px;
   display: grid;
   place-items: center;
+  border-radius: var(--radius-card);
   color: #5b6b88;
   background: linear-gradient(145deg, rgba(231, 240, 255, 0.94), rgba(244, 239, 255, 0.96));
-  box-shadow: 0 20px 42px rgba(98, 122, 179, 0.18);
 }
 
 .course-ready-success-heading {
@@ -3770,6 +3768,133 @@ html {
   font-size: 0.75rem;
   line-height: 1.4;
   text-align: right;
+}
+
+.lesson-block-assets,
+.lesson-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+}
+
+.lesson-block-assets {
+  margin-top: 14px;
+}
+
+.lesson-asset-gallery-card {
+  display: grid;
+  gap: 14px;
+}
+
+.lesson-asset-gallery-heading {
+  align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.lesson-asset-gallery-heading > div {
+  min-width: 0;
+}
+
+.lesson-asset-gallery-heading p {
+  margin: 3px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.lesson-asset-card {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(152, 174, 210, 0.24);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 24px rgba(43, 67, 111, 0.08);
+}
+
+.lesson-asset-preview {
+  width: 100%;
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 0;
+  background: #f7f8f3;
+}
+
+.lesson-asset-preview img,
+.lesson-asset-fallback {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  max-height: 420px;
+}
+
+.lesson-asset-preview img {
+  display: block;
+  object-fit: contain;
+}
+
+.lesson-asset-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--color-text-muted);
+  background: var(--color-surface-soft);
+}
+
+.lesson-asset-card figcaption {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.lesson-asset-card figcaption > strong {
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.lesson-asset-card figcaption > small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.lesson-asset-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lesson-asset-badges span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: #365678;
+  background: #eaf2ff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.lesson-asset-badges span.is-ready {
+  color: #236b58;
+  background: #e2f7ef;
+}
+
+.lesson-asset-badges span.is-review {
+  color: #8a5a17;
+  background: #fff1d7;
+}
+
+.lesson-asset-card.is-compact .lesson-asset-preview,
+.lesson-asset-card.is-compact .lesson-asset-preview img,
+.lesson-asset-card.is-compact .lesson-asset-fallback {
+  min-height: 150px;
+  max-height: 300px;
 }
 
 .concept-card-grid {

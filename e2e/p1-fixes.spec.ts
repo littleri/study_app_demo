@@ -3,10 +3,6 @@ import { expect, test, type Page } from "playwright/test";
 async function openLesson(page: Page) {
   await page.goto("/?embedded=device-preview");
   await page.getByRole("button", { name: "继续学习", exact: true }).click();
-  await expect(page.locator(".library-screen")).toBeVisible();
-  await page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }).click();
-  await expect(page.locator(".book-course-screen")).toBeVisible();
-  await page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }).click();
   await expect(page.locator(".lesson-screen")).toBeVisible();
 }
 
@@ -65,17 +61,17 @@ test.describe("P1 learning flow safeguards", () => {
     await page.getByRole("button", { name: "关闭", exact: true }).click();
     await expect(conceptSheet).toHaveCount(0);
 
-    await page.getByRole("button", { name: "回课程主页", exact: true }).click();
+    await page.getByRole("button", { name: "返回学习目录", exact: true }).click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
     await expect.poll(() => readMainScrollTop(page)).toBe(0);
-    await page.getByRole("button", { name: "返回", exact: true }).click();
+    await page.getByRole("button", { name: "进入学习", exact: true }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
-    await expect.poll(async () => Math.abs((await readMainScrollTop(page)) - lessonScrollBeforeSheet)).toBeLessThanOrEqual(24);
+    await expect.poll(() => readMainScrollTop(page)).toBe(0);
   });
 
   test("keeps choosing local, uploads only after confirmation, and starts parsing only from ParseReady", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
-    await page.locator(".nav-upload").click();
+    await page.locator('[data-home-global-action="upload"]').click();
     await expect(page.locator(".upload-flow-screen")).toBeVisible();
 
     const sourceCopy = page.locator(".upload-source-copy");

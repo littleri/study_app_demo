@@ -154,6 +154,9 @@ export type ExtractedAsset = {
   source_chunk_ids: string[];
   concepts: string[];
   review_status?: string | null;
+  source_parser?: string | null;
+  content_hash?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type AiGeneratedAsset = {
@@ -172,6 +175,9 @@ export type AiGeneratedAsset = {
   concepts: string[];
   generation_provider: string;
   review_status: string;
+  source_parser?: string | null;
+  content_hash?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 export type ApiAsset = ExtractedAsset | AiGeneratedAsset;

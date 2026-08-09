@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "provenance": {
-    "content_scope": "人教版高中生物必修 2《遗传与进化》完整原文目录",
-    "fixture_policy": "Curated demo copy is human-authored; the content builder refreshes its source evidence from MinerU."
+    "content_scope": "人教版高中生物必修 2《遗传与进化》当前 PDF 可用原文目录（源文件缺第 1 章正文）",
+    "fixture_policy": "目录只保留当前 PDF 中实际存在的页面；第 1 章印刷页 1–14 作为源文件缺页处理。"
   },
   "book": {
     "id": "book_biology_2",
@@ -13,7 +13,7 @@
     "pages": 125,
     "fileSize": "38.8 MB",
     "chapterCount": 7,
-    "sectionCount": 19,
+    "sectionCount": 17,
     "knowledgePointCount": 96,
     "progress": 18,
     "mastery": 68,
@@ -27,46 +27,18 @@
   },
   "chapters": [
     {
-      "chapter_id": "c1",
+      "chapter_id": "frontmatter",
       "level": 1,
-      "source_title": "第 1 章 遗传因子的发现",
-      "ai_title": "课程 1：理解孟德尔遗传规律",
+      "source_title": "封面、编者信息、目录与科学家访谈",
+      "ai_title": "教材前置页",
       "page_start": 1,
       "page_end": 9,
-      "printed_page_start": 1,
-      "printed_page_end": 14,
+      "printed_page_start": null,
+      "printed_page_end": null,
       "confidence": 100,
       "status": "已确认",
-      "source": "manual_toc_reference",
+      "source": "verified_pdf_page_map",
       "parent_id": null
-    },
-    {
-      "chapter_id": "c1s1",
-      "level": 2,
-      "source_title": "第 1 节 孟德尔的豌豆杂交实验（一）",
-      "ai_title": "课程 1.1：从实验设计理解分离定律",
-      "page_start": 1,
-      "page_end": 3,
-      "printed_page_start": 2,
-      "printed_page_end": 8,
-      "confidence": 100,
-      "status": "已确认",
-      "source": "manual_toc_reference",
-      "parent_id": "c1"
-    },
-    {
-      "chapter_id": "c1s2",
-      "level": 2,
-      "source_title": "第 2 节 孟德尔的豌豆杂交实验（二）",
-      "ai_title": "课程 1.2：用概率解释自由组合",
-      "page_start": 4,
-      "page_end": 9,
-      "printed_page_start": 9,
-      "printed_page_end": 14,
-      "confidence": 100,
-      "status": "已确认",
-      "source": "manual_toc_reference",
-      "parent_id": "c1"
     },
     {
       "chapter_id": "c2",
@@ -410,9 +382,9 @@
       "source_title": "第 1 节 杂交育种与诱变育种",
       "ai_title": "课程 6.1：比较杂交与诱变育种",
       "page_start": 93,
-      "page_end": 95,
+      "page_end": 96,
       "printed_page_start": 98,
-      "printed_page_end": 100,
+      "printed_page_end": 101,
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
@@ -420,7 +392,7 @@
     },
     {
       "chapter_id": "c6career1",
-      "level": 2,
+      "level": 3,
       "source_title": "与生物学有关的职业 育种工作者",
       "ai_title": "职业拓展：育种工作者",
       "page_start": 96,
@@ -430,7 +402,7 @@
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
-      "parent_id": "c6"
+      "parent_id": "c6s1"
     },
     {
       "chapter_id": "c6s2",
@@ -438,9 +410,9 @@
       "source_title": "第 2 节 基因工程及其应用",
       "ai_title": "课程 6.2：理解基因工程的应用",
       "page_start": 97,
-      "page_end": 100,
+      "page_end": 103,
       "printed_page_start": 102,
-      "printed_page_end": 105,
+      "printed_page_end": 108,
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
@@ -448,7 +420,7 @@
     },
     {
       "chapter_id": "c6career2",
-      "level": 2,
+      "level": 3,
       "source_title": "与生物学有关的职业 生物技术产业的研发人员",
       "ai_title": "职业拓展：生物技术产业研发",
       "page_start": 101,
@@ -458,7 +430,7 @@
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
-      "parent_id": "c6"
+      "parent_id": "c6s2"
     },
     {
       "chapter_id": "c7",
@@ -494,9 +466,9 @@
       "source_title": "第 2 节 现代生物进化理论的主要内容",
       "ai_title": "课程 7.2：理解现代进化理论",
       "page_start": 109,
-      "page_end": 125,
+      "page_end": 121,
       "printed_page_start": 114,
-      "printed_page_end": 130,
+      "printed_page_end": 126,
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
@@ -560,7 +532,7 @@
     },
     {
       "chapter_id": "c7sts1",
-      "level": 3,
+      "level": 2,
       "source_title": "科学·技术·社会 理想的“地质时钟”",
       "ai_title": "拓展：理想的地质时钟",
       "page_start": 122,
@@ -570,7 +542,7 @@
       "confidence": 100,
       "status": "已确认",
       "source": "manual_toc_reference",
-      "parent_id": "c7s2"
+      "parent_id": "c7"
     }
   ],
   "assets": [
@@ -877,62 +849,6 @@
     "days": 14,
     "daily_minutes": 30,
     "tasks": [
-      {
-        "task_id": "task_01",
-        "user_id": "local_user",
-        "day": 1,
-        "title": "孟德尔实验导读",
-        "chapter_id": "c1s1",
-        "task_type": "导读 + 小测",
-        "minutes": 25,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 88,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_02",
-        "user_id": "local_user",
-        "day": 2,
-        "title": "分离定律",
-        "chapter_id": "c1s1",
-        "task_type": "课程 + 练习",
-        "minutes": 30,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 82,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_03",
-        "user_id": "local_user",
-        "day": 3,
-        "title": "自由组合定律",
-        "chapter_id": "c1s2",
-        "task_type": "作业诊断",
-        "minutes": 35,
-        "lesson_id": null,
-        "review_target": null,
-        "status": "done",
-        "score": 78,
-        "weak_points": []
-      },
-      {
-        "task_id": "task_04",
-        "user_id": "local_user",
-        "day": 4,
-        "title": "错题复习：遗传图解",
-        "chapter_id": "c1s2",
-        "task_type": "薄弱点复习",
-        "minutes": 20,
-        "lesson_id": null,
-        "review_target": "遗传图解",
-        "status": "done",
-        "score": 80,
-        "weak_points": []
-      },
       {
         "task_id": "task_05",
         "user_id": "local_user",

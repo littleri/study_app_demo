@@ -14,6 +14,14 @@ npm run demo:validate
 npm run dev
 ```
 
+从相邻 `study_app` 后端正式包刷新目录、125 张原文页图和全部 MinerU 配图：
+
+```powershell
+npm run demo:refresh
+```
+
+其中 `demo:assets` 会复制正式配图与缩略图、按已核验的 PDF 页范围映射 demo 章节，并把对应资产写入课程和课程讲解块。复制出的二进制图片只保留在本机并由 Git 忽略；生成的资产清单继续版本化，方便核验来源和数量。
+
 内容重建需要本机 PDF 路径和 MinerU 环境，详见 [docs/CONTENT_PROVENANCE.md](./docs/CONTENT_PROVENANCE.md)。视觉素材来源见 [docs/ASSET_PROVENANCE.md](./docs/ASSET_PROVENANCE.md)，源仓库基线见 [docs/SOURCE_BASELINE.md](./docs/SOURCE_BASELINE.md)。
 
 ## 已确认的输入

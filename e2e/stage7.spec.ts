@@ -255,20 +255,20 @@ async function openProductionLibrary(page: Page, scenario = "default") {
 }
 
 async function openProductionStudy(page: Page, scenario = "default") {
-  await loadProductionCourse(page, scenario);
+  await openProductionLesson(page, scenario);
   await clickAfterMotionAndScrollSettle(
-    page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action'),
-    "open production Study"
+    page.getByRole("button", { name: "返回学习目录", exact: true }),
+    "return from production Lesson to Study"
   );
   await expect(page.locator(".book-course-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
 async function openProductionLesson(page: Page, scenario = "default") {
-  await openProductionStudy(page, scenario);
+  await loadProductionCourse(page, scenario);
   await clickAfterMotionAndScrollSettle(
-    page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
-    "open production Lesson"
+    page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action'),
+    "continue directly to production Lesson"
   );
   await expect(page.locator(".lesson-layout")).toBeVisible();
   await waitForVisualMotionToSettle(page);

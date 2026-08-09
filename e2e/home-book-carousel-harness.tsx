@@ -26,7 +26,7 @@ import "../src/styles/home.css";
 import "../src/styles/chapter-tools.css";
 
 type HarnessMode = "empty" | "single" | "two" | "many";
-type HarnessAction = { destination: "study" | "source" | "assignment" | "flashcards"; bookId: string; chapterId: string };
+type HarnessAction = { destination: "lesson" | "source" | "assignment" | "flashcards"; bookId: string; chapterId: string };
 type StatusAction = { bookId: string; target: HomeBookStatusAction | "upload" | "source" };
 
 type HomeBookCarouselHarness = {
@@ -358,7 +358,7 @@ function HarnessView() {
         pendingBookId={pendingBookId}
         selectionError={selectionError}
         nextStep={nextStep}
-        onContinue={() => recordWorkspaceAction("study")}
+        onContinue={() => recordWorkspaceAction("lesson")}
         onOpenOriginal={() => {
           if (selectedBook) statusActionsRef.current.push({ bookId: selectedBook.bookId, target: "source" });
         }}

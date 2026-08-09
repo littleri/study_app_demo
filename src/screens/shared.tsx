@@ -16,8 +16,9 @@ export function backendAssetUrl(url?: string | null, fallback = textbookAssets.i
 }
 
 
-export function sourcePageImageUrl(_bookId: string, _page: number) {
-  return textbookAssets.chapterTwo;
+export function sourcePageImageUrl(_bookId: string, page: number) {
+  const safePage = Math.max(1, Math.trunc(page));
+  return `/assets/textbook/pages/page_${String(safePage).padStart(3, "0")}.jpeg`;
 }
 
 

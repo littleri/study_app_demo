@@ -17,7 +17,7 @@ import {
 } from "./shared";
 
 export function SourceReaderScreen() {
-  const { back, go, parsedAssets, parsedScanResult, sourcePageTarget, showToast, uploadedFile } = useAppContext();
+  const { back, go, parsedChapters, parsedScanResult, sourcePageTarget, showToast, uploadedFile } = useAppContext();
   const bookId = sourcePageTarget?.bookId ?? uploadedFile?.bookId ?? "";
   const pageCount = parsedScanResult?.page_count ?? null;
   const sourceUnit = parsedScanResult?.source_unit ?? "page";
@@ -26,13 +26,7 @@ export function SourceReaderScreen() {
   const targetEnd = Math.max(targetStart, sourcePageTarget?.pageEnd ?? targetStart);
   const [currentPage, setCurrentPage] = useState(targetStart);
   const [failedImageKey, setFailedImageKey] = useState<string | null>(null);
-  const exactPageAsset = parsedAssets?.find((asset) => (
-    asset.source_type === "extracted"
-    && asset.book_id === bookId
-    && asset.page === currentPage
-    && Boolean(asset.source_page_image_url)
-  ));
-  const imageUrl = exactPageAsset?.source_page_image_url ?? (bookId ? sourcePageImageUrl(bookId, currentPage) : "");
+  const imageUrl = bookId ? sourcePageImageUrl(bookId, currentPage) : "";
   const imageKey = `${bookId}:${currentPage}:${imageUrl}`;
   const imageFailed = Boolean(imageUrl) && failedImageKey === imageKey;
   const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content");
@@ -53,7 +47,13 @@ export function SourceReaderScreen() {
   }, [currentPage, imageUrl]);
 
   const maxPage = Math.max(pageCount ?? targetEnd, targetEnd, 1);
-  const displayTitle = sourcePageTarget?.title ?? uploadedFile?.name ?? "教材原文";
+  const currentChapter = parsedChapters
+    ?.filter((chapter) => chapter.page_start <= currentPage && currentPage <= chapter.page_end)
+    .sort((left, right) => right.level - left.level || (left.page_end - left.page_start) - (right.page_end - right.page_start))[0];
+  const isBiologyFrontMatter = bookId === "book_biology_2" && currentPage < 10;
+  const displayTitle = isBiologyFrontMatter
+    ? "封面、编者信息、目录与科学家访谈"
+    : currentChapter?.source_title ?? sourcePageTarget?.title ?? uploadedFile?.name ?? "教材原文";
   const exactLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === targetStart);
   const sourceRange = targetStart === targetEnd && typeof exactLocation?.label === "string"
     ? exactLocation.label
@@ -66,6 +66,14 @@ export function SourceReaderScreen() {
     ? `教材${sourcePageLabel(printedStart, typeof printedEnd === "number" ? printedEnd : printedStart)}（PDF ${sourcePageLabel(targetStart, targetEnd)}）`
     : sourceRange;
   const isOnTargetRange = currentPage >= targetStart && currentPage <= targetEnd;
+  const currentLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === currentPage);
+  const currentLocationLabel = isBiologyFrontMatter
+    ? `PDF ${sourcePageLabel(currentPage)}`
+    : typeof currentLocation?.label === "string"
+      ? currentLocation.label
+      : sourceUnit === "page"
+        ? `PDF ${sourcePageLabel(currentPage)}`
+        : `${unitName} ${currentPage}`;
 
   if (!bookId) {
     return (
@@ -85,7 +93,10 @@ export function SourceReaderScreen() {
       <section className="source-reader-summary">
         <Pill tone={isOnTargetRange ? "mint" : "sky"}>{isOnTargetRange ? "已定位引用页" : "正在浏览原文"}</Pill>
         <h2>{displayTitle}</h2>
-        <p>引用位置：{displayRange}{pageCount ? ` · 共 ${pageCount} 个${unitName}` : ""}</p>
+        <p>
+          当前位置：{currentLocationLabel}{pageCount ? ` · 共 ${pageCount} 个${unitName}` : ""}
+          {!isOnTargetRange ? ` · 原引用：${displayRange}` : ""}
+        </p>
       </section>
 
       <div className="source-reader-workspace">

@@ -10,7 +10,7 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { useMotionHistory, useReducedMotion, useStageThreeImageMotion } from "../motion";
 
-const courseReadyHeroSource = "/assets/brand/cloud-mascot-success.png";
+const courseReadyHeroSource = "/assets/brand/cloud-mascot-success-transparent-v1.png";
 
 function CourseReadySuccessMark({ bookId, lessonBuildJobId }: { bookId: string; lessonBuildJobId: string | null }) {
   const { consume } = useMotionHistory();
@@ -67,7 +67,7 @@ function CourseReadyHeroImage() {
     <img
       className="success-hero-image"
       src={courseReadyHeroSource}
-      alt="云怪完成解析"
+      alt="云朵举起完成标记和教材"
       ref={imageMotion.imageRef}
       data-motion-image-source={courseReadyHeroSource}
       data-motion-image-state={imageMotion.state}

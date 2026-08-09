@@ -244,7 +244,7 @@ export function HomeScreen() {
 
   function continueNextStep() {
     if (!setNextStepContext()) return;
-    go("study");
+    go("lesson");
   }
 
   function openNextStepSource() {

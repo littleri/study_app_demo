@@ -823,12 +823,16 @@ body {
     gap: 12px;
   }
 
-  .course-ready-primary .success-hero-image,
+  .course-ready-primary .success-hero-image {
+    width: min(280px, 72%);
+    height: auto;
+    margin: 18px auto 8px;
+  }
+
   .course-ready-primary .success-hero-image-fallback {
-    width: 100%;
-    height: clamp(230px, 34vw, 340px);
-    margin: 0;
-    border-radius: 28px;
+    width: min(280px, 72%);
+    height: 190px;
+    margin: 18px auto 8px;
   }
 
   .course-ready-support .module-grid {

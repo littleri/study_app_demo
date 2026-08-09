@@ -146,7 +146,9 @@ test.describe("device preview studio", () => {
     }).toEqual({ height: 874, width: 402 });
 
     await embeddedFrame.getByRole("button", { name: "继续学习", exact: true }).click();
-    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".lesson-screen")).toBeVisible();
+    await embeddedFrame.getByRole("button", { name: "返回", exact: true }).click();
+    await expect(embeddedFrame.locator(".home-dashboard")).toBeVisible();
     await embeddedFrame.locator(".primary-nav .nav-item").last().click();
     await expect(embeddedFrame.locator(".profile-screen")).toBeVisible();
     const innerMain = await embeddedFrame.locator("main").elementHandle();
@@ -525,12 +527,12 @@ test.describe("device preview studio", () => {
     }).toEqual({ height: 874, width: 402 });
 
     await embeddedFrame.getByRole("button", { name: "继续学习", exact: true }).click();
-    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".lesson-screen")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator(".device-preview-toolbar")).toBeVisible();
     await expect(page.getByTestId("device-preview-summary")).toBeVisible();
     await expect(page).toHaveURL(/chrome=1/);
-    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".lesson-screen")).toBeVisible();
     await expect.poll(() => iframeHandle.evaluate((element) => (
       element === element.ownerDocument.querySelector("iframe.device-preview-iframe")
     ))).toBe(true);

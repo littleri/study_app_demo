@@ -1,0 +1,34 @@
+{
+  "baseUrl": "http://127.0.0.1:5173/?device=iphone-17-pro&orientation=portrait&quality=retina-3x&chrome=0",
+  "canvas": {
+    "canvasHeight": 2622,
+    "canvasWidth": 1206,
+    "renderedHeight": 2622,
+    "renderedWidth": 1206
+  },
+  "completed": true,
+  "container": "WebM",
+  "createdAt": "2026-08-09T16:25:39.032Z",
+  "outputVideoPath": "D:\\code\\study_app_demo\\movies\\bookcourse-ai-operation-2k-2026-08-09T16-24-29-775Z.webm",
+  "page16StillPath": "D:\\code\\study_app_demo\\movies\\bookcourse-ai-operation-2k-2026-08-09T16-24-29-775Z-page16.png",
+  "completedStillPath": "D:\\code\\study_app_demo\\movies\\bookcourse-ai-operation-2k-2026-08-09T16-24-29-775Z-complete.png",
+  "quality": "Retina 3x",
+  "route": [
+    "上传教材",
+    "开始解析",
+    "原书目录被识别",
+    "确认生成课程",
+    "学习计划与课程目录",
+    "进入减数分裂章节",
+    "AI 提问",
+    "回到教材第 16 页",
+    "完成三步练习"
+  ],
+  "sourcePdf": "C:\\Users\\asd25\\Desktop\\示范文件\\人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所, 生物课程教材研究开发中心.pdf",
+  "video": {
+    "durationSeconds": 68.52,
+    "height": 2622,
+    "width": 1206,
+    "sizeBytes": 9076639
+  }
+}
