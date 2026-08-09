@@ -46,23 +46,24 @@ test.describe("P1 learning flow safeguards", () => {
     const lessonScrollTop = await readMainScrollTop(page);
     expect(lessonScrollTop).toBeGreaterThan(100);
 
-    await page.getByRole("button", { name: "完成章节", exact: true }).click();
-    await expect(page.locator(".report-screen")).toBeVisible();
+    await page.getByRole("button", { name: "完成本节", exact: true }).click();
+    await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".report-screen")).toHaveCount(0);
     await expect.poll(() => readMainScrollTop(page)).toBe(0);
 
-    await page.getByRole("button", { name: "返回", exact: true }).click();
+    await page.getByRole("button", { name: "进入学习", exact: true }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
-    await expect.poll(async () => Math.abs((await readMainScrollTop(page)) - lessonScrollTop)).toBeLessThanOrEqual(24);
+    await expect.poll(() => readMainScrollTop(page)).toBe(0);
 
-    const chatButton = page.getByRole("button", { name: "问 AI", exact: true });
-    await chatButton.scrollIntoViewIfNeeded();
+    const conceptButton = page.getByRole("button", { name: "查看核心概念：减数分裂", exact: true });
+    await conceptButton.scrollIntoViewIfNeeded();
     const lessonScrollBeforeSheet = await readMainScrollTop(page);
-    await chatButton.click();
-    const chatSheet = page.locator(".sheet[data-sheet-type='chat']");
-    await expect(chatSheet).toBeVisible();
+    await conceptButton.click();
+    const conceptSheet = page.locator(".sheet[data-sheet-type='note']");
+    await expect(conceptSheet).toBeVisible();
     await expect.poll(() => readMainScrollTop(page)).toBe(lessonScrollBeforeSheet);
     await page.getByRole("button", { name: "关闭", exact: true }).click();
-    await expect(chatSheet).toHaveCount(0);
+    await expect(conceptSheet).toHaveCount(0);
 
     await page.getByRole("button", { name: "回课程主页", exact: true }).click();
     await expect(page.locator(".book-course-screen")).toBeVisible();

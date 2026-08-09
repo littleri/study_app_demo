@@ -452,6 +452,7 @@
 .study-section-list {
   position: relative;
   padding: 5px 10px 12px 23px;
+  background: color-mix(in srgb, var(--color-bg) 55%, var(--color-surface));
 }
 
 .study-section-list::before {

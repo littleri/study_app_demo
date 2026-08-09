@@ -636,6 +636,52 @@
       "mineru_extracted": false,
       "authorization_status": "internal-demo-only; verify before distribution",
       "provenance_note": "该页图来自源前端既有视觉基线，本轮内容引用由 MinerU OCR 重新建立。"
+    },
+    {
+      "asset_id": "asset_ai_meiosis_homologous_v1",
+      "book_id": "book_biology_2",
+      "chapter_id": "c2s1",
+      "source_type": "ai_generated",
+      "page": null,
+      "type": "diagram",
+      "caption": "同源染色体联会、交叉互换与分离示意",
+      "bbox": null,
+      "image_url": "/assets/lesson/meiosis-homologous-separation-v1.webp",
+      "thumbnail_url": "/assets/lesson/meiosis-homologous-separation-v1.webp",
+      "source_page_image_url": null,
+      "source_chunk_ids": [
+        "chunk_c2s1_13"
+      ],
+      "concepts": [
+        "减数分裂",
+        "同源染色体",
+        "联会",
+        "四分体"
+      ],
+      "generation_provider": "openai-imagegen",
+      "review_status": "approved"
+    },
+    {
+      "asset_id": "asset_ai_fertilization_v1",
+      "book_id": "book_biology_2",
+      "chapter_id": "c2s1",
+      "source_type": "ai_generated",
+      "page": null,
+      "type": "diagram",
+      "caption": "受精作用使染色体数目恢复为二倍体示意",
+      "bbox": null,
+      "image_url": "/assets/lesson/fertilization-diploid-restoration-v1.webp",
+      "thumbnail_url": "/assets/lesson/fertilization-diploid-restoration-v1.webp",
+      "source_page_image_url": null,
+      "source_chunk_ids": [
+        "chunk_c2s1_19"
+      ],
+      "concepts": [
+        "受精作用",
+        "染色体数目稳定"
+      ],
+      "generation_provider": "openai-imagegen",
+      "review_status": "approved"
     }
   ],
   "flashcards": [

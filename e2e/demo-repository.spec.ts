@@ -59,7 +59,7 @@ test.describe("local DemoRepository P0 flow", () => {
     await expect(page.locator(".assignment-card textarea")).toBeFocused();
   });
 
-  test("replays upload through report with deterministic local data only", async ({ page }) => {
+  test("replays upload through lesson completion with deterministic local data only", async ({ page }) => {
     test.setTimeout(75_000);
 
     const observedRequests: string[] = [];
@@ -143,9 +143,9 @@ test.describe("local DemoRepository P0 flow", () => {
     await clickUniqueAction(page, page.getByRole("button", { name: "查看原文", exact: true }), "return to the lesson");
     await expectScreenReady(page, ".lesson-screen", "lesson");
 
-    await clickUniqueAction(page, page.getByRole("button", { name: "完成章节", exact: true }), "complete the chapter");
-    await expectScreenReady(page, ".report-screen", "report");
-    await expect(page.locator(".report-score-ring")).toContainText("82%");
+    await clickUniqueAction(page, page.getByRole("button", { name: "完成本节", exact: true }), "complete the chapter");
+    await expectScreenReady(page, ".book-course-screen", "study directory");
+    await expect(page.locator(".report-screen")).toHaveCount(0);
 
     await page.reload();
     await expect(page.locator(".home-dashboard")).toBeVisible();

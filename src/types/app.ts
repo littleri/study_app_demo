@@ -28,7 +28,15 @@ export type Screen =
 export type SheetState =
   | { type: "chat" }
   | { type: "source"; title: string; image: string; page: string }
-  | { type: "note"; concept: string }
+  | {
+      type: "note";
+      concept: string;
+      explanation?: string;
+      sourceLabel?: string;
+      source?: SourcePageTarget;
+      image?: string;
+      imageCaption?: string;
+    }
   | { type: "editChapter"; chapterId: string; evidence?: ChapterEvidence }
   | { type: "bookSwitcher" }
   | null;

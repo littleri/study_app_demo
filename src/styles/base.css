@@ -3582,60 +3582,164 @@ html {
 }
 
 .lesson-screen {
-  gap: 12px;
+  min-width: 0;
 }
 
-.source-fragment-card,
-.ai-explain-card,
-.concept-flash-card {
-  padding: 16px;
+.lesson-layout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.lesson-card-title {
-  margin-bottom: 9px;
+.lesson-reading-column {
+  min-width: 0;
+  color: var(--color-text);
 }
 
-.lesson-card-title h3 {
+.lesson-article-header {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 2px 0 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lesson-article-header h2 {
+  max-width: 22ch;
   margin: 0;
-  flex: 1;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
-.lesson-card-title svg {
-  color: #3e8fff;
+.lesson-article-meta {
+  max-width: 100%;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
-.source-fragment-card p,
-.ai-explain-card p,
-.ai-explain-card li {
-  color: #333b4f;
-  font-size: 14px;
-  line-height: 1.65;
-}
-
-.ai-explain-card ul {
-  margin: 10px 0 0;
-  padding-left: 18px;
-}
-
-.lesson-objectives-card ul {
+.lesson-generation-panel {
   display: grid;
-  gap: 8px;
+  gap: 14px;
+  width: 100%;
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
 }
 
-.lesson-evidence-list {
+.lesson-generation-panel > p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.lesson-introduction {
   display: grid;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  padding: 20px 0 22px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lesson-introduction h3,
+.lesson-knowledge-section h3,
+.lesson-section-heading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.125rem;
+  font-weight: 780;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+.lesson-introduction > p,
+.lesson-knowledge-section > p {
+  max-width: 65ch;
+  margin: 0;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.62;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+}
+
+.lesson-introduction ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.lesson-introduction li::marker {
+  color: var(--color-primary);
+}
+
+.lesson-knowledge-flow {
+  display: grid;
+}
+
+.lesson-knowledge-section {
+  display: grid;
+  gap: 10px;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lesson-inline-figure {
+  display: grid;
+  justify-self: center;
+  gap: 6px;
+  width: min(92%, 30rem);
+  margin: 4px 0 0;
+}
+
+.lesson-inline-figure img {
+  display: block;
+  width: 100%;
+  max-height: 22rem;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.lesson-figure-open {
+  width: 100%;
+  padding: 0;
+  border-radius: 12px;
+  background: var(--color-surface);
+  text-align: left;
+}
+
+.lesson-figure-open:active {
+  transform: scale(0.995);
+}
+
+.lesson-inline-figure figcaption {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .lesson-source-link {
+  width: fit-content;
   min-height: var(--touch-target-min);
   max-width: 100%;
-  margin-top: 4px;
-  padding: 8px 0;
+  padding: 6px 0;
   color: var(--color-primary);
   background: transparent;
-  font-size: 13px;
+  font-size: 0.875rem;
   font-weight: 750;
   text-align: left;
 }
@@ -3644,100 +3748,92 @@ html {
   color: var(--color-primary-pressed);
 }
 
-.lesson-evidence-toggle {
-  width: 100%;
-  min-height: var(--touch-target-min);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  color: var(--color-text);
-  background: var(--color-surface-soft);
-  font-weight: 750;
-  text-align: left;
+.lesson-source-link:active {
+  transform: translateY(1px);
 }
 
-.lesson-evidence-toggle > span:last-child {
-  flex: 0 0 auto;
-  color: var(--color-primary);
-  font-size: 13px;
-}
-
-.lesson-evidence-region .lesson-evidence-list {
-  margin-top: 8px;
-}
-
-.lesson-evidence-list button {
+.lesson-concepts {
   display: grid;
-  gap: 4px;
-  width: 100%;
-  min-width: 0;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(232, 241, 255, 0.9);
-  color: #263049;
-  text-align: left;
+  gap: 10px;
+  padding: 24px 0 16px;
 }
 
-.lesson-evidence-list strong,
-.lesson-evidence-list span,
-.lesson-evidence-list small {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.lesson-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.lesson-evidence-list span,
-.lesson-evidence-list small {
-  color: #6a7894;
-  font-size: 12px;
-  line-height: 1.45;
+.lesson-section-heading span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: right;
 }
 
 .concept-card-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .concept-card-grid button {
-  min-height: 72px;
-  border-radius: 14px;
-  padding: 10px 6px;
-  color: #4a5266;
-  background: #eef5ff;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 6px;
+  border: 1px solid var(--color-primary-light);
+  border-radius: 12px;
+  color: var(--color-text);
+  background: var(--color-primary-soft);
   text-align: center;
+  transition:
+    background-color var(--motion-duration-local-base) var(--motion-ease-local-state),
+    border-color var(--motion-duration-local-base) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
-.concept-card-grid button:nth-child(2) {
-  background: #edf7ff;
+.concept-card-grid button:hover {
+  border-color: var(--color-primary);
+  background: #eee4ff;
 }
 
-.concept-card-grid button:nth-child(3) {
-  background: #eaf9f3;
-}
-
-.concept-card-grid button:nth-child(4) {
-  background: #fff4e6;
-}
-
-.concept-card-grid strong,
-.concept-card-grid small {
-  display: block;
+.concept-card-grid button:active {
+  transform: scale(0.98);
 }
 
 .concept-card-grid strong {
-  margin-bottom: 4px;
-  font-size: 12px;
+  display: block;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
-.concept-card-grid small {
-  color: #8a96aa;
-  font-size: 10px;
+.lesson-floating-complete {
+  position: fixed;
+  z-index: 28;
+  left: 50%;
+  bottom: calc(var(--safe-area-bottom) + var(--home-indicator-height) + 12px);
+  width: min(calc(100% - var(--safe-area-left) - var(--safe-area-right) - 24px), 44rem);
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--glass-nav-surface-opaque);
+  box-shadow: 0 4px 8px rgba(32, 38, 58, 0.18);
+  transform: translateX(-50%);
 }
 
-.lesson-bottom-actions,
+.app-shell:not([data-active-screen="lesson"]) > .lesson-floating-complete {
+  display: none;
+}
+
+.lesson-floating-complete .button {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 999px;
+}
+
 .sticky-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3745,10 +3841,66 @@ html {
   padding: 10px;
 }
 
-.lesson-bottom-actions .button,
 .sticky-actions .button {
   min-height: 46px;
   padding: 10px 8px;
+}
+
+.concept-detail-sheet {
+  gap: 14px;
+}
+
+.concept-detail-sheet h3 {
+  margin: 0;
+  font-size: 1.375rem;
+}
+
+.concept-detail-explanation {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.concept-detail-figure {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.concept-detail-figure img {
+  display: block;
+  width: 100%;
+  max-height: 20rem;
+  object-fit: contain;
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.concept-detail-figure figcaption {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.concept-detail-source {
+  min-height: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 0;
+  color: var(--color-primary);
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 750;
+  text-align: left;
+}
+
+.concept-note-label {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 750;
 }
 
 .diagnosis-card {

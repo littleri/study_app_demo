@@ -88,6 +88,11 @@ body {
   padding-bottom: calc(var(--safe-area-bottom) + var(--space-layout));
 }
 
+.screen-content.without-nav[data-screen="lesson"] {
+  padding-bottom: calc(var(--safe-area-bottom) + var(--home-indicator-height) + 104px);
+  scroll-padding-bottom: calc(var(--safe-area-bottom) + var(--home-indicator-height) + 104px);
+}
+
 .header-bar {
   top: calc(var(--safe-area-top) + var(--space-layout));
   left: calc(var(--safe-area-left) + var(--space-inline));
@@ -1078,46 +1083,6 @@ body {
   margin-inline: auto;
 }
 
-.lesson-learning-tools {
-  padding: 14px;
-  border: var(--card-border);
-  border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: var(--card-shadow);
-}
-
-.lesson-tools-heading {
-  display: grid;
-  gap: 3px;
-}
-
-.lesson-tools-heading strong {
-  color: var(--color-text);
-}
-
-.lesson-tools-heading span {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.lesson-learning-tools > .button,
-.lesson-learning-tools .button {
-  min-height: var(--touch-target-min);
-}
-
-.lesson-learning-tools .lesson-action-grid,
-.lesson-learning-tools .lesson-bottom-actions {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.lesson-learning-tools .lesson-bottom-actions {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
 .citation-media {
   width: 62px;
   aspect-ratio: 3 / 4;
@@ -1274,22 +1239,13 @@ body {
   }
 
   .lesson-layout {
-    grid-template-columns: minmax(0, 72ch) minmax(172px, 214px);
+    grid-template-columns: minmax(0, 72ch);
     justify-content: center;
-    gap: clamp(16px, 2.4vw, 26px);
   }
 
   .lesson-reading-column {
     width: 100%;
     margin-inline: 0;
-  }
-
-  .lesson-learning-tools {
-    position: sticky;
-    top: calc(var(--overlay-visual-top) + var(--header-block-size) + var(--safe-area-top) + var(--space-layout));
-    max-height: calc(var(--overlay-visual-height) - var(--header-block-size) - var(--safe-area-top) - var(--safe-area-bottom) - var(--space-layout) - var(--space-layout));
-    overflow: auto;
-    overscroll-behavior: contain;
   }
 
   .source-reader-workspace {

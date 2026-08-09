@@ -134,7 +134,7 @@ async function openSourceFromStudy(page: Page) {
   await entry.press("Enter");
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
-  await page.locator(".lesson-learning-tools > .button").first().click();
+  await page.locator(".lesson-source-link").first().click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -705,7 +705,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     expect((await readAnimation(page.locator(".ai-overlay"))).name).toBe("none");
   });
 
-  test("covers bookSwitcher, Chat, Source, and Note sheets through focus, replacement, rapid reopen, and cleanup", async ({ page }) => {
+  test("covers bookSwitcher and concept detail sheets through focus, rapid reopen, and cleanup", async ({ page }) => {
     test.setTimeout(70_000);
 
     await openStudy(page);
@@ -714,7 +714,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await bookTrigger.focus();
     await bookTrigger.click();
     let sheet = page.locator(".sheet[data-sheet-type='bookSwitcher']");
-    let scrim = page.locator(".sheet-scrim");
+    const scrim = page.locator(".sheet-scrim");
     const bookEntryName = await expectGlobalPresenceMotion(sheet, "entering", "bookSwitcher panel entry");
     await expectGlobalPresenceMotion(scrim, "entering", "bookSwitcher scrim entry");
     await expectFocusWithin(page, sheet, "bookSwitcher entry");
@@ -726,54 +726,6 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await dispatchAnimation(sheet, "animationend", bookExitName);
     await expect(sheet).toHaveCount(0);
     await expect(bookTrigger, "bookSwitcher cleanup restores its real trigger").toBeFocused();
-    await pause.evaluate((element) => element.remove());
-
-    await openLesson(page);
-    pause = await installPauseStyle(page, ".sheet, .sheet-scrim");
-    const chatTrigger = page.locator(".lesson-action-grid .button").first();
-    await chatTrigger.focus();
-    await chatTrigger.click();
-    const chat = page.locator(".sheet[data-sheet-type='chat']");
-    scrim = page.locator(".sheet-scrim");
-    const chatEntryName = await expectGlobalPresenceMotion(chat, "entering", "Chat panel entry");
-    await expectGlobalPresenceMotion(scrim, "entering", "Chat scrim entry");
-    await expectFocusWithin(page, chat, "Chat entry");
-    await dispatchAnimation(chat, "animationend", chatEntryName);
-    await expect(chat).toHaveAttribute("data-motion-state", "idle");
-    await chat.locator(".chat-input input").fill("How does meiosis separate homologous chromosomes?");
-    await chat.locator(".chat-sheet .button").click();
-    const sourceTrigger = chat.locator("[data-sheet-replacement='source']");
-    await expect(sourceTrigger).toBeVisible();
-
-    await chat.focus();
-    await page.keyboard.press("Escape");
-    const chatExitName = await expectGlobalPresenceMotion(chat, "closing", "Chat frozen exit");
-    const chatPresence = Number(await chat.getAttribute("data-motion-presence"));
-    const staleChat = await chat.elementHandle();
-    if (!staleChat) throw new Error("Chat replacement needs its closing generation root");
-    await sourceTrigger.dispatchEvent("click");
-    const source = page.locator(".sheet[data-sheet-type='source']");
-    const sourceEntryName = await expectGlobalPresenceMotion(source, "entering", "Source replacement entry");
-    const sourcePresence = Number(await source.getAttribute("data-motion-presence"));
-    expect(sourcePresence, "Source owns a newer Presence generation than frozen Chat").toBeGreaterThan(chatPresence);
-    await expect(page.locator(".sheet"), "Chat→Source replacement keeps one live panel").toHaveCount(1);
-    expect(await staleChat.evaluate((element) => element.isConnected), "replaced Chat root is detached").toBe(false);
-    for (const type of ["animationend", "animationcancel"] as const) {
-      await staleChat.evaluate((element, event) => {
-        element.dispatchEvent(new AnimationEvent(event.type, { animationName: event.name, bubbles: true }));
-      }, { name: chatExitName, type });
-      await expect(source, `stale Chat ${type} cannot settle Source`).toHaveAttribute("data-motion-state", "entering");
-    }
-    await dispatchAnimation(source, "animationcancel", sourceEntryName);
-    await expect(source).toHaveAttribute("data-motion-state", "idle");
-    await expectFocusWithin(page, source, "Source replacement");
-    await source.locator(".sheet-close").click();
-    const sourceExitName = await expectGlobalPresenceMotion(source, "closing", "Source panel exit");
-    await dispatchAnimation(source, "animationend", sourceEntryName);
-    await expect(source, "stale Source entry event cannot settle its exit").toHaveAttribute("data-motion-state", "closing");
-    await dispatchAnimation(source, "animationcancel", sourceExitName);
-    await expect(source).toHaveCount(0);
-    await expect(chatTrigger, "replacement chain restores the original Chat trigger").toBeFocused();
     await pause.evaluate((element) => element.remove());
 
     await openLesson(page);
@@ -1678,50 +1630,23 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await pause.evaluate((element) => element.remove());
   });
 
-  test("keeps Lesson, Report, Export, and Profile local entries scoped to their current real screen instances", async ({ page }) => {
+  test("keeps Lesson and Profile local entries scoped to their current real screen instances", async ({ page }) => {
     test.setTimeout(50_000);
-    await installInitialPauseStyle(page, ".lesson-title-card, .report-card, .export-intro-card, .profile-card");
+    await installInitialPauseStyle(page, ".lesson-article-header, .profile-card");
     await openLesson(page);
 
-    const lessonTitle = page.locator(".lesson-title-card");
+    const lessonTitle = page.locator(".lesson-article-header");
     await expectLocalEntry(lessonTitle, "lesson title entry");
     await dispatchAnimation(lessonTitle, "animationend", "motion-local-item-in");
     await expect(lessonTitle).toHaveAttribute("data-motion-item-state", "idle");
     const lessonNode = await lessonTitle.elementHandle();
     if (!lessonNode) throw new Error("Lesson title local-motion root is missing");
 
-    await page.locator(".lesson-bottom-actions .button").last().click();
-    await expect(page.locator(".report-screen")).toBeVisible();
+    await page.locator(".lesson-floating-complete .button").click();
+    await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".report-screen")).toHaveCount(0);
     await settleScreen(page);
     expect(await lessonNode.evaluate((element) => element.isConnected), "leaving Lesson detaches its old local root").toBe(false);
-    const report = page.locator(".report-card");
-    await expectLocalEntry(report, "report summary entry");
-    await dispatchAnimation(report, "animationend", "motion-local-item-in");
-    await expect(report).toHaveAttribute("data-motion-item-state", "idle");
-    const reportNode = await report.elementHandle();
-    if (!reportNode) throw new Error("Report local-motion root is missing");
-
-    await page.locator(".report-guidance-column .inline-link").click();
-    await expect(page.locator(".notes-screen")).toBeVisible();
-    await settleScreen(page);
-    expect(await reportNode.evaluate((element) => element.isConnected), "leaving Report detaches its old local root").toBe(false);
-    await page.locator(".notes-actions .button").last().click();
-    await expect(page.locator(".export-preview-screen")).toBeVisible();
-    await settleScreen(page);
-    const exportIntro = page.locator(".export-intro-card");
-    await expectLocalEntry(exportIntro, "export intro entry");
-    await dispatchAnimation(exportIntro, "animationend", "motion-local-item-in");
-    await expect(exportIntro).toHaveAttribute("data-motion-item-state", "idle");
-
-    await page.locator(".header-bar button").first().click();
-    await expect(page.locator(".notes-screen")).toBeVisible();
-    await settleScreen(page);
-    await page.locator(".header-bar button").first().click();
-    await expect(page.locator(".report-screen")).toBeVisible();
-    await settleScreen(page);
-    await page.locator(".report-actions .button").first().click();
-    await expect(page.locator(".book-course-screen")).toBeVisible();
-    await settleScreen(page);
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen")).toBeVisible();
     await settleScreen(page);

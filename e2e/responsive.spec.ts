@@ -233,7 +233,7 @@ async function openSourceReader(page: Page) {
   await entry.press("Enter");
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
-  await page.locator(".lesson-learning-tools > .button").first().click();
+  await page.locator(".lesson-source-link").first().click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -566,52 +566,18 @@ test.describe("current DemoRepository responsive matrix", () => {
     await settleScreen(page);
 
     await openLesson(page);
-    const evidenceToggle = page.locator(".lesson-evidence-toggle");
-    if (await evidenceToggle.getAttribute("aria-expanded") !== "true") await evidenceToggle.click();
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
+      ".lesson-reading-column",
+      ".lesson-knowledge-section",
+      ".lesson-inline-figure",
       ".lesson-source-link",
-      ".lesson-evidence-list .lesson-evidence-source",
       ".concept-card-grid button",
-      ".lesson-learning-tools > .button",
-      ".lesson-action-grid .button",
-      ".lesson-bottom-actions .button"
-    ], `${project.name} Lesson all repeated entries, tools, and lists`);
-    await page.locator(".lesson-bottom-actions .button").last().click();
-    await expect(page.locator(".report-screen")).toBeVisible();
-    await settleScreen(page);
-    await expectCurrentScreenGeometry(page, ".report-screen", [
-      ".report-workspace",
-      ".report-card",
-      ".report-guidance-column .inline-link",
-      ".report-actions .button"
-    ], `${project.name} Report`);
-    await page.locator(".report-guidance-column .inline-link").click();
-    await expect(page.locator(".notes-screen")).toBeVisible();
-    await settleScreen(page);
-    await expectCurrentScreenGeometry(page, ".notes-screen", [
-      ".notes-workspace",
-      ".notes-list button",
-      ".notes-detail-panel",
-      ".notes-actions .button"
-    ], `${project.name} Notes`);
-    await page.locator(".notes-actions .button").last().click();
-    await expect(page.locator(".export-preview-screen")).toBeVisible();
-    await settleScreen(page);
-    await expectCurrentScreenGeometry(page, ".export-preview-screen", [
-      ".export-workspace",
-      ".export-module-list label",
-      ".export-actions .button"
-    ], `${project.name} Export`);
-
-    await page.locator(".header-bar .icon-button").click();
-    await expect(page.locator(".notes-screen")).toBeVisible();
-    await settleScreen(page);
-    await page.locator(".header-bar .icon-button").click();
-    await expect(page.locator(".report-screen")).toBeVisible();
-    await settleScreen(page);
-    await page.locator(".report-actions .button").first().click();
+      ".lesson-floating-complete .button"
+    ], `${project.name} Lesson article, concepts, and fixed completion action`);
+    await page.locator(".lesson-floating-complete .button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".report-screen")).toHaveCount(0);
     await settleScreen(page);
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen")).toBeVisible();
@@ -631,7 +597,7 @@ test.describe("current DemoRepository responsive matrix", () => {
     ], `${project.name} Community`);
   });
 
-  test("keeps every Lesson entry and toolbar control reachable, bounded, and unobscured in paired and shrunken visual viewports", async ({ page }, testInfo) => {
+  test("keeps every Lesson article control and fixed completion action reachable in paired and shrunken visual viewports", async ({ page }, testInfo) => {
     test.setTimeout(45_000);
     const project = getResponsiveProject(testInfo.project.name);
     await installVisualViewportShim(page);
@@ -639,26 +605,21 @@ test.describe("current DemoRepository responsive matrix", () => {
     await page.setViewportSize(project.pairedViewport);
     await setVisualViewport(page, { height: project.pairedViewport.height, offsetTop: 0 });
     await openLesson(page);
-    const evidenceToggle = page.locator(".lesson-evidence-toggle");
-    if (await evidenceToggle.getAttribute("aria-expanded") !== "true") await evidenceToggle.click();
     const repeatedLessonSelectors = [
       ".lesson-source-link",
-      ".lesson-evidence-list .lesson-evidence-source",
       ".concept-card-grid button",
-      ".lesson-learning-tools > .button",
-      ".lesson-action-grid .button",
-      ".lesson-bottom-actions .button"
+      ".lesson-inline-figure",
+      ".lesson-floating-complete .button"
     ];
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
       ".lesson-reading-column",
-      ".lesson-learning-tools",
       ...repeatedLessonSelectors
     ], `${project.name} Lesson paired viewport full-element geometry`);
     await expectAllControlsReachableInVisualViewport(
       page,
-      ".lesson-learning-tools > .button, .lesson-action-grid .button, .lesson-bottom-actions .button",
-      `${project.name} Lesson paired visual viewport toolbar`
+      ".lesson-source-link, .concept-card-grid button, .lesson-floating-complete .button",
+      `${project.name} Lesson paired visual viewport controls`
     );
 
     const shortLandscape = project.name === "small-phone-short-landscape";
@@ -672,13 +633,12 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
       ".lesson-reading-column",
-      ".lesson-learning-tools",
       ...repeatedLessonSelectors
     ], `${project.name} Lesson shrunken visual viewport full-element geometry`);
     await expectAllControlsReachableInVisualViewport(
       page,
-      ".lesson-learning-tools > .button, .lesson-action-grid .button, .lesson-bottom-actions .button",
-      `${project.name} Lesson shrunken visual viewport toolbar`
+      ".lesson-source-link, .concept-card-grid button, .lesson-floating-complete .button",
+      `${project.name} Lesson shrunken visual viewport controls`
     );
     await expectNoShellOverflow(page, `${project.name} Lesson visual viewport cleanup`);
   });

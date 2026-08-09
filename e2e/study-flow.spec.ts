@@ -150,7 +150,7 @@ test.describe("study directory flow", () => {
     expect(visibleContent.toolsBottom).toBeGreaterThan(0);
   });
 
-  test("opens a textbook section and reaches each learning tool", async ({ page }) => {
+  test("opens a textbook section, reads the illustrated lesson, and returns to the pre-lesson tools", async ({ page }) => {
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto("/?embedded=device-preview");
 
@@ -167,6 +167,33 @@ test.describe("study directory flow", () => {
     await expect(firstChapter.locator(".study-chapter-progress")).toHaveAttribute("data-progress", "100");
     await expect(firstChapter.locator(".study-chapter-progress")).toHaveClass(/is-complete/);
     await expect(firstChapter.locator(".study-chapter-progress svg.lucide-check")).toBeVisible();
+    const expandedChapterSurfaces = await firstChapter.locator("..").evaluate((chapter) => {
+      const chapterToggle = chapter.querySelector<HTMLElement>(".study-chapter-toggle")!;
+      const sectionList = chapter.querySelector<HTMLElement>(".study-section-list")!;
+      const screen = chapter.closest<HTMLElement>('.screen-content[data-screen="study"]')!;
+      const lightness = (value: string) => {
+        const channels = value.match(/\d*\.?\d+/g)?.slice(0, 3).map(Number) ?? [];
+        if (channels.length !== 3) return 0;
+        const normalized = channels.some((channel) => channel > 1)
+          ? channels.map((channel) => channel / 255)
+          : channels;
+        return normalized.reduce((sum, channel) => sum + channel, 0) / 3;
+      };
+      const chapterBackground = getComputedStyle(chapterToggle).backgroundColor;
+      const sectionBackground = getComputedStyle(sectionList).backgroundColor;
+      const pageBackground = getComputedStyle(screen).backgroundColor;
+      return {
+        chapter: chapterBackground,
+        chapterLightness: lightness(chapterBackground),
+        pageLightness: lightness(pageBackground),
+        sections: sectionBackground,
+        sectionsLightness: lightness(sectionBackground)
+      };
+    });
+    expect(expandedChapterSurfaces.sections).not.toBe("rgba(0, 0, 0, 0)");
+    expect(expandedChapterSurfaces.sections).not.toBe(expandedChapterSurfaces.chapter);
+    expect(expandedChapterSurfaces.sectionsLightness).toBeGreaterThan(expandedChapterSurfaces.pageLightness);
+    expect(expandedChapterSurfaces.sectionsLightness).toBeLessThan(expandedChapterSurfaces.chapterLightness);
     await expect(page.getByRole("button", { name: "第 1 节 孟德尔的豌豆杂交实验（一） 教材第 2-8 页 已完成", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "第 2 节 孟德尔的豌豆杂交实验（二） 教材第 9-14 页 已完成", exact: true })).toBeVisible();
 
@@ -181,16 +208,82 @@ test.describe("study directory flow", () => {
     await expect(page.getByRole("button", { name: "更多功能 预留新学习工具", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "进入学习", exact: true }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
-    await expect(page.locator(".lesson-title-card h2")).toContainText("减数分裂和受精作用");
-    await page.getByRole("button", { name: "查看引用", exact: true }).click();
+    await expect(page.locator(".lesson-article-header h2")).toContainText("减数分裂和受精作用");
+    await expect(page.getByText("已生成", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("全文依据状态", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("本节来源", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("学习工具", { exact: true })).toHaveCount(0);
+    const lessonFigures = page.locator(".lesson-inline-figure img");
+    await expect(lessonFigures).toHaveCount(2);
+    await expect(lessonFigures.nth(0)).toHaveAttribute("src", "/assets/lesson/meiosis-homologous-separation-v1.webp");
+    await expect(lessonFigures.nth(1)).toHaveAttribute("src", "/assets/lesson/fertilization-diploid-restoration-v1.webp");
+    await expect(page.getByText("AI 辅助示意", { exact: true })).toHaveCount(2);
+    await expect(page.getByRole("button", { name: /查看教材原图/ })).toHaveCount(0);
+    const compactReadingMetrics = await page.locator(".lesson-reading-column").evaluate((article) => {
+      const body = article.querySelector<HTMLElement>(".lesson-knowledge-section > p")!;
+      const heading = article.querySelector<HTMLElement>(".lesson-knowledge-section > h3")!;
+      const section = article.querySelector<HTMLElement>(".lesson-knowledge-section")!;
+      const figure = article.querySelector<HTMLElement>(".lesson-inline-figure")!;
+      const bodyStyle = getComputedStyle(body);
+      const headingStyle = getComputedStyle(heading);
+      const sectionStyle = getComputedStyle(section);
+      return {
+        bodyFontSize: Number.parseFloat(bodyStyle.fontSize),
+        bodyLineHeight: Number.parseFloat(bodyStyle.lineHeight),
+        figureRatio: figure.getBoundingClientRect().width / article.getBoundingClientRect().width,
+        headingFontSize: Number.parseFloat(headingStyle.fontSize),
+        sectionPaddingTop: Number.parseFloat(sectionStyle.paddingTop)
+      };
+    });
+    expect(compactReadingMetrics.bodyFontSize).toBe(15);
+    expect(compactReadingMetrics.bodyLineHeight).toBeLessThanOrEqual(25);
+    expect(compactReadingMetrics.headingFontSize).toBe(18);
+    expect(compactReadingMetrics.sectionPaddingTop).toBe(22);
+    expect(compactReadingMetrics.figureRatio).toBeLessThanOrEqual(0.93);
+
+    const lessonScroller = page.locator('.screen-content[data-screen="lesson"]');
+    const floatingCompletion = page.locator(".lesson-floating-complete");
+    const completionBeforeScroll = await floatingCompletion.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { position: getComputedStyle(element).position, top: bounds.top, left: bounds.left, width: bounds.width };
+    });
+    expect(completionBeforeScroll.position).toBe("fixed");
+    await lessonScroller.hover();
+    await page.mouse.wheel(0, 700);
+    await expect.poll(() => lessonScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+    const completionAfterScroll = await floatingCompletion.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { top: bounds.top, left: bounds.left, width: bounds.width };
+    });
+    expect(Math.abs(completionAfterScroll.top - completionBeforeScroll.top)).toBeLessThanOrEqual(1);
+    expect(Math.abs(completionAfterScroll.left - completionBeforeScroll.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(completionAfterScroll.width - completionBeforeScroll.width)).toBeLessThanOrEqual(1);
+
+    await page.locator(".concept-card-grid button").first().click();
+    const conceptSheet = page.locator(".sheet[data-sheet-type='note']");
+    await expect(conceptSheet).toBeVisible();
+    await expect(conceptSheet.locator(".concept-detail-explanation")).not.toBeEmpty();
+    await expect(conceptSheet.locator(".concept-detail-figure img")).toBeVisible();
+    await expect(conceptSheet.getByRole("button", { name: /查看教材第/ })).toBeVisible();
+    await conceptSheet.locator(".sheet-close").click();
+    await expect(conceptSheet).toHaveCount(0);
+
+    await page.getByRole("button", { name: "查看教材第 16 页", exact: true }).click();
     await expect(page.getByRole("heading", { name: "原文文档", exact: true })).toBeVisible();
     await expect(page.getByText("教材第 16 页（PDF 第 11 页）", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
     await expect(page.locator(".lesson-screen")).toBeVisible();
-    await page.getByRole("button", { name: "返回学习目录", exact: true }).click();
+    const pausedCompletionTransition = await page.addStyleTag({
+      content: '.motion-screen-transition[data-motion-state="transitioning"] > .motion-screen-surface { animation-play-state: paused !important; }'
+    });
+    await page.getByRole("button", { name: "完成本节", exact: true }).click();
+    await expect(page.locator(".app-shell")).toHaveAttribute("data-active-screen", "study");
+    await expect(page.locator(".lesson-floating-complete")).toBeHidden();
+    await pausedCompletionTransition.evaluate((style) => style.remove());
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
     await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".report-screen")).toHaveCount(0);
     await expect(secondChapter).toHaveAttribute("aria-expanded", "true");
 
     await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();

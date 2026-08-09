@@ -808,10 +808,15 @@ export default function App() {
       return {
         key: `note:${sheet.concept}`,
         sheet,
-        title: "导学笔记",
+        title: "核心概念",
         content: (
           <NoteSheetContent
             concept={sheet.concept}
+            explanation={sheet.explanation}
+            sourceLabel={sheet.sourceLabel}
+            image={sheet.image}
+            imageCaption={sheet.imageCaption}
+            onOpenSource={sheet.source ? () => openSourcePage(sheet.source!) : undefined}
             setSavedNoteCount={setSavedNoteCount}
             closeSheet={closeSheet}
             showToast={showToast}

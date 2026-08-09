@@ -207,18 +207,9 @@ test.describe("state feedback primitives", () => {
 
   test("real assignment path blocks an empty answer before either backend call", async ({ page, bookCourseApi }) => {
     await openStageSixCourse(page, bookCourseApi);
-    await page.locator(".primary-nav .nav-item").first().click();
-    await expect(page.locator(".home-dashboard")).toBeVisible();
-    await waitForNaturalScreenTransition(page, "Assignment path returns Home");
-    await page.locator('[data-home-global-action="plan"]').click();
-    await expect(page.locator(".study-plan-screen")).toBeVisible();
-    await waitForNaturalScreenTransition(page, "Assignment path opens the learning plan");
-    await page.getByRole("button", { name: "开始今天学习", exact: true }).click();
-    await expect(page.locator(".lesson-layout")).toBeVisible();
-    await waitForNaturalScreenTransition(page, "Assignment path opens the lesson");
-    await page.getByRole("button", { name: "做练习", exact: true }).click();
+    await page.locator('.study-section.is-expanded [data-tool="assignment"]').click();
     await expect(page.locator(".assignment-screen")).toBeVisible();
-    await waitForNaturalScreenTransition(page, "Assignment path opens the exercise");
+    await waitForNaturalScreenTransition(page, "Pre-lesson tool entry opens the exercise");
     await advanceAssignmentToShortAnswer(page);
     const beforeRequests = bookCourseApi.requests.length;
     await page.getByRole("button", { name: "提交作业", exact: true }).click();

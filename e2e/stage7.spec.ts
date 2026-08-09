@@ -274,10 +274,20 @@ async function openProductionLesson(page: Page, scenario = "default") {
   await waitForVisualMotionToSettle(page);
 }
 
+async function openProductionAssignment(page: Page, scenario = "default") {
+  await openProductionStudy(page, scenario);
+  await clickAfterMotionAndScrollSettle(
+    page.locator(".study-section.is-expanded [data-tool='assignment']"),
+    "open production Assignment from the pre-lesson tools"
+  );
+  await expect(page.locator(".assignment-screen")).toBeVisible();
+  await waitForVisualMotionToSettle(page);
+}
+
 async function openProductionSourceReader(page: Page, scenario = "default") {
   await openProductionLesson(page, scenario);
   await clickAfterMotionAndScrollSettle(
-    page.locator(".lesson-learning-tools > .button").first(),
+    page.locator(".lesson-source-link").first(),
     "open production SourceReader"
   );
   await expect(page.locator(".source-reader-screen")).toBeVisible();
@@ -593,7 +603,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     void bookCourseApi;
     await openProductionLesson(page);
     await expectVisualBaseline(page, "lesson.png");
-    await expectSurfaceContract(page, "Lesson", ".lesson-learning-tools > .button");
+    await expectSurfaceContract(page, "Lesson", ".lesson-floating-complete .button");
   });
 
   test("records the SourceReader visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
@@ -635,12 +645,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
       )) as typeof window.setTimeout;
     });
     void bookCourseApi;
-    await openProductionLesson(page);
-    await clickAfterMotionAndScrollSettle(
-      page.locator(".lesson-action-grid .button").nth(2),
-      "open production Assignment"
-    );
-    await expect(page.locator(".assignment-screen")).toBeVisible();
+    await openProductionAssignment(page);
     const initialAssignmentGeometry = await page.evaluate(() => {
       const action = document.querySelector<HTMLElement>(".assignment-primary-action");
       const prompt = document.querySelector<HTMLElement>(".assignment-card > p");
@@ -658,22 +663,22 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await expectSurfaceContract(page, "Assignment", ".assignment-primary-action .button");
   });
 
-  test("records the ActionSheet visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
+  test("records the concept detail ActionSheet visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
     await openProductionLesson(page);
     await beginOverlayScrollAudit(page);
     await clickAfterMotionAndScrollSettle(
-      page.locator(".lesson-action-grid .button").first(),
-      "open production chat ActionSheet"
+      page.locator(".concept-card-grid button").first(),
+      "open production concept detail ActionSheet"
     );
-    await expect(page.locator(".sheet[data-sheet-type='chat']")).toBeVisible();
+    await expect(page.locator(".sheet[data-sheet-type='note']")).toBeVisible();
     await waitForVisualMotionToSettle(page);
     await expectOverlayScrollToRemainStable(page);
-    const chatSheet = page.locator(".sheet[data-sheet-type='chat']");
-    await expectInitialVisualViewportContainment(chatSheet.getByRole("textbox", { name: "继续提问" }), "Chat action sheet composer");
-    await expectInitialVisualViewportContainment(chatSheet.getByRole("button", { name: "发送问题", exact: true }), "Chat action sheet send action");
-    await expectVisualBaseline(page, "action-sheet-chat.png");
-    await expectSurfaceContract(page, "Chat action sheet", ".sheet[data-sheet-type='chat'] .icon-button");
+    const conceptSheet = page.locator(".sheet[data-sheet-type='note']");
+    await expectInitialVisualViewportContainment(conceptSheet.getByRole("textbox", { name: "导学笔记" }), "Concept detail note field");
+    await expectInitialVisualViewportContainment(conceptSheet.getByRole("button", { name: "保存到笔记", exact: true }), "Concept detail save action");
+    await expectVisualBaseline(page, "action-sheet-concept.png");
+    await expectSurfaceContract(page, "Concept detail action sheet", ".sheet[data-sheet-type='note'] .icon-button");
   });
 
   test("records the AI chat visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
@@ -785,12 +790,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await expectSurfaceContract(page, "150 percent Home", ".home-primary-action");
 
     void bookCourseApi;
-    await openProductionLesson(page);
-    await clickAfterMotionAndScrollSettle(
-      page.locator(".lesson-action-grid .button").nth(2),
-      "open scaled production Assignment"
-    );
-    await expect(page.locator(".assignment-screen")).toBeVisible();
+    await openProductionAssignment(page);
     const assignmentAction = page.locator(".assignment-primary-action .button");
     const assignmentBefore = await assignmentAction.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     await applyVisibleTextScale(page, scale);
@@ -802,21 +802,21 @@ test.describe("Stage 7 final responsive acceptance", () => {
   test("keeps keyboard focus, reduced motion, rotations, and visualViewport AI controls stable", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
     await openProductionLesson(page);
-    const sheetTrigger = page.locator(".lesson-action-grid .button").first();
+    const sheetTrigger = page.locator(".concept-card-grid button").first();
     await sheetTrigger.focus();
     await sheetTrigger.click();
-    const sheet = page.locator(".sheet[data-sheet-type='chat']");
+    const sheet = page.locator(".sheet[data-sheet-type='note']");
     await expect(sheet).toBeVisible();
     const sheetControls = sheet.locator("button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])");
     const firstSheetControl = sheetControls.first();
     const lastSheetControl = sheetControls.last();
-    await expect(firstSheetControl, "chat ActionSheet receives initial focus").toBeFocused();
+    await expect(firstSheetControl, "concept detail ActionSheet receives initial focus").toBeFocused();
     await lastSheetControl.focus();
     await page.keyboard.press("Tab");
-    await expect(firstSheetControl, "chat ActionSheet traps forward Tab focus").toBeFocused();
+    await expect(firstSheetControl, "concept detail ActionSheet traps forward Tab focus").toBeFocused();
     await page.keyboard.press("Escape");
     await expect(sheet).toHaveCount(0);
-    await expect(sheetTrigger, "closing the chat ActionSheet restores trigger focus").toBeFocused();
+    await expect(sheetTrigger, "closing the concept detail ActionSheet restores trigger focus").toBeFocused();
 
     await page.setViewportSize({ width: 402, height: 681 });
     await loadProductionCourse(page);

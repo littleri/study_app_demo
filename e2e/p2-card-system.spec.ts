@@ -170,14 +170,8 @@ async function openLesson(page: Page, bookCourseApi: BookCourseApiFixture) {
   const section = await openMeiosisSection(page);
   await clickAfterMotionAndScrollSettle(
     page,
-    section.getByRole("button", { name: "闪卡复习 用短时回忆巩固本节概念", exact: true }),
-    "open section flashcards"
-  );
-  await expect(page.locator(".flashcard-screen")).toBeVisible();
-  await clickAfterMotionAndScrollSettle(
-    page,
-    page.getByRole("button", { name: "回到章节", exact: true }),
-    "return from flashcards to lesson"
+    section.getByRole("button", { name: "进入学习", exact: true }),
+    "open section lesson"
   );
   await expect(page.locator(".lesson-screen")).toBeVisible();
 }
@@ -259,10 +253,10 @@ test.describe("P2 card-system acceptance", () => {
     const lessonViolations = await readTouchViolations(page);
     expect(lessonViolations, "lesson non-inline targets are all at least 44 x 44 CSS px").toEqual([]);
 
-    const lessonPrimary = await page.locator(".lesson-bottom-actions .button-primary").evaluate((element) => element.getBoundingClientRect().height);
+    const lessonPrimary = await page.locator(".lesson-floating-complete .button-primary").evaluate((element) => element.getBoundingClientRect().height);
     expect(lessonPrimary, "lesson completion CTA is at least 48px high").toBeGreaterThanOrEqual(48);
-    await expect(page.getByRole("button", { name: "做练习", exact: true }), "exercise is a secondary learning tool").toHaveClass(/button-secondary/);
-    await expect(page.getByRole("button", { name: "完成章节", exact: true }), "chapter completion remains the outcome CTA").toHaveClass(/button-primary/);
+    await expect(page.getByRole("button", { name: "做练习", exact: true }), "exercise entry is intentionally absent from the reading surface").toHaveCount(0);
+    await expect(page.getByRole("button", { name: "完成本节", exact: true }), "chapter completion remains the outcome CTA").toHaveClass(/button-primary/);
     await expect(page.locator(".lesson-screen .button-primary"), "the lesson exposes exactly one solid primary action").toHaveCount(1);
   });
 
@@ -361,7 +355,7 @@ test.describe("P2 card-system acceptance", () => {
     expect(navigationStyles.items.find((item) => item.active)?.background, "the original active tab does not become an extra card").toBe("rgba(0, 0, 0, 0)");
   });
 
-  test("uses flat 12–16px reading cards and maintains AA contrast on rendered lesson text", async ({ page, bookCourseApi }) => {
+  test("uses a continuous reading surface and maintains AA contrast on rendered lesson text", async ({ page, bookCourseApi }) => {
     await openLesson(page, bookCourseApi);
 
     const surfaceViolations = await page.locator(".screen-content .card, .screen-content .quick-action, .screen-content .metric-card").evaluateAll((elements) => {
@@ -375,10 +369,11 @@ test.describe("P2 card-system acceptance", () => {
         };
       }).filter((surface) => surface.backdropFilter !== "none" || surface.boxShadow !== "none" || surface.radius < 12 || surface.radius > 16);
     });
-    expect(surfaceViolations, "ordinary lesson cards are flat 12–16px reading surfaces").toEqual([]);
+    expect(surfaceViolations, "the lesson has no decorative elevated card regressions").toEqual([]);
+    await expect(page.locator(".lesson-knowledge-section.card"), "knowledge sections are continuous article content rather than cards").toHaveCount(0);
 
     const renderedPairs = await page.locator(
-      ".lesson-title-card p, .lesson-evidence-list span, .concept-card-grid small, .lesson-bottom-actions .button-primary"
+      ".lesson-article-meta, .lesson-knowledge-section > p, .concept-card-grid strong, .lesson-floating-complete .button-primary"
     ).evaluateAll((elements) => elements.map((element) => {
       const parseRgb = (value: string) => {
         const channels = value.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
@@ -407,27 +402,44 @@ test.describe("P2 card-system acceptance", () => {
     }).filter((pair) => pair.ratio < 4.5);
     expect(contrastViolations, "rendered ordinary text, labels and primary button text meet WCAG AA").toEqual([]);
 
+    const lessonScroller = page.locator('.screen-content[data-screen="lesson"]');
+    const completionBar = page.locator(".lesson-floating-complete");
+    const fixedBeforeScroll = await completionBar.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        position: getComputedStyle(element).position,
+        top: bounds.top,
+        left: bounds.left,
+        width: bounds.width
+      };
+    });
+    expect(fixedBeforeScroll.position, "completion control is anchored to the viewport").toBe("fixed");
+    await lessonScroller.hover();
+    await page.mouse.wheel(0, 700);
+    await expect.poll(() => lessonScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+    const fixedAfterScroll = await completionBar.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { top: bounds.top, left: bounds.left, width: bounds.width };
+    });
+    expect(Math.abs(fixedAfterScroll.top - fixedBeforeScroll.top), "completion control does not move vertically with the article").toBeLessThanOrEqual(1);
+    expect(Math.abs(fixedAfterScroll.left - fixedBeforeScroll.left), "completion control keeps its horizontal anchor").toBeLessThanOrEqual(1);
+    expect(Math.abs(fixedAfterScroll.width - fixedBeforeScroll.width), "completion control keeps its floating tab-bar width").toBeLessThanOrEqual(1);
+
     await clickAfterMotionAndScrollSettle(
       page,
-      page.locator(".lesson-action-grid .button").first(),
-      "open lesson chat for the card-system form audit"
+      page.locator(".concept-card-grid button").first(),
+      "open the concept detail sheet for the form audit"
     );
-    const chatSheet = page.locator(".sheet[data-sheet-type='chat']");
-    await expect(chatSheet).toBeVisible();
-    const chatInput = chatSheet.locator("input");
-    const chatField = await chatInput.evaluate((element) => {
-      const placeholder = getComputedStyle(element, "::placeholder").color.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
+    const conceptSheet = page.locator(".sheet[data-sheet-type='note']");
+    await expect(conceptSheet).toBeVisible();
+    const noteInput = conceptSheet.locator("textarea");
+    const noteField = await noteInput.evaluate((element) => {
       const background = getComputedStyle(element).backgroundColor.match(/\d+(?:\.\d+)?/g)?.slice(0, 3).map(Number);
       const bounds = element.getBoundingClientRect();
-      return { background, height: bounds.height, placeholder };
+      return { background, height: bounds.height };
     });
-    expect(chatField.height, "chat input keeps the 44px form-control target").toBeGreaterThanOrEqual(44);
-    expect(chatField.placeholder).toHaveLength(3);
-    expect(chatField.background).toHaveLength(3);
-    expect(
-      contrastRatio(chatField.placeholder as Rgb, chatField.background as Rgb),
-      "placeholder text on the chat input meets WCAG AA"
-    ).toBeGreaterThanOrEqual(4.5);
+    expect(noteField.height, "concept note input keeps a comfortable form-control target").toBeGreaterThanOrEqual(44);
+    expect(noteField.background).toHaveLength(3);
     expect(await readTouchViolations(page), "sheet actions keep the same 44px target contract").toEqual([]);
   });
 
