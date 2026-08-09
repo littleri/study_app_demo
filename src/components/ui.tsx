@@ -455,7 +455,7 @@ export function AppShell({
 
   return (
     <div className="stage">
-      <div ref={setAppShellNode} className="app-shell" role="application" aria-label="BookCourse AI 应用" data-device-layout={deviceLayout} data-motion-reduced={motionReduced ? "true" : "false"} onClickCapture={onClickCapture}>
+      <div ref={setAppShellNode} className="app-shell" role="application" aria-label="BookCourse AI 应用" data-active-screen={active} data-device-layout={deviceLayout} data-motion-reduced={motionReduced ? "true" : "false"} onClickCapture={onClickCapture}>
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>

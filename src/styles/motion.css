@@ -1427,7 +1427,15 @@
     transition: none !important;
   }
 
-  .progress-fill {
+  .progress-fill,
+  .flashcard-progress-track > span,
+  .flashcard-deck-preview,
+  .flashcard-deck-preview-surface,
+  .flashcard-deck-preview-footer,
+  .flashcard-progress,
+  .memory-card,
+  .memory-card-trigger,
+  .memory-card-source-row {
     transition: none !important;
   }
 

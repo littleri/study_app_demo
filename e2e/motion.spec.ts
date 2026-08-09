@@ -4737,6 +4737,16 @@ async function openStageFourBAssignment(page: Page, fixture: BookCourseApiFixtur
   await page.locator(".lesson-action-grid .button").nth(2).click();
   await expect(page.locator(".assignment-screen"), "Stage 4B assignment opens through its existing lesson action").toBeVisible();
   await settleCurrentScreenTransition(page);
+  await advanceStageFourBAssignmentToShortAnswer(page);
+}
+
+async function advanceStageFourBAssignmentToShortAnswer(page: Page) {
+  await page.locator(".assignment-judgment-options button").first().click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="choice"]')).toBeVisible();
+  await page.locator(".assignment-choice-options button").nth(1).click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="short-answer"]')).toBeVisible();
 }
 
 async function readStageFourBMotion(locator: Locator) {
@@ -5143,6 +5153,7 @@ test.describe("Stage 4B Flashcard and Diagnosis motion", () => {
       await page.locator(".diagnosis-actions .button").first().click();
       await expect(page.locator(".assignment-screen")).toBeVisible();
       await settleCurrentScreenTransition(page);
+      await advanceStageFourBAssignmentToShortAnswer(page);
       await page.locator(".assignment-primary-action .button").click();
       await expect(page.locator(".diagnosis-screen")).toBeVisible();
       await settleCurrentScreenTransition(page);

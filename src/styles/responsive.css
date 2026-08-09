@@ -1366,13 +1366,8 @@ body {
   min-width: 0;
 }
 
-.flashcard-source-sidebar {
-  display: none;
-}
-
 .flashcard-workspace .memory-reveal,
 .flashcard-workspace .flashcard-actions .button,
-.flashcard-workspace .button-row .button,
 .assignment-primary-action .button,
 .diagnosis-actions .button,
 .filter-pill {
@@ -1380,7 +1375,6 @@ body {
 }
 
 .flashcard-workspace .memory-card-source-row .inline-link,
-.flashcard-workspace .flashcard-source-sidebar .inline-link,
 .assignment-source-column .citation-card .inline-link,
 .diagnosis-analysis-card .inline-link,
 .report-guidance-column .knowledge-map-card .inline-link {
@@ -1396,10 +1390,8 @@ body {
 }
 
 .study-plan-calendar .plan-date-row button:focus,
-.flashcard-workspace .memory-reveal:focus,
 .flashcard-workspace .flashcard-actions .button:focus,
 .flashcard-workspace .memory-card-source-row .inline-link:focus,
-.flashcard-workspace .flashcard-source-sidebar .inline-link:focus,
 .assignment-card textarea:focus,
 .assignment-primary-action .button:focus,
 .assignment-source-column .citation-card .inline-link:focus,
@@ -1410,6 +1402,11 @@ body {
 .report-guidance-column .knowledge-map-card .inline-link:focus {
   outline: 3px solid rgba(95, 51, 225, 0.28);
   outline-offset: 3px;
+}
+
+.flashcard-workspace .memory-reveal:focus-visible {
+  outline: 3px solid #a78bfa;
+  outline-offset: -5px;
 }
 
 .assignment-card {
@@ -1423,9 +1420,38 @@ body {
 
 .screen-content[data-screen="assignment"] {
   scroll-padding-bottom: calc(var(--safe-area-bottom) + var(--space-layout) + 96px);
+  background: transparent;
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  .screen-content[data-screen="assignment"] {
+    padding-bottom: 0;
+  }
+
+  .assignment-practice-workspace {
+    min-height: calc(100dvh - var(--safe-area-top) - var(--header-block-size) - var(--space-layout) - var(--space-layout));
+  }
+
+  .assignment-exercise-card {
+    margin-right: calc(0px - var(--safe-area-right) - var(--space-inline));
+    margin-bottom: 0;
+    margin-left: calc(0px - var(--safe-area-left) - var(--space-inline));
+    padding: 24px 26px calc(16px + var(--safe-area-bottom));
+  }
+
+  .assignment-exercise-card[data-assignment-type="judgment"] .assignment-exercise-instruction {
+    margin-top: clamp(72px, 11svh, 92px);
+  }
 }
 
 .assignment-primary-action {
+  position: static;
+  padding: 0;
+  background: transparent;
+}
+
+.assignment-answer-column:has(.assignment-card[data-motion-assignment-selection="selected"]) .assignment-primary-action,
+.assignment-answer-column:has(.assignment-card[data-motion-assignment-submit="submitting"]) .assignment-primary-action {
   position: sticky;
   z-index: 5;
   bottom: calc(var(--overlay-visual-bottom) + var(--safe-area-bottom) + 6px);
@@ -1601,12 +1627,50 @@ body {
 }
 
 @media (max-width: 480px) {
-  .diagnosis-card {
-    grid-template-columns: minmax(0, 1fr);
+  .flashcard-deck-stage {
+    padding-inline: 2px;
   }
 
-  .score-number {
-    justify-self: start;
+  .memory-card-trigger {
+    height: clamp(330px, 49svh, 405px);
+    padding: 17px;
+  }
+
+  .memory-card h2 {
+    font-size: 23px;
+  }
+
+  .assignment-card .answer-field textarea {
+    min-height: 140px;
+  }
+
+  .assignment-card {
+    gap: 12px;
+  }
+
+  .assignment-exercise-card {
+    min-height: 510px;
+  }
+
+  .screen-content .assignment-question {
+    font-size: 20px;
+    line-height: 1.46;
+  }
+
+  .assignment-answer-column:has(.assignment-card[data-motion-assignment-selection="selected"]) .assignment-primary-action,
+  .assignment-answer-column:has(.assignment-card[data-motion-assignment-submit="submitting"]) .assignment-primary-action {
+    bottom: max(0px, calc(var(--safe-area-bottom) - 8px));
+    padding-block: 0;
+  }
+
+  .diagnosis-card {
+    grid-template-columns: 42px minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .diagnosis-status-icon {
+    width: 42px;
+    height: 42px;
   }
 
   .suggestion-grid {
@@ -1623,6 +1687,15 @@ body {
 @media (max-height: 599px) and (orientation: landscape) {
   .assignment-workspace {
     gap: 8px;
+  }
+
+  .assignment-brief {
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .assignment-checkpoints {
+    padding-top: 8px;
   }
 
   .assignment-card {
@@ -1644,8 +1717,8 @@ body {
     padding: 6px 0;
   }
 
-  .flashcard-workspace .memory-card {
-    min-height: 240px;
+  .flashcard-workspace .memory-card-trigger {
+    height: 240px;
   }
 }
 
@@ -1683,65 +1756,26 @@ body {
   }
 
   .flashcard-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(230px, 290px);
+    width: min(100%, 520px);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    gap: clamp(16px, 2.4vw, 28px);
-  }
-
-  .flashcard-workspace .memory-card {
-    grid-column: 1;
-    grid-row: 1 / span 2;
-    min-height: clamp(390px, 52vw, 520px);
-  }
-
-  .flashcard-workspace .flashcard-actions {
-    grid-column: 1;
-    grid-row: 3;
-  }
-
-  .flashcard-workspace .flashcard-hero {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .flashcard-workspace .flashcard-context-card {
-    grid-column: 2;
-    grid-row: 2 / span 2;
-  }
-
-  .flashcard-workspace .memory-card-source-row {
-    display: none;
-  }
-
-  .flashcard-source-sidebar {
-    display: grid;
-    gap: 6px;
-    margin-top: 4px;
-    padding: 12px;
-    border-radius: 14px;
-    background: rgba(238, 245, 255, 0.84);
-  }
-
-  .flashcard-source-sidebar span {
-    color: var(--color-text-muted);
-    font-size: 12px;
-    font-weight: 800;
-  }
-
-  .flashcard-source-sidebar strong {
-    color: var(--color-text);
-    font-size: 14px;
-  }
-
-  .flashcard-source-sidebar .inline-link {
-    min-height: var(--touch-target-min);
-    justify-self: start;
+    gap: 18px;
   }
 
   .assignment-workspace {
     grid-template-columns: minmax(240px, 0.82fr) minmax(0, 1.18fr);
     align-items: start;
     gap: clamp(16px, 2.6vw, 30px);
+  }
+
+  .assignment-workspace.assignment-practice-workspace {
+    width: min(100%, 660px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .assignment-brief {
+    grid-column: 1 / -1;
   }
 
   .assignment-source-column {
@@ -1944,7 +1978,8 @@ body {
   }
 
   .flashcard-workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 322px);
+    width: min(100%, 540px);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .community-screen .community-grid {

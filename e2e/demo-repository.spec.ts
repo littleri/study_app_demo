@@ -1,5 +1,14 @@
 import { expect, test } from "playwright/test";
 
+async function advanceAssignmentToShortAnswer(page: import("playwright/test").Page) {
+  await page.locator(".assignment-judgment-options button").first().click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="choice"]')).toBeVisible();
+  await page.locator(".assignment-choice-options button").nth(1).click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="short-answer"]')).toBeVisible();
+}
+
 test.describe("local DemoRepository P0 flow", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
@@ -20,6 +29,7 @@ test.describe("local DemoRepository P0 flow", () => {
 
     await page.getByRole("button", { name: "做练习", exact: true }).click();
     await expect(page.locator(".assignment-screen")).toBeVisible();
+    await advanceAssignmentToShortAnswer(page);
     await page.getByRole("button", { name: "提交作业", exact: true }).click();
     await expect(page.locator("#assignment-answer-error")).toHaveText("请先填写答案，再提交作业诊断。");
     await expect(page.locator(".assignment-card textarea")).toBeFocused();
@@ -70,6 +80,7 @@ test.describe("local DemoRepository P0 flow", () => {
 
     await page.locator(".lesson-action-grid button").last().click();
     await expect(page.locator(".assignment-screen")).toBeVisible();
+    await advanceAssignmentToShortAnswer(page);
     await page.locator(".assignment-card textarea").fill("同源染色体在减数第一次分裂后期分离，姐妹染色单体在第二次分裂后期分离。");
     await page.locator(".assignment-primary-action .button").click();
     await expect(page.locator(".diagnosis-screen")).toBeVisible();

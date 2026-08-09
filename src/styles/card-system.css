@@ -28,6 +28,31 @@ body,
   background: transparent;
 }
 
+/* Assignment is a focused, full-screen practice stage rather than a neutral
+   dashboard. The opaque brand tint continues behind the iOS header and safe
+   areas, while the two white exercise surfaces remain the only page cards. */
+.app-shell[data-active-screen="assignment"] {
+  background: #d9d2ff;
+}
+
+.screen-content[data-screen="assignment"] :is(.assignment-progress-card, .assignment-exercise-card) {
+  background: var(--color-surface);
+  border-color: rgba(94, 76, 148, 0.18);
+}
+
+.screen-content[data-screen="assignment"] .assignment-progress-card {
+  border-radius: 999px;
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  .screen-content[data-screen="assignment"] .assignment-exercise-card {
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 48px 48px 0 0;
+  }
+}
+
 /* The preview studio is a tool surface too: neutral, opaque, and readable. */
 .device-preview-studio {
   --device-preview-surface: var(--color-surface);

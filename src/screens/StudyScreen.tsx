@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent
+} from "react";
 import {
   BookOpenText,
   Check,
@@ -247,7 +255,9 @@ function StudyChapter({
   onToggleSection: (sectionId: string) => void;
 }) {
   const expanded = location.expandedChapterId === node.chapter.chapter_id;
+  const articleRef = useRef<HTMLElement | null>(null);
   const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const wasExpandedRef = useRef(expanded);
   const safeId = node.chapter.chapter_id.replace(/[^a-zA-Z0-9_-]/g, "-");
   const toggleId = `study-chapter-${safeId}-toggle`;
   const regionId = `study-chapter-${safeId}-content`;
@@ -255,8 +265,88 @@ function StudyChapter({
   const formalSectionCount = countFormalSections(node);
   const complete = progress >= 100;
 
+  useEffect(() => {
+    const opened = expanded && !wasExpandedRef.current;
+    wasExpandedRef.current = expanded;
+    if (!opened) return;
+
+    const article = articleRef.current;
+    const region = article?.querySelector<HTMLElement>(".study-chapter-region");
+    const scroller = article?.closest<HTMLElement>(".screen-content");
+    if (!article || !region || !scroller) return;
+
+    let cancelled = false;
+    let positionFrame: number | null = null;
+    let fallbackTimer: number | null = null;
+
+    const removeTransitionListener = () => {
+      region.removeEventListener("transitionend", handleTransitionEnd);
+    };
+    const positionExpandedChapter = () => {
+      if (cancelled) return;
+      const articleRect = article.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const stickyBottom = Array.from(
+        scroller.querySelectorAll<HTMLElement>(".study-sticky-stack, .study-book-bar, .study-plan-summary")
+      ).reduce((bottom, element) => {
+        const rect = element.getBoundingClientRect();
+        const horizontallyOverlaps = rect.right > articleRect.left && rect.left < articleRect.right;
+        return rect.height > 0 && horizontallyOverlaps ? Math.max(bottom, rect.bottom) : bottom;
+      }, scrollerRect.top);
+      const desiredTop = stickyBottom + 8;
+      const nextScrollTop = Math.max(0, scroller.scrollTop + articleRect.top - desiredTop);
+      if (Math.abs(articleRect.top - desiredTop) < 2) return;
+      scroller.scrollTo({
+        top: nextScrollTop,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+      });
+    };
+    const settleAndPosition = () => {
+      if (cancelled) return;
+      removeTransitionListener();
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      positionFrame = window.requestAnimationFrame(positionExpandedChapter);
+    };
+    function handleTransitionEnd(event: TransitionEvent) {
+      if (event.target === region && event.propertyName === "grid-template-rows") {
+        settleAndPosition();
+      }
+    }
+    const cancelForUserInput = () => {
+      cancelled = true;
+      removeTransitionListener();
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      if (positionFrame !== null) window.cancelAnimationFrame(positionFrame);
+      const currentScrollTop = scroller.scrollTop;
+      const inlineScrollBehavior = scroller.style.scrollBehavior;
+      scroller.style.scrollBehavior = "auto";
+      scroller.scrollTop = currentScrollTop;
+      scroller.style.scrollBehavior = inlineScrollBehavior;
+    };
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      positionFrame = window.requestAnimationFrame(positionExpandedChapter);
+    } else {
+      region.addEventListener("transitionend", handleTransitionEnd);
+      fallbackTimer = window.setTimeout(settleAndPosition, 320);
+    }
+    scroller.addEventListener("pointerdown", cancelForUserInput, { once: true, passive: true });
+    scroller.addEventListener("touchstart", cancelForUserInput, { once: true, passive: true });
+    scroller.addEventListener("wheel", cancelForUserInput, { once: true, passive: true });
+
+    return () => {
+      cancelled = true;
+      removeTransitionListener();
+      scroller.removeEventListener("pointerdown", cancelForUserInput);
+      scroller.removeEventListener("touchstart", cancelForUserInput);
+      scroller.removeEventListener("wheel", cancelForUserInput);
+      if (fallbackTimer !== null) window.clearTimeout(fallbackTimer);
+      if (positionFrame !== null) window.cancelAnimationFrame(positionFrame);
+    };
+  }, [expanded]);
+
   return (
-    <article className={`study-chapter ${expanded ? "is-expanded" : ""}`}>
+    <article ref={articleRef} className={`study-chapter ${expanded ? "is-expanded" : ""}`}>
       <button
         ref={toggleRef}
         id={toggleId}
@@ -355,6 +445,17 @@ export function StudyScreen() {
     go
   } = useAppContext();
   const [attemptedBookId, setAttemptedBookId] = useState<string | null>(null);
+  const [planCompact, setPlanCompact] = useState(false);
+  const [directoryDragging, setDirectoryDragging] = useState(false);
+  const studyScreenRef = useRef<HTMLDivElement | null>(null);
+  const directoryDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startScrollTop: number;
+    moved: boolean;
+    scroller: HTMLElement;
+  } | null>(null);
+  const suppressDirectoryClickRef = useRef(false);
   const chapterTree = useMemo(() => buildChapterTree(parsedChapters ?? []), [parsedChapters]);
   const currentBookId = uploadedFile?.bookId ?? null;
   const defaultLocation = useMemo(() => getDefaultLocation(parsedChapters ?? []), [parsedChapters]);
@@ -374,6 +475,36 @@ export function StudyScreen() {
     setAttemptedBookId(readyCourse.book_id);
     void selectCourse(readyCourse.book_id);
   }, [attemptedBookId, courseSelectionLoadingId, courseSummaries, parsedChapters, selectCourse, uploadedFile]);
+
+  useEffect(() => {
+    const scroller = studyScreenRef.current?.closest<HTMLElement>(".screen-content");
+    if (!scroller) return;
+
+    let updateFrame: number | null = null;
+    const updatePlanState = () => {
+      const scrollTop = scroller.scrollTop;
+      const planHasFocus = studyScreenRef.current
+        ?.querySelector<HTMLElement>(".study-plan-summary")
+        ?.contains(document.activeElement) ?? false;
+      setPlanCompact((current) => (
+        current ? scrollTop > 16 : scrollTop > 48 && !planHasFocus
+      ));
+    };
+    const schedulePlanStateUpdate = () => {
+      if (updateFrame !== null) return;
+      updateFrame = window.requestAnimationFrame(() => {
+        updateFrame = null;
+        updatePlanState();
+      });
+    };
+
+    updatePlanState();
+    scroller.addEventListener("scroll", schedulePlanStateUpdate, { passive: true });
+    return () => {
+      scroller.removeEventListener("scroll", schedulePlanStateUpdate);
+      if (updateFrame !== null) window.cancelAnimationFrame(updateFrame);
+    };
+  }, [courseSelectionLoadingId, courseSummariesLoadState, currentBookId, parsedChapters?.length]);
 
   const totalTasks = currentStudyPlan?.tasks.length ?? 0;
   const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
@@ -409,6 +540,56 @@ export function StudyScreen() {
     if (nextSectionId) setActiveChapterId(nextSectionId);
   }
 
+  function startDirectoryMouseDrag(event: ReactPointerEvent<HTMLElement>) {
+    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    const scroller = event.currentTarget.closest<HTMLElement>(".screen-content");
+    if (!scroller) return;
+    directoryDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startScrollTop: scroller.scrollTop,
+      moved: false,
+      scroller
+    };
+  }
+
+  function moveDirectoryWithMouse(event: ReactPointerEvent<HTMLElement>) {
+    const drag = directoryDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const distance = event.clientY - drag.startY;
+    if (!drag.moved) {
+      if (Math.abs(distance) < 5) return;
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDirectoryDragging(true);
+    }
+    event.preventDefault();
+    drag.scroller.scrollTop = drag.startScrollTop - distance;
+  }
+
+  function finishDirectoryMouseDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = directoryDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.moved) {
+      suppressDirectoryClickRef.current = true;
+      window.setTimeout(() => {
+        suppressDirectoryClickRef.current = false;
+      }, 0);
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    directoryDragRef.current = null;
+    setDirectoryDragging(false);
+  }
+
+  function suppressClickAfterDirectoryDrag(event: ReactMouseEvent<HTMLElement>) {
+    if (!suppressDirectoryClickRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressDirectoryClickRef.current = false;
+  }
+
   if (courseSummariesLoadState === "loading" || courseSelectionLoadingId) {
     return (
       <div className="study-screen book-course-screen" aria-busy="true">
@@ -439,44 +620,60 @@ export function StudyScreen() {
   }
 
   return (
-    <div className="study-screen book-course-screen">
-      <header className="study-book-bar">
-        <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
-          <img src={sourcePageImageUrl(uploadedFile.bookId, 1)} alt="" />
-          <span>
-            <small>当前教材</small>
-            <strong>{bookTitle}</strong>
-          </span>
-          <ChevronDown size={19} aria-hidden="true" />
-        </button>
-        <button type="button" className="study-add-button" onClick={() => go("upload")}>
-          <Plus size={18} aria-hidden="true" />添加
-        </button>
-      </header>
+    <div ref={studyScreenRef} className="study-screen book-course-screen">
+      <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
+        <header className="study-book-bar">
+          <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
+            <img src={sourcePageImageUrl(uploadedFile.bookId, 1)} alt="" />
+            <span>
+              <small>当前教材</small>
+              <strong>{bookTitle}</strong>
+            </span>
+            <ChevronDown size={19} aria-hidden="true" />
+          </button>
+          <button type="button" className="study-add-button" onClick={() => go("upload")}>
+            <Plus size={18} aria-hidden="true" />添加
+          </button>
+        </header>
 
-      <section className="study-intro">
-        <p className="eyebrow">沿着原书目录继续</p>
-        <h1>学习</h1>
-      </section>
+        <section
+          className={`study-plan-summary ${planCompact ? "is-compact" : ""}`}
+          data-plan-state={planCompact ? "compact" : "expanded"}
+          aria-label="学习计划"
+        >
+          {!planCompact ? (
+            <>
+              <div className="study-plan-heading">
+                <h1>学习计划</h1>
+                <button type="button" onClick={() => go("plan")}>
+                  计划详情
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="study-plan-copy">
+                <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
+                <div>
+                  <small>今日建议 · {todayMinutes} 分钟</small>
+                  <strong>{currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}</strong>
+                </div>
+              </div>
+            </>
+          ) : null}
+          <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
+        </section>
+      </div>
 
-      <section className="study-plan-summary" aria-label="今日学习计划">
-        <div className="study-plan-copy">
-          <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
-          <div>
-            <small>今日建议 · {todayMinutes} 分钟</small>
-            <strong>{currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}</strong>
-          </div>
-          <button type="button" onClick={() => go("plan")}>计划详情</button>
-        </div>
-        <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
-      </section>
-
-      <section className="study-directory" aria-labelledby="study-directory-title">
+      <section
+        className={`study-directory ${directoryDragging ? "is-mouse-dragging" : ""}`}
+        aria-labelledby="study-directory-title"
+        onClickCapture={suppressClickAfterDirectoryDrag}
+        onPointerCancel={finishDirectoryMouseDrag}
+        onPointerDown={startDirectoryMouseDrag}
+        onPointerMove={moveDirectoryWithMouse}
+        onPointerUp={finishDirectoryMouseDrag}
+      >
         <div className="study-directory-heading">
-          <div>
-            <p className="eyebrow">从这里继续</p>
-            <h2 id="study-directory-title">教材目录</h2>
-          </div>
+          <h2 id="study-directory-title">教材目录</h2>
           <span>{chapterTree.length} 章</span>
         </div>
         <div className="study-chapter-list">

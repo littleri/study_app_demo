@@ -749,16 +749,33 @@ async function expectStageSixFlashcardLayout(page: Page, viewport: CssViewport, 
 }
 
 async function expectStageSixAssignmentLayout(page: Page, viewport: CssViewport, label: string) {
-  const textarea = page.locator(".assignment-card textarea");
+  const exerciseCard = page.locator(".assignment-exercise-card");
+  const judgmentOptions = page.locator(".assignment-judgment-options button");
   const submit = page.locator(".assignment-primary-action .button");
-  await expect(textarea, `${label}: answer input is visible`).toBeVisible();
+  await expect(exerciseCard, `${label}: current exercise card is visible`).toBeVisible();
+  await expect(exerciseCard, `${label}: the automatic flow starts with judgment`).toHaveAttribute("data-assignment-type", "judgment");
+  await expect(judgmentOptions, `${label}: judgment exposes two touch choices`).toHaveCount(2);
+  await expect(page.locator(".assignment-progress-card"), `${label}: exercise progress is visible`).toBeVisible();
+  await expect(page.locator(".assignment-workspace > .card"), `${label}: progress and exercise are the only two primary surfaces`).toHaveCount(2);
+  await expect(exerciseCard.locator(".assignment-source-button"), `${label}: source control lives inside the exercise surface`).toHaveCount(1);
+  await expect(exerciseCard.locator(".assignment-primary-action"), `${label}: submit control lives inside the exercise surface`).toHaveCount(1);
+  await expect(page.locator('[role="tablist"]'), `${label}: no manual type selector is rendered`).toHaveCount(0);
   await expect(submit, `${label}: submit action is visible`).toBeVisible();
-  await expectStageSixTwoColumnLayout(page, viewport, ".assignment-source-column", ".assignment-answer-column", label);
-  const controls = await Promise.all([textarea.boundingBox(), submit.boundingBox()]);
+  const controls = await Promise.all([judgmentOptions.first().boundingBox(), submit.boundingBox()]);
   if (!controls[0] || !controls[1]) throw new Error(`${label}: assignment controls are not measurable`);
-  expect(controls[0].height, `${label}: answer input has a usable writing area`).toBeGreaterThanOrEqual(90);
+  expect(controls[0].height, `${label}: judgment choice is a generous touch target`).toBeGreaterThanOrEqual(90);
   expect(controls[1].height, `${label}: submit action is a touch target`).toBeGreaterThanOrEqual(44);
+  expect(viewport.width, `${label}: viewport remains measurable for the single-column exercise flow`).toBeGreaterThan(0);
   await expectNoHorizontalOverflow(page, `${label}: assignment`);
+}
+
+async function advanceStageSixAssignmentToShortAnswer(page: Page, label: string) {
+  await page.locator(".assignment-judgment-options button").first().click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="choice"]'), `${label}: judgment advances to choice`).toBeVisible();
+  await page.locator(".assignment-choice-options button").nth(1).click();
+  await page.locator(".assignment-primary-action .button").click();
+  await expect(page.locator('.assignment-exercise-card[data-assignment-type="short-answer"]'), `${label}: choice advances to short answer`).toBeVisible();
 }
 
 async function expectStageSixDiagnosisLayout(page: Page, viewport: CssViewport, label: string) {
@@ -1598,11 +1615,13 @@ test.describe("responsive smoke", () => {
     await page.locator(".lesson-action-grid .button").nth(2).click();
     await expect(page.locator(".assignment-screen"), `${project.name}: assignment opens from the lesson tool`).toBeVisible();
     await expectStageSixAssignmentLayout(page, project.initialViewport, `${project.name}: Stage 6 initial assignment`);
-    const assignmentCitationLink = await expectStageSixVisibleInlineLinkAudit(page, ".assignment-screen", `${project.name}: Stage 6 assignment citation`);
+    const assignmentCitationLink = page.locator(".assignment-source-button");
+    await expect(assignmentCitationLink, `${project.name}: Stage 6 assignment citation is visible`).toBeVisible();
     await assignmentCitationLink.press("Enter");
     await expect(page.locator(".source-reader-screen"), `${project.name}: assignment citation keeps its source-reader destination`).toBeVisible();
     await page.locator(".source-reader-actions .button").nth(1).click();
     await expect(page.locator(".assignment-screen"), `${project.name}: assignment citation back path returns to the answer`).toBeVisible();
+    await advanceStageSixAssignmentToShortAnswer(page, `${project.name}: Stage 6 automatic exercise order`);
 
     const textarea = page.locator(".assignment-card textarea");
     const submit = page.locator(".assignment-primary-action .button");
