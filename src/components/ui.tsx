@@ -459,8 +459,8 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" ? (
-          <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
+        {active !== "study" && active !== "book" && active !== "communityBook" ? (
+          <GlobalAIAssistant active={active} containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
         ) : null}
         {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
         {overlays}
@@ -591,7 +591,7 @@ function getOverlayViewportMetrics(shell: HTMLElement): OverlayViewportMetrics {
   };
 }
 
-function getOrbMetrics(shell: HTMLElement): OrbMetrics {
+function getOrbMetrics(shell: HTMLElement, reservedTop = 0): OrbMetrics {
   const bounds = shell.getBoundingClientRect();
   const style = getComputedStyle(shell);
   const viewport = getOverlayViewportMetrics(shell);
@@ -605,8 +605,9 @@ function getOrbMetrics(shell: HTMLElement): OrbMetrics {
   const navHeight = readCssNumber(style, "--primary-nav-height");
   const orbSize = 54;
   const inset = 12;
-  const topMin = Math.min(bottom - orbSize, visibleTop + safeTop + inset);
-  const topMax = Math.max(topMin, bottom - safeBottom - navHeight - inset - orbSize);
+  const baseTopMin = Math.min(bottom - orbSize, visibleTop + safeTop + inset);
+  const topMax = Math.max(baseTopMin, bottom - safeBottom - navHeight - inset - orbSize);
+  const topMin = Math.min(topMax, Math.max(baseTopMin, reservedTop));
   const leftMin = safeLeft + inset;
   const leftMax = Math.max(leftMin, bounds.width - safeRight - inset - orbSize);
 
@@ -614,10 +615,12 @@ function getOrbMetrics(shell: HTMLElement): OrbMetrics {
 }
 
 function GlobalAIAssistant({
+  active,
   containerElement,
   containerRef,
   reducedMotion
 }: {
+  active: Screen;
   containerElement: HTMLDivElement | null;
   containerRef: RefObject<HTMLDivElement | null>;
   reducedMotion: boolean;
@@ -694,7 +697,14 @@ function GlobalAIAssistant({
   const constrainOrb = useCallback(() => {
     const shell = containerRef.current;
     if (!shell) return;
-    const metrics = getOrbMetrics(shell);
+    const shellBounds = shell.getBoundingClientRect();
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    const reservedTop = discoveryControls
+      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
+      : 0;
+    const metrics = getOrbMetrics(shell, reservedTop);
     const useLeftDock = shell.clientHeight < 600 && shell.clientWidth > shell.clientHeight;
 
     setOrbPosition((current) => {
@@ -707,7 +717,7 @@ function GlobalAIAssistant({
       if (nextTop === current.top && nextLeft === current.left && nextSide === current.side) return current;
       return { ...current, side: nextSide, top: nextTop, left: nextLeft };
     });
-  }, [containerRef]);
+  }, [active, containerRef]);
 
   const cancelOrbInteraction = useCallback(() => {
     clearOrbMotion();
@@ -728,6 +738,10 @@ function GlobalAIAssistant({
     constrainOrb();
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleViewportChange);
     resizeObserver?.observe(shell);
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    if (discoveryControls) resizeObserver?.observe(discoveryControls);
     const visualViewport = window.visualViewport;
     visualViewport?.addEventListener("resize", handleViewportChange);
     visualViewport?.addEventListener("scroll", handleViewportChange);
@@ -741,7 +755,7 @@ function GlobalAIAssistant({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("orientationchange", handleViewportChange);
     };
-  }, [containerElement, constrainOrb, handleViewportChange]);
+  }, [active, containerElement, constrainOrb, handleViewportChange]);
 
   useEffect(() => {
     if (!reducedMotion) return;
@@ -859,7 +873,13 @@ function GlobalAIAssistant({
 
     const before = orb.getBoundingClientRect();
     const shellBounds = shell.getBoundingClientRect();
-    const metrics = getOrbMetrics(shell);
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    const reservedTop = discoveryControls
+      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
+      : 0;
+    const metrics = getOrbMetrics(shell, reservedTop);
     const releasedLeft = reducedMotion ? dragState.current.baseLeft + pendingDragRef.current.x : before.left;
     const releasedTop = reducedMotion ? dragState.current.baseTop + pendingDragRef.current.y : before.top;
     const top = clamp(releasedTop - shellBounds.top, metrics.topMin, metrics.topMax);
