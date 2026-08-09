@@ -69,7 +69,7 @@ export function ProcessingScreen() {
   const stages = ["解析页面与版面", "抽取标题段落图表", "写入 PostgreSQL", "BGE-M3 embedding", "BM25 + pgvector 索引"];
   const activeStage = liveProgress <= 0 ? -1 : Math.min(stages.length - 1, Math.floor(liveProgress / 22));
   const stageCount = stages.length;
-  const completedStages = stages.map((_, index) => index < activeStage);
+  const completedStages = stages.map((_, index) => index < activeStage || (isDone && index === activeStage));
   const progressBucket = Math.max(0, Math.min(100, Math.floor(liveProgress / 10) * 10));
   const processingStatusText = parseError
     ?? (jobMessage || `已识别 ${parsedChapters?.length ?? 0} 个目录项，正在生成课程结构和检索索引`);
@@ -96,7 +96,10 @@ export function ProcessingScreen() {
     }
 
     const previous = stageCompletionSnapshotRef.current;
-    const currentCompletedStages = Array.from({ length: stageCount }, (_, index) => index < activeStage);
+    const currentCompletedStages = Array.from(
+      { length: stageCount },
+      (_, index) => index < activeStage || (isDone && index === activeStage)
+    );
     stageCompletionSnapshotRef.current = {
       completed: currentCompletedStages,
       jobId: parseJobId
@@ -125,7 +128,7 @@ export function ProcessingScreen() {
       enteringKeys.forEach((key) => next.add(key));
       return next;
     });
-  }, [activeStage, consume, parseJobId, reducedMotion, stageCount]);
+  }, [activeStage, consume, isDone, parseJobId, reducedMotion, stageCount]);
 
   useLayoutEffect(() => {
     if (!reducedMotion) return;
@@ -165,10 +168,13 @@ export function ProcessingScreen() {
       </div>
       <div className="processing-flow-support">
         <div className="stage-list" aria-label="解析处理阶段">
-          {stages.map((stage, index) => (
-            <div className={`stage-row ${index <= activeStage ? "done" : ""}`} key={stage}>
+          {stages.map((stage, index) => {
+            const completed = completedStages[index];
+            const active = !isDone && index === activeStage;
+            return (
+            <div className={`stage-row ${completed ? "done" : ""} ${active ? "is-processing" : ""}`} key={stage}>
               <span>
-                {completedStages[index] ? (
+                {completed ? (
                   <StageCompletionCheck
                     motionKey={`parse:${parseJobId}:stage:${index}`}
                     motionState={enteringStageKeys.has(`parse:${parseJobId}:stage:${index}`) ? "entering" : "idle"}
@@ -178,10 +184,11 @@ export function ProcessingScreen() {
               </span>
               <div>
                 <strong>{stage}</strong>
-                <small>{index <= activeStage ? "已完成" : "等待中"}</small>
+                <small>{completed ? "已完成" : active ? "处理中" : "等待中"}</small>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
         <Card className="insight-card processing-status-card">
           <p>

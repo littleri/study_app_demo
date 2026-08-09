@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { LearningState, StudyPlan, StudyPlanRequest, StudyTaskUpdate } from "../types/api";
 
 export function useStudyPlan(bookId: string | null, userId = "anonymous") {
+  const bookcourseRepository = useBookCourseRepository();
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +13,7 @@ export function useStudyPlan(bookId: string | null, userId = "anonymous") {
     if (!bookId) return;
     let active = true;
     setLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getStudyPlan(bookId, userId)
       .then((result) => {
         if (!active) return;
@@ -29,13 +30,13 @@ export function useStudyPlan(bookId: string | null, userId = "anonymous") {
     return () => {
       active = false;
     };
-  }, [bookId, reloadKey, userId]);
+  }, [bookcourseRepository, bookId, reloadKey, userId]);
 
   async function create(payload: StudyPlanRequest) {
     if (!bookId) throw new Error("bookId is required");
     setLoading(true);
     try {
-      const result = await bookcourseApi.createStudyPlan(bookId, { ...payload, user_id: payload.user_id ?? userId });
+      const result = await bookcourseRepository.createStudyPlan(bookId, { ...payload, user_id: payload.user_id ?? userId });
       setPlan(result);
       setError(null);
       return result;
@@ -51,7 +52,7 @@ export function useStudyPlan(bookId: string | null, userId = "anonymous") {
   async function patchTask(taskId: string, payload: StudyTaskUpdate) {
     setLoading(true);
     try {
-      const updated = await bookcourseApi.patchStudyTask(taskId, payload);
+      const updated = await bookcourseRepository.patchStudyTask(taskId, payload);
       setPlan((current) => {
         if (!current) return current;
         const tasks = current.tasks.map((task) => (task.task_id === updated.task_id ? updated : task));
@@ -74,6 +75,7 @@ export function useStudyPlan(bookId: string | null, userId = "anonymous") {
 }
 
 export function useLearningState(userId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [state, setState] = useState<LearningState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +85,7 @@ export function useLearningState(userId: string | null) {
     if (!userId) return;
     let active = true;
     setLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getLearningState(userId)
       .then((result) => {
         if (!active) return;
@@ -100,7 +102,7 @@ export function useLearningState(userId: string | null) {
     return () => {
       active = false;
     };
-  }, [reloadKey, userId]);
+  }, [bookcourseRepository, reloadKey, userId]);
 
   return { state, loading, error, retry: () => setReloadKey((value) => value + 1) };
 }

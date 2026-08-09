@@ -6,15 +6,17 @@ import {
   type MotionState,
   type PresenceSnapshot
 } from "./presenceMachine";
+import { localMotionFallbackMs } from "./timing";
 
-export const motionPresenceMaxMs = 320 as const;
+/** @deprecated Use a semantic fallback from `timing.ts` for new surfaces. */
+export const motionPresenceMaxMs = localMotionFallbackMs;
 
 export type UseMotionPresenceOptions<T> = {
   requested: T | null;
   getKey: (value: T) => string;
   reducedMotion: boolean;
   motionNames: readonly string[];
-  maxMotionMs?: typeof motionPresenceMaxMs;
+  maxMotionMs?: number;
 };
 
 export type MotionPresence<T> = {
@@ -36,7 +38,7 @@ export function useMotionPresence<T>({
   getKey,
   reducedMotion,
   motionNames,
-  maxMotionMs = motionPresenceMaxMs
+  maxMotionMs = localMotionFallbackMs
 }: UseMotionPresenceOptions<T>): MotionPresence<T> {
   const [snapshot, setSnapshot] = useState<PresenceSnapshot<T>>(() => (
     reconcilePresence(createPresenceSnapshot<T>(), { requested, getKey, reducedMotion })

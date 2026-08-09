@@ -3,22 +3,18 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentType,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from "react";
 import {
-  BookOpenText,
-  BookX,
   Check,
   ChevronDown,
   ChevronRight,
-  ClipboardCheck,
-  Layers3,
   LibraryBig,
   Plus,
   Upload
 } from "lucide-react";
+import { ChapterToolCards } from "../components/study/ChapterToolCards";
 import { Button, ProgressBar } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { CollapsibleRegion, MotionIconSwap } from "../motion";
@@ -28,13 +24,7 @@ import { buildChapterTree, type ChapterTreeNode } from "../utils/chapterStructur
 import { liveBookTitle, sourcePageImageUrl, sourcePageLabel } from "./shared";
 import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
-
-const toolIcons: Record<StudyToolId, ComponentType<{ size?: number; "aria-hidden"?: boolean }>> = {
-  source: BookOpenText,
-  assignment: ClipboardCheck,
-  flashcards: Layers3,
-  mistakes: BookX
-};
+import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 
 function getDefaultLocation(chapters: ApiChapter[]): StudyLocation {
   const [firstRoot] = buildChapterTree(chapters);
@@ -85,23 +75,13 @@ function isSectionInChapter(node: ChapterTreeNode, sectionId: string | null): bo
 }
 
 function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
-  const { go, openSourcePage, setActiveChapterId, uploadedFile } = useAppContext();
+  const { go, setActiveChapterId } = useAppContext();
   const primaryTool = studyToolDefinitions.find((tool) => tool.id === "source");
-  const cardTools = studyToolDefinitions.filter((tool) => tool.id !== "source");
-  const previewTitle = chapter.source_title.replace(/^第\s*\d+\s*[章节]\s*/, "");
 
   function openTool(toolId: StudyToolId) {
     setActiveChapterId(chapter.chapter_id);
-    if (toolId === "source" && uploadedFile) {
-      openSourcePage({
-        bookId: uploadedFile.bookId,
-        title: chapter.source_title,
-        pageStart: chapter.page_start,
-        pageEnd: chapter.page_end,
-        printedPageStart: chapter.printed_page_start,
-        printedPageEnd: chapter.printed_page_end,
-        from: "study"
-      });
+    if (toolId === "source") {
+      go("lesson");
       return;
     }
     if (toolId === "assignment") {
@@ -123,71 +103,7 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
           <ChevronRight size={17} aria-hidden="true" />
         </button>
       </div>
-      <div className="study-tool-grid" aria-label="本节辅助工具">
-        {cardTools.map((tool) => {
-          const Icon = toolIcons[tool.id];
-          return (
-            <button
-              aria-label={`${tool.title} ${tool.description}`}
-              className="study-tool-card"
-              data-tool={tool.id}
-              type="button"
-              key={tool.id}
-              onClick={() => openTool(tool.id)}
-            >
-              <span className="study-tool-cover" aria-hidden="true">
-                {tool.id === "assignment" ? (
-                  <span className="study-assignment-preview">
-                    <small>知识检测</small>
-                    <strong>这一节的核心概念是？</strong>
-                    <span><b>A</b>选择你的答案</span>
-                  </span>
-                ) : tool.id === "mistakes" ? (
-                  <span className="study-mistake-preview">
-                    <span className="study-mistake-preview-head">
-                      <small>今日待复习</small>
-                      <strong>3 道</strong>
-                    </span>
-                    <span className="study-mistake-preview-row"><i />减数分裂 <b>错 2 次</b></span>
-                    <span className="study-mistake-preview-row"><i />同源染色体 <b>待复习</b></span>
-                  </span>
-                ) : (
-                  <span className="study-flashcard-preview">
-                    <span>{previewTitle}</span>
-                  </span>
-                )}
-              </span>
-              <span className="study-tool-card-footer">
-                <span className="study-tool-card-icon" aria-hidden="true"><Icon size={17} /></span>
-                <span className="study-tool-copy">
-                  <strong>{tool.title}</strong>
-                  <small>{tool.description}</small>
-                </span>
-                <ChevronRight size={17} aria-hidden="true" />
-              </span>
-            </button>
-          );
-        })}
-        <button
-          aria-label="更多功能 预留新学习工具"
-          className="study-tool-card study-tool-card-future"
-          data-tool="future"
-          type="button"
-          disabled
-        >
-          <span className="study-tool-cover study-future-preview" aria-hidden="true">
-            <span><Plus size={25} /></span>
-            <small>新工具</small>
-          </span>
-          <span className="study-tool-card-footer">
-            <span className="study-tool-card-icon" aria-hidden="true"><Plus size={17} /></span>
-            <span className="study-tool-copy">
-              <strong>更多功能</strong>
-              <small>预留新学习工具</small>
-            </span>
-          </span>
-        </button>
-      </div>
+      <ChapterToolCards chapterTitle={chapter.source_title} onSelectTool={openTool} />
     </section>
   );
 }
@@ -448,9 +364,14 @@ export function StudyScreen() {
     courseSummaries,
     courseSummariesLoadState,
     currentStudyPlan,
+    generatedFlashcards,
     generatedLessons,
+    generatedQuizzes,
+    loadedBookId,
     openSheet,
+    parsedAssets,
     parsedChapters,
+    parsedChunks,
     parsedScanResult,
     selectCourse,
     setActiveChapterId,
@@ -471,17 +392,30 @@ export function StudyScreen() {
     scroller: HTMLElement;
   } | null>(null);
   const suppressDirectoryClickRef = useRef(false);
-  const chapterTree = useMemo(() => buildChapterTree(parsedChapters ?? []), [parsedChapters]);
-  const currentBookId = uploadedFile?.bookId ?? null;
-  const defaultLocation = useMemo(() => getDefaultLocation(parsedChapters ?? []), [parsedChapters]);
+  const hasLoadedCourse = hasCompleteLoadedCourseContext({
+    loadedBookId,
+    uploadedFile,
+    parsedScanResult,
+    parsedChapters,
+    parsedChunks,
+    parsedAssets,
+    currentStudyPlan,
+    generatedLessons,
+    generatedFlashcards,
+    generatedQuizzes
+  });
+  const activeChapters = hasLoadedCourse ? parsedChapters : null;
+  const chapterTree = useMemo(() => buildChapterTree(activeChapters ?? []), [activeChapters]);
+  const currentBookId = hasLoadedCourse ? loadedBookId : null;
+  const defaultLocation = useMemo(() => getDefaultLocation(activeChapters ?? []), [activeChapters]);
   const location = currentBookId ? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
 
   useEffect(() => {
-    if (currentBookId && parsedChapters?.length && !studyLocations[currentBookId]) {
+    if (currentBookId && activeChapters?.length && !studyLocations[currentBookId]) {
       updateStudyLocation(currentBookId, defaultLocation);
       setActiveChapterId(defaultLocation.expandedSectionId);
     }
-  }, [currentBookId, defaultLocation, parsedChapters, setActiveChapterId, studyLocations, updateStudyLocation]);
+  }, [activeChapters, currentBookId, defaultLocation, setActiveChapterId, studyLocations, updateStudyLocation]);
 
   useEffect(() => {
     if (uploadedFile) return;
@@ -524,8 +458,8 @@ export function StudyScreen() {
   const totalTasks = currentStudyPlan?.tasks.length ?? 0;
   const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
   const planProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const currentSection = parsedChapters?.find((chapter) => chapter.chapter_id === location.expandedSectionId)
-    ?? parsedChapters?.[0]
+  const currentSection = activeChapters?.find((chapter) => chapter.chapter_id === location.expandedSectionId)
+    ?? activeChapters?.[0]
     ?? null;
   const currentLesson = generatedLessons?.find((lesson) => lesson.chapter_id === currentSection?.chapter_id);
   const bookTitle = liveBookTitle(uploadedFile, parsedScanResult);
@@ -617,7 +551,7 @@ export function StudyScreen() {
     );
   }
 
-  if (!uploadedFile || !parsedChapters?.length) {
+  if (!hasLoadedCourse || !uploadedFile || !activeChapters?.length) {
     return (
       <div className="study-screen book-course-screen">
         <header className="study-book-bar study-book-bar-empty">

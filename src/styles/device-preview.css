@@ -105,7 +105,10 @@
   font-size: 13px;
   font-weight: 750;
   line-height: 1.1;
-  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  transition:
+    color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    background-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    border-color var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .device-preview-toggle[aria-pressed="true"] {

@@ -106,8 +106,9 @@
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
   opacity: 0;
   transform: skewX(-18deg) translateX(-20%);
-  transition: opacity var(--motion-duration-surface) var(--motion-ease-standard),
-    transform var(--motion-duration-surface) var(--motion-ease-standard);
+  transition:
+    opacity var(--motion-duration-local-slow) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 @media (hover: hover) and (pointer: fine) {

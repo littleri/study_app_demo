@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
-import { StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
+import { globalMotionFallbackMs, localSlowMotionDurationSeconds, localStateGsapEase, StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
 import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
 import { useDeviceLayout } from "../layouts/useDeviceLayout";
@@ -283,23 +283,36 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       && previousActiveIndexRef.current !== activeIndex
       && !layoutChanged
       && !reducedMotion;
-    const targetPosition = { x: target.offsetLeft, y: target.offsetTop };
+    const targetPosition = {
+      x: target.offsetLeft,
+      y: target.offsetTop,
+      width: target.offsetWidth,
+      height: target.offsetHeight
+    };
 
     gsap.killTweensOf(selection);
     gsap.set(selection, {
-      width: target.offsetWidth,
-      height: target.offsetHeight
+      width: targetPosition.width,
+      height: targetPosition.height
     });
 
     if (canAnimate) {
       gsap.to(selection, {
-        ...targetPosition,
-        duration: 0.24,
-        ease: "power2.out",
+        x: targetPosition.x,
+        y: targetPosition.y,
+        width: targetPosition.width,
+        height: targetPosition.height,
+        duration: localSlowMotionDurationSeconds,
+        ease: localStateGsapEase,
         overwrite: "auto"
       });
     } else {
-      gsap.set(selection, targetPosition);
+      gsap.set(selection, {
+        x: targetPosition.x,
+        y: targetPosition.y,
+        width: targetPosition.width,
+        height: targetPosition.height
+      });
     }
 
     previousActiveIndexRef.current = activeIndex;
@@ -459,8 +472,14 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" ? (
-          <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
+        {active !== "study" && active !== "book" && active !== "communityBook" ? (
+          <GlobalAIAssistant
+            active={active}
+            containerElement={appShellElement}
+            containerRef={appShellRef}
+            homeLayout={active === "home"}
+            reducedMotion={motionReduced}
+          />
         ) : null}
         {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
         {overlays}
@@ -591,7 +610,7 @@ function getOverlayViewportMetrics(shell: HTMLElement): OverlayViewportMetrics {
   };
 }
 
-function getOrbMetrics(shell: HTMLElement): OrbMetrics {
+function getOrbMetrics(shell: HTMLElement, reservedTop = 0): OrbMetrics {
   const bounds = shell.getBoundingClientRect();
   const style = getComputedStyle(shell);
   const viewport = getOverlayViewportMetrics(shell);
@@ -605,8 +624,9 @@ function getOrbMetrics(shell: HTMLElement): OrbMetrics {
   const navHeight = readCssNumber(style, "--primary-nav-height");
   const orbSize = 54;
   const inset = 12;
-  const topMin = Math.min(bottom - orbSize, visibleTop + safeTop + inset);
-  const topMax = Math.max(topMin, bottom - safeBottom - navHeight - inset - orbSize);
+  const baseTopMin = Math.min(bottom - orbSize, visibleTop + safeTop + inset);
+  const topMax = Math.max(baseTopMin, bottom - safeBottom - navHeight - inset - orbSize);
+  const topMin = Math.min(topMax, Math.max(baseTopMin, reservedTop));
   const leftMin = safeLeft + inset;
   const leftMax = Math.max(leftMin, bounds.width - safeRight - inset - orbSize);
 
@@ -614,12 +634,16 @@ function getOrbMetrics(shell: HTMLElement): OrbMetrics {
 }
 
 function GlobalAIAssistant({
+  active,
   containerElement,
   containerRef,
+  homeLayout,
   reducedMotion
 }: {
+  active: Screen;
   containerElement: HTMLDivElement | null;
   containerRef: RefObject<HTMLDivElement | null>;
+  homeLayout: boolean;
   reducedMotion: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -656,7 +680,8 @@ function GlobalAIAssistant({
     requested: requestedDialog,
     getKey: getAiDialogKey,
     reducedMotion,
-    motionNames: aiDialogAnimationNames
+    motionNames: aiDialogAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
   });
   const previouslyRenderedDialogRef = useRef(false);
   const dialogVisible = dialogPresence.rendered !== null;
@@ -694,12 +719,23 @@ function GlobalAIAssistant({
   const constrainOrb = useCallback(() => {
     const shell = containerRef.current;
     if (!shell) return;
-    const metrics = getOrbMetrics(shell);
+    const shellBounds = shell.getBoundingClientRect();
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    const reservedTop = discoveryControls
+      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
+      : 0;
+    const metrics = getOrbMetrics(shell, reservedTop);
     const useLeftDock = shell.clientHeight < 600 && shell.clientWidth > shell.clientHeight;
 
     setOrbPosition((current) => {
-      const defaultTop = metrics.topMin + ((metrics.topMax - metrics.topMin) * 0.65);
-      const nextTop = clamp(current.top || defaultTop, metrics.topMin, metrics.topMax);
+      const defaultTopRatio = homeLayout
+        ? (metrics.visibleHeight < 760 ? .69 : .82)
+        : .65;
+      const defaultTop = metrics.topMin + ((metrics.topMax - metrics.topMin) * defaultTopRatio);
+      const requestedTop = hasDraggedOrbRef.current ? (current.top || defaultTop) : defaultTop;
+      const nextTop = clamp(requestedTop, metrics.topMin, metrics.topMax);
       const nextLeft = current.left === null ? null : clamp(current.left, metrics.leftMin, metrics.leftMax);
       const nextSide = current.left === null && !hasDraggedOrbRef.current
         ? (useLeftDock ? "left" : "right")
@@ -707,7 +743,7 @@ function GlobalAIAssistant({
       if (nextTop === current.top && nextLeft === current.left && nextSide === current.side) return current;
       return { ...current, side: nextSide, top: nextTop, left: nextLeft };
     });
-  }, [containerRef]);
+  }, [active, containerRef, homeLayout]);
 
   const cancelOrbInteraction = useCallback(() => {
     clearOrbMotion();
@@ -728,6 +764,10 @@ function GlobalAIAssistant({
     constrainOrb();
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleViewportChange);
     resizeObserver?.observe(shell);
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    if (discoveryControls) resizeObserver?.observe(discoveryControls);
     const visualViewport = window.visualViewport;
     visualViewport?.addEventListener("resize", handleViewportChange);
     visualViewport?.addEventListener("scroll", handleViewportChange);
@@ -741,7 +781,7 @@ function GlobalAIAssistant({
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("orientationchange", handleViewportChange);
     };
-  }, [containerElement, constrainOrb, handleViewportChange]);
+  }, [active, containerElement, constrainOrb, handleViewportChange]);
 
   useEffect(() => {
     if (!reducedMotion) return;
@@ -859,7 +899,13 @@ function GlobalAIAssistant({
 
     const before = orb.getBoundingClientRect();
     const shellBounds = shell.getBoundingClientRect();
-    const metrics = getOrbMetrics(shell);
+    const discoveryControls = active === "community"
+      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
+      : null;
+    const reservedTop = discoveryControls
+      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
+      : 0;
+    const metrics = getOrbMetrics(shell, reservedTop);
     const releasedLeft = reducedMotion ? dragState.current.baseLeft + pendingDragRef.current.x : before.left;
     const releasedTop = reducedMotion ? dragState.current.baseTop + pendingDragRef.current.y : before.top;
     const top = clamp(releasedTop - shellBounds.top, metrics.topMin, metrics.topMax);

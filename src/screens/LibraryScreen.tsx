@@ -13,8 +13,8 @@ import {
   Pill,
   ProgressBar
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { CourseCardMotion, SkeletonReveal } from "../motion";
 import type { JobStatusResponse } from "../types/api";
 import {
@@ -23,6 +23,9 @@ import {
   CourseSummaryLoadError,
   liveBookTitle
 } from "./shared";
+import {
+  resolveProgressOpenMode
+} from "./courseResourceIdentity";
 
 type CourseCardModel = {
   bookId: string;
@@ -42,7 +45,10 @@ type CourseCardModel = {
 const processingStatuses = new Set(["pending", "processing"]);
 
 export function LibraryScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const {
+    clearCourseSession,
+    clearLoadedCourse,
     courseSummaries,
     courseSummariesError,
     courseSummariesLoadState,
@@ -55,16 +61,6 @@ export function LibraryScreen() {
     parseJobStatus,
     refreshCourses,
     selectCourse,
-    setActiveChapterId,
-    setCurrentStudyPlan,
-    setLatestDiagnosis,
-    setParsedAssets,
-    setParsedChapters,
-    setParsedChunks,
-    setParsedScanResult,
-    setGeneratedFlashcards,
-    setGeneratedLessons,
-    setGeneratedQuizzes,
     setParseJobId,
     setParseJobStatus,
     setUploadedFile,
@@ -81,14 +77,15 @@ export function LibraryScreen() {
       && parseJobId
       && (!parseJobStatus || parseJobStatus.book_id === uploadedFile.bookId)
   );
-  const liveStatus = parsedChapters?.length
-    ? "ready"
-    : liveJobMatches && processingStatuses.has(parseJobStatus?.status ?? "processing")
+  const liveStatus = liveJobMatches && processingStatuses.has(parseJobStatus?.status ?? "processing")
       ? "processing"
       : liveJobMatches && parseJobStatus?.status === "failed"
         ? "error"
+        : liveJobMatches && parseJobStatus?.status === "done"
+          ? "needs_review"
         : "uploaded";
   const liveCourse: CourseCardModel | null = uploadedFile
+    && uploadedFile.origin !== "remote-course"
     && !courseSummaries.some((course) => course.book_id === uploadedFile.bookId)
     ? {
         bookId: uploadedFile.bookId,
@@ -103,7 +100,7 @@ export function LibraryScreen() {
           : liveStatus === "error"
             ? parseJobStatus?.error ?? "解析遇到问题"
             : parsedChapters?.[0]?.ai_title ?? "等待启动解析任务",
-        plan: liveStatus === "processing" ? "后台处理中" : liveStatus === "error" ? "解析异常" : liveStatus === "ready" ? "课程已生成" : "等待解析",
+        plan: liveStatus === "processing" ? "后台处理中" : liveStatus === "error" ? "解析异常" : liveStatus === "needs_review" ? "目录待确认" : "等待解析",
         mistakes: 0,
         flashcardsDue: parsedChapters?.length ?? 0,
         status: liveStatus,
@@ -116,10 +113,7 @@ export function LibraryScreen() {
     const localJob = parseJobStatus?.book_id === course.book_id ? parseJobStatus : null;
     const localJobIsActive = Boolean(localJob && processingStatuses.has(localJob.status));
     const localJobFailed = localJob?.status === "failed";
-    const hasLoadedCourse = uploadedFile?.bookId === course.book_id && Boolean(parsedChapters?.length);
-    const status = hasLoadedCourse
-      ? "ready"
-      : localJobIsActive
+    const status = localJobIsActive
         ? "processing"
         : localJobFailed
           ? "error"
@@ -169,20 +163,25 @@ export function LibraryScreen() {
   const courses = liveCourse ? [liveCourse, ...backendCourses] : backendCourses;
 
   function openProgress(course: CourseCardModel) {
-    if (course.jobId) {
+    const mode = resolveProgressOpenMode(course.bookId, course.jobId, uploadedFile?.bookId);
+    if (mode === "job") {
+      clearLoadedCourse();
+      clearCourseSession();
       setUploadedFile({
         bookId: course.bookId,
         name: course.filename || course.title,
         sizeBytes: 0,
         contentType: course.filename?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream",
-        uploadedAt: Date.now()
+        uploadedAt: Date.now(),
+        origin: "remote-course"
       });
-      setParseJobId(course.jobId);
-      if (course.job) setParseJobStatus(course.job);
+      setParseJobId(course.jobId ?? null);
+      setParseJobStatus(course.job ?? null);
       go("processing");
       return;
     }
-    if (uploadedFile?.bookId === course.bookId) {
+    if (mode === "current-session") {
+      clearLoadedCourse();
       go("parseReady");
       return;
     }
@@ -209,22 +208,9 @@ export function LibraryScreen() {
   async function deleteCourse(course: CourseCardModel) {
     setDeletingBookId(course.bookId);
     try {
-      await bookcourseApi.deleteCourse(course.bookId);
-      if (uploadedFile?.bookId === course.bookId) {
-        setUploadedFile(null);
-        setParseJobId(null);
-        setParseJobStatus(null);
-        setParsedScanResult(null);
-        setParsedChapters(null);
-        setParsedChunks(null);
-        setParsedAssets(null);
-        setCurrentStudyPlan(null);
-        setGeneratedLessons(null);
-        setGeneratedFlashcards(null);
-        setGeneratedQuizzes(null);
-        setActiveChapterId(null);
-        setLatestDiagnosis(null);
-      }
+      await bookcourseRepository.deleteCourse(course.bookId);
+      clearLoadedCourse(course.bookId);
+      clearCourseSession(course.bookId);
       setEditingBookId(null);
       setConfirmingDeleteBookId(null);
       await refreshCourses();

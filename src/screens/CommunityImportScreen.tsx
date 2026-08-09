@@ -1,7 +1,6 @@
 import {
   CheckCircle2
 } from "lucide-react";
-import { communityBooks } from "../data/mockBook";
 import {
   Button,
   Card,
@@ -10,10 +9,11 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useLocalMotionItem } from "../motion";
+import { resolveCommunityBook } from "./communityCatalog";
 
 export function CommunityImportScreen() {
-  const { go } = useAppContext();
-  const book = communityBooks[0];
+  const { go, selectedCommunityBookId } = useAppContext();
+  const book = resolveCommunityBook(selectedCommunityBookId);
   const successMotion = useLocalMotionItem(`community-import:${book.id}:success`);
 
   return (
@@ -35,8 +35,8 @@ export function CommunityImportScreen() {
       </Card>
 
       <div className="capability-grid">
-        <Metric label="章节" value="3" helper="已导入" />
-        <Metric label="闪卡" value="24" helper="生成中" />
+        <Metric label="章节" value={`${book.chapters.length}`} helper="已导入" />
+        <Metric label="闪卡" value={`${book.flashcardCount}`} helper="生成中" />
         <Metric label="测试" value="8" helper="可练习" />
       </div>
       </div>

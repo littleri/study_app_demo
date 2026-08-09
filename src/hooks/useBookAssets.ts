@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { ApiAsset } from "../types/api";
 
 export function useBookAssets(bookId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [assets, setAssets] = useState<ApiAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +13,7 @@ export function useBookAssets(bookId: string | null) {
     let active = true;
     setLoading(true);
 
-    bookcourseApi
+    bookcourseRepository
       .getAssets(bookId)
       .then((result) => {
         if (!active) return;
@@ -30,7 +31,7 @@ export function useBookAssets(bookId: string | null) {
     return () => {
       active = false;
     };
-  }, [bookId]);
+  }, [bookcourseRepository, bookId]);
 
   return { assets, loading, error };
 }

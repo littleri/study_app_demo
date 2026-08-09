@@ -156,7 +156,7 @@
   border-radius: inherit;
   background: var(--color-primary);
   transform-origin: left center;
-  transition: transform var(--motion-duration-progress) var(--motion-ease-standard);
+  transition: transform var(--motion-duration-local-slow) var(--motion-ease-progress);
 }
 
 .mistake-insights {
@@ -329,9 +329,9 @@
   background: var(--color-surface);
   box-shadow: none;
   transition:
-    border-color var(--motion-duration-fast) var(--motion-ease-standard),
-    background-color var(--motion-duration-fast) var(--motion-ease-standard),
-    transform var(--motion-duration-press) var(--motion-ease-standard);
+    border-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    background-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .mistake-book-screen .mistake-list-item:hover {
@@ -596,7 +596,7 @@
   height: 10px;
   border-radius: 5px;
   background: var(--color-surface-tint);
-  animation: mistake-loading-pulse var(--motion-duration-loading) ease-in-out infinite alternate;
+  animation: mistake-loading-pulse var(--motion-duration-loading) var(--motion-ease-local-state) infinite alternate;
 }
 
 .mistake-loading-preview span:nth-child(2) {

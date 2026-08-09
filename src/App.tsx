@@ -6,11 +6,13 @@ import {
   actionSheetAnimationNames,
   type ActionSheetView
 } from "./components/ui";
-import { bookcourseApi } from "./api/bookcourseApi";
 import { runtimeConfig } from "./config/runtime";
 import { AppProvider } from "./context/AppContext";
 import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./context/AppContext";
-import { ScreenTransition, useMotionPresence } from "./motion";
+import { communityBooks } from "./data/mockBook";
+import { useBookCourseRepository } from "./context/BookCourseRepositoryContext";
+import { demoRepository } from "./services/DemoRepository";
+import { globalMotionFallbackMs, ScreenTransition, useMotionPresence } from "./motion";
 import {
   createInitialNavigation,
   navigate,
@@ -61,6 +63,15 @@ import type {
   StudyPlan
 } from "./types/api";
 import type { Screen, SheetState, SourcePageTarget, StudyLocation, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
+import { createCourseSelectionCoordinator } from "./screens/homeBookModel";
+import {
+  hasCompleteLoadedCourseContext,
+  resolveCourseSessionClear,
+  shouldClearLoadedCourseAfterRefresh,
+  shouldClearLoadedCourseForDeletedBook,
+  shouldClearRemoteSessionAfterRefresh,
+  type LoadedCourseContext
+} from "./screens/courseResourceIdentity";
 
 const studyLocationsStorageKey = "bookcourse.study-locations.v1";
 
@@ -80,11 +91,11 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   upload: { title: "上传书籍", subtitle: "把教材变成 AI 课程", back: true, hideNav: true },
   parseReady: { title: "解析教材", subtitle: "确认资料后开始生成", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
-  chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true },
+  chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
   courseReady: { title: "生成成功", back: true, hideNav: true },
   library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
-  community: { title: "社区", subtitle: "发现同学共享的 AI 课程" },
-  communityBook: { title: "共享课程", subtitle: "导入后加入你的书库", back: true },
+  community: { title: "社区", subtitle: "发现同学分享的优质课程" },
+  communityBook: { title: "共享课程", back: true, hideNav: true },
   communityImport: { title: "导入成功", subtitle: "已生成可学习内容", back: true },
   study: {},
   book: {},
@@ -128,6 +139,7 @@ function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
 }
 
 export default function App() {
+  const bookcourseRepository = useBookCourseRepository();
   const reducedMotion = useReducedMotion();
   const navigationRef = useRef<NavigationSnapshot>(createInitialNavigation());
   const [navigation, setNavigation] = useState<NavigationSnapshot>(navigationRef.current);
@@ -143,6 +155,8 @@ export default function App() {
   const toastTimerRef = useRef<number | undefined>(undefined);
   const [selectedUpload, setSelectedUpload] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<UploadedCourseFile | null>(null);
+  const uploadedFileRef = useRef(uploadedFile);
+  uploadedFileRef.current = uploadedFile;
   const [parseJobId, setParseJobId] = useState<string | null>(null);
   const [parseJobStatus, setParseJobStatus] = useState<JobStatusResponse | null>(null);
   const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([]);
@@ -150,11 +164,18 @@ export default function App() {
   const [courseSummariesReadyKind, setCourseSummariesReadyKind] = useState<CourseSummariesReadyKind>("empty");
   const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
   const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
-  const [courseSelectionLoadingId, setCourseSelectionLoadingId] = useState<string | null>(null);
+  const [selectedCommunityBookId, setSelectedCommunityBookId] = useState(communityBooks[0]?.id ?? "");
+  const [pendingBookId, setPendingBookId] = useState<string | null>(null);
+  const courseSelectionCoordinatorRef = useRef(createCourseSelectionCoordinator());
   const courseSummariesRef = useRef<CourseSummary[]>([]);
   courseSummariesRef.current = courseSummaries;
+  const [loadedBookId, setLoadedBookId] = useState<string | null>(null);
   const [parsedScanResult, setParsedScanResult] = useState<ScanResult | null>(null);
   const [parsedChapters, setParsedChapters] = useState<ApiChapter[] | null>(null);
+  const loadedBookIdRef = useRef(loadedBookId);
+  loadedBookIdRef.current = loadedBookId;
+  const parsedChaptersRef = useRef(parsedChapters);
+  parsedChaptersRef.current = parsedChapters;
   const [parsedChunks, setParsedChunks] = useState<ApiChunk[] | null>(null);
   const [parsedAssets, setParsedAssets] = useState<ApiAsset[] | null>(null);
   const [generatedLessons, setGeneratedLessons] = useState<Lesson[] | null>(null);
@@ -172,6 +193,31 @@ export default function App() {
   const studyLocationsRef = useRef(studyLocations);
   studyLocationsRef.current = studyLocations;
   const completedParseJobRef = useRef<string | null>(null);
+  const parseSessionGenerationRef = useRef(0);
+  const loadedCourseContextRef = useRef<LoadedCourseContext>({
+    loadedBookId,
+    uploadedFile,
+    parsedScanResult,
+    parsedChapters,
+    parsedChunks,
+    parsedAssets,
+    currentStudyPlan,
+    generatedLessons,
+    generatedFlashcards,
+    generatedQuizzes
+  });
+  loadedCourseContextRef.current = {
+    loadedBookId,
+    uploadedFile,
+    parsedScanResult,
+    parsedChapters,
+    parsedChunks,
+    parsedAssets,
+    currentStudyPlan,
+    generatedLessons,
+    generatedFlashcards,
+    generatedQuizzes
+  };
 
   const commitNavigation = useCallback((resolve: (current: NavigationSnapshot) => NavigationSnapshot) => {
     const next = resolve(navigationRef.current);
@@ -223,6 +269,10 @@ export default function App() {
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
   }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
+
+  const selectCommunityBook = useCallback((bookId: string) => {
+    setSelectedCommunityBookId(bookId);
+  }, []);
 
   const back = useCallback(() => {
     const current = navigationRef.current;
@@ -299,23 +349,91 @@ export default function App() {
     toastTimerRef.current = timer;
   }, []);
 
+  const clearLoadedCourse = useCallback((expectedBookId?: string) => {
+    if (
+      expectedBookId
+      && !shouldClearLoadedCourseForDeletedBook(loadedBookIdRef.current, expectedBookId)
+    ) return false;
+    courseSelectionCoordinatorRef.current.invalidate();
+    setPendingBookId(null);
+    loadedBookIdRef.current = null;
+    parsedChaptersRef.current = null;
+    loadedCourseContextRef.current = {
+      loadedBookId: null,
+      uploadedFile: uploadedFileRef.current,
+      parsedScanResult: null,
+      parsedChapters: null,
+      parsedChunks: null,
+      parsedAssets: null,
+      currentStudyPlan: null,
+      generatedLessons: null,
+      generatedFlashcards: null,
+      generatedQuizzes: null
+    };
+    setLoadedBookId(null);
+    setParsedScanResult(null);
+    setParsedChapters(null);
+    setParsedChunks(null);
+    setParsedAssets(null);
+    setCurrentStudyPlan(null);
+    setGeneratedLessons(null);
+    setGeneratedFlashcards(null);
+    setGeneratedQuizzes(null);
+    setActiveChapterId(null);
+    setLatestDiagnosis(null);
+    setLessonBuildJobId(null);
+    setLessonBuildJobStatus(null);
+    setAnswer("");
+    setSourcePageTarget(null);
+    return true;
+  }, []);
+
+  const clearCourseSession = useCallback((expectedBookId?: string) => {
+    const decision = resolveCourseSessionClear(
+      uploadedFileRef.current,
+      expectedBookId,
+      parseSessionGenerationRef.current
+    );
+    if (!decision.shouldClear) return false;
+
+    parseSessionGenerationRef.current = decision.nextGeneration;
+    uploadedFileRef.current = null;
+    loadedCourseContextRef.current = {
+      ...loadedCourseContextRef.current,
+      uploadedFile: null
+    };
+    setUploadedFile(null);
+    setParseJobId(null);
+    setParseJobStatus(null);
+    completedParseJobRef.current = null;
+    return true;
+  }, []);
+
   const refreshCourses = useCallback(async () => {
     const hasExistingCourses = courseSummariesRef.current.length > 0;
     if (!hasExistingCourses) setCourseSummariesLoadState("loading");
     setCourseSummariesRefreshing(true);
     try {
-      const courses = await bookcourseApi.listCourses();
+      const courses = await bookcourseRepository.listCourses();
       setCourseSummaries(courses);
       setCourseSummariesReadyKind(courses.length > 0 ? "content" : "empty");
       setCourseSummariesLoadState("ready");
       setCourseSummariesError(null);
+
+      const activeUploadedFile = uploadedFileRef.current;
+      if (shouldClearLoadedCourseAfterRefresh(loadedBookIdRef.current, activeUploadedFile, courses)) {
+        clearLoadedCourse();
+      }
+      if (shouldClearRemoteSessionAfterRefresh(activeUploadedFile, courses)) {
+        clearCourseSession(activeUploadedFile?.bookId);
+      }
     } catch (err) {
       setCourseSummariesError(err instanceof Error ? err.message : "课程列表加载失败");
       if (!hasExistingCourses) setCourseSummariesLoadState("error");
     } finally {
       setCourseSummariesRefreshing(false);
     }
-  }, []);
+  }, [bookcourseRepository, clearCourseSession, clearLoadedCourse]);
 
   const updateStudyLocation = useCallback((bookId: string, location: Partial<StudyLocation>) => {
     setStudyLocations((current) => ({
@@ -337,51 +455,85 @@ export default function App() {
     }
   }, [studyLocations]);
 
+  const cancelCourseSelection = useCallback(() => {
+    courseSelectionCoordinatorRef.current.invalidate();
+    setPendingBookId(null);
+  }, []);
+
   const selectCourse = useCallback(async (bookId: string) => {
-    if (uploadedFile?.bookId === bookId && parsedChapters?.length) return true;
-    setCourseSelectionLoadingId(bookId);
-    try {
-      const summary = courseSummariesRef.current.find((course) => course.book_id === bookId);
-      const [scan, chapters, chunks, assets, plan, lessons, cards, quizzes] = await Promise.all([
-        bookcourseApi.getScanResult(bookId),
-        bookcourseApi.getChapters(bookId),
-        bookcourseApi.getChunks(bookId),
-        bookcourseApi.getAssets(bookId),
-        bookcourseApi.getStudyPlan(bookId, runtimeConfig.defaultUserId),
-        bookcourseApi.getLessons(bookId),
-        bookcourseApi.getFlashcards(bookId),
-        bookcourseApi.getQuizzes(bookId)
-      ]);
-      const storedLocation = studyLocationsRef.current[bookId];
-      const chapterIds = new Set(chapters.map((chapter) => chapter.chapter_id));
-      const activeId = storedLocation?.expandedSectionId && chapterIds.has(storedLocation.expandedSectionId)
-        ? storedLocation.expandedSectionId
-        : lessons[0]?.chapter_id ?? chapters.find((chapter) => chapter.level > 1)?.chapter_id ?? chapters[0]?.chapter_id ?? null;
-      setUploadedFile({
-        bookId,
-        name: scan.filename || summary?.title || "已选择教材",
-        sizeBytes: 0,
-        contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type,
-        uploadedAt: Date.now()
-      });
-      setParsedScanResult(scan);
-      setParsedChapters(chapters);
-      setParsedChunks(chunks);
-      setParsedAssets(assets);
-      setCurrentStudyPlan(plan);
-      setGeneratedLessons(lessons);
-      setGeneratedFlashcards(cards);
-      setGeneratedQuizzes(quizzes);
-      setActiveChapterId(activeId);
-      setLatestDiagnosis(null);
+    if (hasCompleteLoadedCourseContext(loadedCourseContextRef.current, bookId)) {
+      courseSelectionCoordinatorRef.current.invalidate();
+      setPendingBookId(null);
       return true;
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "课程数据加载失败", "warning");
-      return false;
-    } finally {
-      setCourseSelectionLoadingId(null);
     }
-  }, [parsedChapters, showToast, uploadedFile]);
+    const summary = courseSummariesRef.current.find((course) => course.book_id === bookId);
+    return courseSelectionCoordinatorRef.current.run(bookId, {
+      load: async () => {
+        const [scan, chapters, chunks, assets, plan, lessons, cards, quizzes] = await Promise.all([
+          bookcourseRepository.getScanResult(bookId),
+          bookcourseRepository.getChapters(bookId),
+          bookcourseRepository.getChunks(bookId),
+          bookcourseRepository.getAssets(bookId),
+          bookcourseRepository.getStudyPlan(bookId, runtimeConfig.defaultUserId),
+          bookcourseRepository.getLessons(bookId),
+          bookcourseRepository.getFlashcards(bookId),
+          bookcourseRepository.getQuizzes(bookId)
+        ]);
+        return { scan, chapters, chunks, assets, plan, lessons, cards, quizzes };
+      },
+      commit: ({ scan, chapters, chunks, assets, plan, lessons, cards, quizzes }) => {
+        const storedLocation = studyLocationsRef.current[bookId];
+        const chapterIds = new Set(chapters.map((chapter) => chapter.chapter_id));
+        const activeId = storedLocation?.expandedSectionId && chapterIds.has(storedLocation.expandedSectionId)
+          ? storedLocation.expandedSectionId
+          : lessons[0]?.chapter_id ?? chapters.find((chapter) => chapter.level > 1)?.chapter_id ?? chapters[0]?.chapter_id ?? null;
+        const selectedCourseFile: UploadedCourseFile = {
+          bookId,
+          name: scan.filename || summary?.title || "已选择教材",
+          sizeBytes: 0,
+          contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type,
+          uploadedAt: Date.now(),
+          origin: "remote-course"
+        };
+        clearCourseSession();
+        uploadedFileRef.current = selectedCourseFile;
+        loadedBookIdRef.current = bookId;
+        parsedChaptersRef.current = chapters;
+        loadedCourseContextRef.current = {
+          loadedBookId: bookId,
+          uploadedFile: selectedCourseFile,
+          parsedScanResult: scan,
+          parsedChapters: chapters,
+          parsedChunks: chunks,
+          parsedAssets: assets,
+          currentStudyPlan: plan,
+          generatedLessons: lessons,
+          generatedFlashcards: cards,
+          generatedQuizzes: quizzes
+        };
+        setUploadedFile(selectedCourseFile);
+        setParsedScanResult(scan);
+        setParsedChapters(chapters);
+        setParsedChunks(chunks);
+        setParsedAssets(assets);
+        setCurrentStudyPlan(plan);
+        setGeneratedLessons(lessons);
+        setGeneratedFlashcards(cards);
+        setGeneratedQuizzes(quizzes);
+        setActiveChapterId(activeId);
+        setLatestDiagnosis(null);
+        setLessonBuildJobId(null);
+        setLessonBuildJobStatus(null);
+        setAnswer("");
+        setSourcePageTarget(null);
+        setLoadedBookId(bookId);
+      },
+      onLatestError: (error) => {
+        showToast(error instanceof Error ? error.message : "课程数据加载失败", "warning");
+      },
+      onPendingChange: setPendingBookId
+    });
+  }, [bookcourseRepository, clearCourseSession, showToast]);
 
   useEffect(() => {
     void refreshCourses();
@@ -407,7 +559,8 @@ export default function App() {
       name: resumable.filename || resumable.title,
       sizeBytes: 0,
       contentType: resumable.filename?.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream",
-      uploadedAt: resumable.updated_at ? resumable.updated_at * 1000 : Date.now()
+      uploadedAt: resumable.updated_at ? resumable.updated_at * 1000 : Date.now(),
+      origin: "remote-course"
     });
     setParseJobId(resumable.parse_job_id);
     setParseJobStatus({
@@ -426,21 +579,40 @@ export default function App() {
 
     const activeParseJobId = parseJobId;
     const activeBookId = uploadedFile.bookId;
+    const parseGeneration = parseSessionGenerationRef.current;
     let active = true;
     let timer: number | undefined;
 
+    function isCurrentParseSession() {
+      return active && parseGeneration === parseSessionGenerationRef.current;
+    }
+
     async function loadParsedCourse(bookId: string) {
       const [scanResult, nextChapters, nextChunks, nextAssets, plan, lessons, cards, quizzes] = await Promise.all([
-        bookcourseApi.getScanResult(bookId),
-        bookcourseApi.getChapters(bookId),
-        bookcourseApi.getChunks(bookId),
-        bookcourseApi.getAssets(bookId),
-        bookcourseApi.getStudyPlan(bookId, runtimeConfig.defaultUserId),
-        bookcourseApi.getLessons(bookId),
-        bookcourseApi.getFlashcards(bookId),
-        bookcourseApi.getQuizzes(bookId)
+        bookcourseRepository.getScanResult(bookId),
+        bookcourseRepository.getChapters(bookId),
+        bookcourseRepository.getChunks(bookId),
+        bookcourseRepository.getAssets(bookId),
+        bookcourseRepository.getStudyPlan(bookId, runtimeConfig.defaultUserId),
+        bookcourseRepository.getLessons(bookId),
+        bookcourseRepository.getFlashcards(bookId),
+        bookcourseRepository.getQuizzes(bookId)
       ]);
-      if (!active) return;
+      if (!isCurrentParseSession()) return;
+      loadedBookIdRef.current = bookId;
+      parsedChaptersRef.current = nextChapters;
+      loadedCourseContextRef.current = {
+        loadedBookId: bookId,
+        uploadedFile: uploadedFileRef.current,
+        parsedScanResult: scanResult,
+        parsedChapters: nextChapters,
+        parsedChunks: nextChunks,
+        parsedAssets: nextAssets,
+        currentStudyPlan: plan,
+        generatedLessons: lessons,
+        generatedFlashcards: cards,
+        generatedQuizzes: quizzes
+      };
       setParsedScanResult(scanResult);
       setParsedChapters(nextChapters);
       setParsedChunks(nextChunks);
@@ -450,17 +622,20 @@ export default function App() {
       setGeneratedFlashcards(cards);
       setGeneratedQuizzes(quizzes);
       setActiveChapterId(nextChapters[0]?.chapter_id ?? null);
+      setAnswer("");
+      setSourcePageTarget(null);
+      setLoadedBookId(bookId);
     }
 
     async function pollParseJob() {
       try {
-        const job = await bookcourseApi.getJob(activeParseJobId);
-        if (!active) return;
+        const job = await bookcourseRepository.getJob(activeParseJobId);
+        if (!isCurrentParseSession()) return;
         setParseJobStatus(job);
 
         if (job.status === "done") {
           await loadParsedCourse(activeBookId);
-          if (!active) return;
+          if (!isCurrentParseSession()) return;
           completedParseJobRef.current = activeParseJobId;
           void refreshCourses();
           showToast("后台 OCR/解析完成，课程目录已生成");
@@ -477,7 +652,7 @@ export default function App() {
 
         timer = window.setTimeout(pollParseJob, 2500);
       } catch (err) {
-        if (!active) return;
+        if (!isCurrentParseSession()) return;
         const message = err instanceof Error ? err.message : "后台解析状态获取失败";
         showToast(message, "warning");
         timer = window.setTimeout(pollParseJob, 4000);
@@ -489,7 +664,7 @@ export default function App() {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [parseJobId, refreshCourses, replaceScreen, showToast, uploadedFile]);
+  }, [bookcourseRepository, parseJobId, refreshCourses, replaceScreen, showToast, uploadedFile]);
 
   const sharedProps = useMemo(
     () => ({
@@ -501,6 +676,7 @@ export default function App() {
       showToast,
       selectCourse,
       updateStudyLocation,
+      demoShelfEnabled: bookcourseRepository === demoRepository,
       selectedUpload,
       setSelectedUpload,
       uploadedFile,
@@ -514,7 +690,14 @@ export default function App() {
       courseSummariesReadyKind,
       courseSummariesError,
       courseSummariesRefreshing,
-      courseSelectionLoadingId,
+      selectedCommunityBookId,
+      selectCommunityBook,
+      loadedBookId,
+      clearLoadedCourse,
+      clearCourseSession,
+      pendingBookId,
+      courseSelectionLoadingId: pendingBookId,
+      cancelCourseSelection,
       refreshCourses,
       parsedScanResult,
       setParsedScanResult,
@@ -551,6 +734,10 @@ export default function App() {
       activeChapterId,
       answer,
       back,
+      bookcourseRepository,
+      cancelCourseSelection,
+      clearCourseSession,
+      clearLoadedCourse,
       closeSheet,
       currentStudyPlan,
       go,
@@ -564,7 +751,10 @@ export default function App() {
       courseSummariesLoadState,
       courseSummariesReadyKind,
       courseSummariesRefreshing,
-      courseSelectionLoadingId,
+      selectedCommunityBookId,
+      selectCommunityBook,
+      loadedBookId,
+      pendingBookId,
       generatedFlashcards,
       generatedLessons,
       generatedQuizzes,
@@ -689,7 +879,8 @@ export default function App() {
     requested: requestedSheetView,
     getKey: getSheetViewKey,
     reducedMotion,
-    motionNames: actionSheetAnimationNames
+    motionNames: actionSheetAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
   });
 
   const header = titles[screen];

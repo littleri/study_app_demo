@@ -12,8 +12,8 @@ import {
   ProgressBar,
   Section
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { useReducedMotion } from "../motion";
 
 const defaultStudyPlanDays = 14;
@@ -34,6 +34,7 @@ function selectRenderablePlanDay(value: unknown, planDayCount: number) {
 }
 
 export function StudyPlanScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { currentStudyPlan, go, setCurrentStudyPlan, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [selectedDay, setSelectedDay] = useState(1);
@@ -62,7 +63,7 @@ export function StudyPlanScreen() {
     if (!uploadedFile || currentStudyPlan) return;
     let active = true;
     setPlanLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getStudyPlan(uploadedFile.bookId, runtimeConfig.defaultUserId)
       .then((plan) => {
         if (!active) return;
@@ -80,12 +81,12 @@ export function StudyPlanScreen() {
     return () => {
       active = false;
     };
-  }, [currentStudyPlan, setCurrentStudyPlan, showToast, uploadedFile]);
+  }, [bookcourseRepository, currentStudyPlan, setCurrentStudyPlan, showToast, uploadedFile]);
 
   async function completeTask(taskId: string) {
     const previousTask = currentStudyPlan?.tasks.find((task) => task.task_id === taskId) ?? null;
     try {
-      const updated = await bookcourseApi.patchStudyTask(taskId, { status: "done", score: 88, weak_points: [] });
+      const updated = await bookcourseRepository.patchStudyTask(taskId, { status: "done", score: 88, weak_points: [] });
       setCurrentStudyPlan(currentStudyPlan ? {
         ...currentStudyPlan,
         tasks: currentStudyPlan.tasks.map((task) => (task.task_id === updated.task_id ? updated : task))
@@ -146,7 +147,6 @@ export function StudyPlanScreen() {
           <p>计划由后端根据解析章节、错题记录和学习状态自动生成，可同步完成状态。</p>
           <ProgressBar value={Math.round((liveTasks.filter((task) => task.status === "done").length / Math.max(1, liveTasks.length)) * 100)} label={`已完成 ${liveTasks.filter((task) => task.status === "done").length} / ${liveTasks.length} 项`} />
         </div>
-        <strong className="plan-percent">{liveTasks.length}</strong>
       </Card>
       <div className="study-plan-workspace">
         <div className="study-plan-calendar" aria-label="选择学习日期">

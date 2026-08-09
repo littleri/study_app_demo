@@ -73,7 +73,6 @@
 .study-chapter-toggle:focus-visible,
 .study-section-toggle:focus-visible,
 .study-enter-button:focus-visible,
-.study-tool-card:focus-visible,
 .book-switcher-row:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-focus) 52%, transparent);
   outline-offset: 2px;
@@ -137,9 +136,9 @@
   font-size: 13px;
   font-weight: 700;
   transition:
-    border-color var(--motion-duration-fast) var(--motion-ease-standard),
-    color var(--motion-duration-fast) var(--motion-ease-standard),
-    background var(--motion-duration-fast) var(--motion-ease-standard);
+    border-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    background var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .study-add-button:hover {
@@ -336,9 +335,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
   background: var(--color-surface);
-  transition:
-    border-color var(--motion-duration-base) var(--motion-ease-standard),
-    box-shadow var(--motion-duration-base) var(--motion-ease-standard);
+  transition: border-color var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .study-chapter.is-expanded {
@@ -400,7 +397,7 @@
   stroke: var(--color-primary);
   stroke-dasharray: 100;
   stroke-linecap: round;
-  transition: stroke-dashoffset var(--motion-duration-progress) var(--motion-ease-enter);
+  transition: stroke-dashoffset var(--motion-duration-local-slow) var(--motion-ease-progress);
 }
 
 .study-chapter-progress > span {
@@ -419,8 +416,7 @@
 }
 
 .study-chapter-copy,
-.study-section-copy,
-.study-tool-copy {
+.study-section-copy {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -517,7 +513,7 @@
   border: 2px solid var(--color-primary-light);
   border-radius: 50%;
   background: var(--color-surface);
-  transition: border-color var(--motion-duration-base) var(--motion-ease-standard);
+  transition: border-color var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .study-section.is-expanded .study-path-node {
@@ -606,8 +602,8 @@
   font-size: 14px;
   font-weight: 750;
   transition:
-    background var(--motion-duration-fast) var(--motion-ease-standard),
-    transform var(--motion-duration-press) var(--motion-ease-standard);
+    background var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .study-enter-button:hover {
@@ -641,9 +637,7 @@
   background: var(--color-surface);
   box-shadow: 0 4px 8px rgba(32, 38, 58, .12);
   text-align: left;
-  transition:
-    box-shadow var(--motion-duration-base) var(--motion-ease-standard),
-    transform var(--motion-duration-base) var(--motion-ease-standard);
+  transition: transform var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .study-tool-card[data-tool="flashcards"] {
@@ -899,7 +893,7 @@
   inset: 0;
   content: "";
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .8), transparent);
-  animation: study-loading-shimmer 1.2s linear infinite;
+  animation: study-loading-shimmer var(--motion-duration-loading) linear infinite;
 }
 
 .study-loading-bar {
@@ -1061,7 +1055,7 @@
   .study-screen {
     width: min(100%, 920px);
     display: grid;
-    grid-template-columns: minmax(260px, .72fr) minmax(420px, 1.28fr);
+    grid-template-columns: minmax(240px, .72fr) minmax(0, 1.28fr);
     column-gap: clamp(24px, 4vw, 52px);
     align-items: start;
   }

@@ -1,18 +1,18 @@
 .button,
 .icon-button {
   transition-property: transform;
-  transition-duration: var(--motion-duration-fast);
-  transition-timing-function: var(--motion-ease-standard);
+  transition-duration: var(--motion-duration-local-fast);
+  transition-timing-function: var(--motion-ease-local-state);
 }
 
 .button:active {
   transform: scale(.98);
-  transition-duration: var(--motion-duration-press);
+  transition-duration: var(--motion-duration-local-fast);
 }
 
 .icon-button:active {
   transform: scale(.96);
-  transition-duration: var(--motion-duration-press);
+  transition-duration: var(--motion-duration-local-fast);
 }
 
 .spin {
@@ -34,7 +34,7 @@
 }
 
 .stage-completion-check[data-motion-stage-state="entering"] {
-  animation: motion-stage-check-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-stage-check-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 @keyframes motion-stage-check-in {
@@ -51,148 +51,283 @@
 
 .motion-screen-transition {
   display: block;
+  position: relative;
+  min-width: 0;
 }
 
-/* A direct centered-flow page root uses a percentage min-height. Give the
-   permanent wrapper the same definite content height its former direct parent
-   supplied, without changing other page roots or scroll containers. */
-.motion-screen-transition:has(> .centered-flow) {
+/* The current surface remains in normal flow and therefore owns the wrapper's
+   height. The outgoing surface is only a visual overlay. */
+.motion-screen-transition:has(> .motion-screen-surface[data-motion-surface="current"] > .centered-flow),
+.motion-screen-transition:has(> .motion-screen-surface[data-motion-surface="current"] > .centered-flow)
+  > .motion-screen-surface[data-motion-surface="current"] {
   height: 100%;
 }
 
-.motion-screen-transition[data-motion-state="entering"] {
-  animation-duration: var(--motion-duration-surface);
-  animation-fill-mode: both;
-  animation-timing-function: var(--motion-ease-enter);
+.motion-screen-surface {
+  width: 100%;
 }
 
-/* The wrapper is the single atomic screen surface. Explicitly clear the
-   finished keyframe layer after it reaches idle. */
-.motion-screen-transition[data-motion-state="idle"] {
+.motion-screen-transition[data-motion-state="transitioning"] > .motion-screen-surface {
+  animation-duration: var(--motion-duration-global);
+  animation-fill-mode: both;
+  will-change: transform;
+}
+
+/* Screen bodies use translucent surfaces, so cross-fading two live trees makes
+   text and cards visibly double-expose. Keep the outgoing tree mounted only for
+   generation-safe cleanup; the fully opaque current tree owns every painted
+   transition frame. */
+.motion-screen-transition[data-motion-state="transitioning"] {
+  overflow: clip;
+}
+
+.motion-screen-transition[data-motion-state="transitioning"]
+  > .motion-screen-surface[data-motion-surface="current"] {
+  position: relative;
+  z-index: 1;
+  animation-timing-function: var(--motion-ease-global-enter);
+}
+
+.motion-screen-transition[data-motion-state="transitioning"]
+  > .motion-screen-surface[data-motion-surface="previous"] {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation-timing-function: var(--motion-ease-global-exit);
+}
+
+/* Idle surfaces retain no compositor layer or completed keyframe styles. */
+.motion-screen-transition[data-motion-state="idle"]
+  > .motion-screen-surface[data-motion-surface="current"] {
   animation: none;
   opacity: 1;
   transform: none;
+  will-change: auto;
 }
 
-.motion-screen-transition[data-motion-state="entering"][data-motion-direction="forward"] {
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="forward"]
+  > .motion-screen-surface[data-motion-surface="current"] {
   animation-name: motion-screen-phone-forward-in;
 }
 
-.motion-screen-transition[data-motion-state="entering"][data-motion-direction="back"] {
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="forward"]
+  > .motion-screen-surface[data-motion-surface="previous"] {
+  animation-name: motion-screen-phone-forward-out;
+}
+
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="back"]
+  > .motion-screen-surface[data-motion-surface="current"] {
   animation-name: motion-screen-phone-back-in;
 }
 
-.motion-screen-transition[data-motion-state="entering"][data-motion-direction="replace"] {
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="back"]
+  > .motion-screen-surface[data-motion-surface="previous"] {
+  animation-name: motion-screen-phone-back-out;
+}
+
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="replace"]
+  > .motion-screen-surface {
   --motion-screen-replace-distance: var(--motion-distance-small);
-  animation-duration: var(--motion-duration-base);
+}
+
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="replace"]
+  > .motion-screen-surface[data-motion-surface="current"] {
   animation-name: motion-screen-replace-in;
+}
+
+.motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="replace"]
+  > .motion-screen-surface[data-motion-surface="previous"] {
+  animation-name: motion-screen-replace-out;
 }
 
 @keyframes motion-screen-phone-forward-in {
   from {
-    opacity: 0;
     transform: translateX(var(--motion-distance-medium));
   }
 
   to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes motion-screen-phone-forward-out {
+  from {
     opacity: 1;
     transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(calc(0px - var(--motion-distance-small)));
   }
 }
 
 @keyframes motion-screen-phone-back-in {
   from {
-    opacity: 0;
     transform: translateX(calc(0px - var(--motion-distance-medium)));
   }
 
   to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes motion-screen-phone-back-out {
+  from {
     opacity: 1;
     transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(var(--motion-distance-small));
   }
 }
 
 @keyframes motion-screen-replace-in {
   from {
-    opacity: 0;
     transform: translateY(var(--motion-screen-replace-distance));
   }
 
   to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-screen-replace-out {
+  from {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(calc(0px - var(--motion-screen-replace-distance)));
   }
 }
 
 @keyframes motion-screen-tablet-in {
   from {
-    opacity: 0;
     transform: translateY(var(--motion-distance-small));
   }
 
   to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes motion-screen-tablet-out {
+  from {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(calc(0px - var(--motion-distance-small)));
   }
 }
 
 @keyframes motion-screen-short-forward-in {
   from {
-    opacity: 0;
     transform: translateX(var(--motion-distance-small));
   }
 
   to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes motion-screen-short-forward-out {
+  from {
     opacity: 1;
     transform: translateX(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(-4px);
   }
 }
 
 @keyframes motion-screen-short-back-in {
   from {
-    opacity: 0;
     transform: translateX(calc(0px - var(--motion-distance-small)));
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
-  .motion-screen-transition[data-motion-state="entering"][data-motion-direction] {
-    animation-name: motion-screen-tablet-in;
+@keyframes motion-screen-short-back-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
   }
 
-  .motion-screen-transition[data-motion-state="entering"][data-motion-direction="replace"] {
-    animation-duration: var(--motion-duration-base);
+  to {
+    opacity: 0;
+    transform: translateX(4px);
   }
 }
 
-@media (max-height: 599px) and (orientation: landscape) {
-  .stage-completion-check[data-motion-stage-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
+@media (min-width: 768px) and (min-height: 600px) {
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction]
+    > .motion-screen-surface[data-motion-surface="current"] {
+    animation-name: motion-screen-tablet-in;
   }
 
-  .motion-screen-transition[data-motion-state="entering"][data-motion-direction="forward"] {
-    animation-duration: var(--motion-duration-base);
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction]
+    > .motion-screen-surface[data-motion-surface="previous"] {
+    animation-name: motion-screen-tablet-out;
+  }
+}
+
+.memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-face-front,
+.memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-face-back,
+.memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-face-back,
+.memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-face-front {
+  animation-duration: var(--motion-duration-local-slow);
+  animation-fill-mode: both;
+  animation-timing-function: var(--motion-ease-local-state);
+}
+
+@media (max-height: 599px) and (orientation: landscape) {
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="forward"]
+    > .motion-screen-surface[data-motion-surface="current"] {
     animation-name: motion-screen-short-forward-in;
   }
 
-  .motion-screen-transition[data-motion-state="entering"][data-motion-direction="back"] {
-    animation-duration: var(--motion-duration-base);
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="forward"]
+    > .motion-screen-surface[data-motion-surface="previous"] {
+    animation-name: motion-screen-short-forward-out;
+  }
+
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="back"]
+    > .motion-screen-surface[data-motion-surface="current"] {
     animation-name: motion-screen-short-back-in;
   }
 
-  .motion-screen-transition[data-motion-state="entering"][data-motion-direction="replace"] {
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="back"]
+    > .motion-screen-surface[data-motion-surface="previous"] {
+    animation-name: motion-screen-short-back-out;
+  }
+
+  .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction="replace"]
+    > .motion-screen-surface {
     --motion-screen-replace-distance: 4px;
-    animation-duration: var(--motion-duration-fast);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --motion-duration-global: 1ms;
+    --motion-duration-local-fast: 1ms;
+    --motion-duration-local-base: 1ms;
+    --motion-duration-local-slow: 1ms;
     --motion-duration-press: 1ms;
     --motion-duration-fast: 1ms;
     --motion-duration-base: 1ms;
@@ -223,21 +358,28 @@
 
   .spin,
   .motion-screen-transition,
+  .motion-screen-surface,
   .stage-completion-check {
     animation: none !important;
+  }
+
+  .motion-screen-surface {
+    opacity: 1 !important;
+    transform: none !important;
+    will-change: auto !important;
   }
 }
 
 .primary-nav .nav-item {
-  transition-duration: var(--motion-duration-surface);
-  transition-property: color, box-shadow;
-  transition-timing-function: var(--motion-ease-standard);
+  transition-duration: var(--motion-duration-local-fast);
+  transition-property: color, background-color;
+  transition-timing-function: var(--motion-ease-local-state);
 }
 
 .primary-nav .nav-icon {
-  transition-duration: var(--motion-duration-fast);
+  transition-duration: var(--motion-duration-local-fast);
   transition-property: transform;
-  transition-timing-function: var(--motion-ease-standard);
+  transition-timing-function: var(--motion-ease-local-state);
 }
 
 .primary-nav .nav-item.active .nav-icon {
@@ -254,9 +396,9 @@
 }
 
 .nav-item[data-motion-active="true"] .nav-icon-motion svg {
-  animation-duration: var(--motion-duration-fast);
+  animation-duration: var(--motion-duration-local-fast);
   animation-fill-mode: backwards;
-  animation-timing-function: var(--motion-ease-standard);
+  animation-timing-function: var(--motion-ease-local-state);
   transform-origin: center;
 }
 
@@ -280,12 +422,12 @@
 
 .sheet-scrim[data-motion-state="entering"],
 .ai-overlay-scrim[data-motion-state="entering"] {
-  animation: motion-scrim-in var(--motion-duration-fast) var(--motion-ease-standard) both;
+  animation: motion-scrim-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
 
 .sheet-scrim[data-motion-state="closing"],
 .ai-overlay-scrim[data-motion-state="closing"] {
-  animation: motion-scrim-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+  animation: motion-scrim-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
 }
 
 .sheet-scrim[data-motion-state="idle"],
@@ -314,17 +456,17 @@
 }
 
 .sheet[data-motion-state="entering"] {
-  animation-duration: var(--motion-duration-surface);
+  animation-duration: var(--motion-duration-global);
   animation-fill-mode: both;
   animation-name: motion-sheet-phone-in;
-  animation-timing-function: var(--motion-ease-enter);
+  animation-timing-function: var(--motion-ease-global-enter);
 }
 
 .sheet[data-motion-state="closing"] {
-  animation-duration: var(--motion-duration-base);
+  animation-duration: var(--motion-duration-global);
   animation-fill-mode: both;
   animation-name: motion-sheet-phone-out;
-  animation-timing-function: var(--motion-ease-exit);
+  animation-timing-function: var(--motion-ease-global-exit);
 }
 
 .sheet[data-motion-state="idle"] {
@@ -452,18 +594,18 @@
 }
 
 .ai-overlay[data-motion-state="entering"] {
-  animation-duration: var(--ai-dialog-enter-duration);
+  animation-duration: var(--motion-duration-global);
   animation-fill-mode: both;
   animation-name: motion-dialog-ai-phone-in;
-  animation-timing-function: var(--motion-ease-enter);
+  animation-timing-function: var(--motion-ease-global-enter);
 }
 
 .ai-overlay[data-motion-state="closing"] {
   z-index: 2;
-  animation-duration: var(--ai-dialog-exit-duration);
+  animation-duration: var(--motion-duration-global);
   animation-fill-mode: both;
   animation-name: motion-dialog-ai-phone-out;
-  animation-timing-function: var(--motion-ease-exit);
+  animation-timing-function: var(--motion-ease-global-exit);
 }
 
 .ai-overlay[data-motion-state="idle"] {
@@ -577,13 +719,13 @@
 .ai-shared-surface[data-motion-ready="true"][data-motion-state="entering"] {
   visibility: visible;
   will-change: transform, opacity, border-radius, background-color;
-  animation: motion-dialog-ai-shared-in var(--ai-dialog-enter-duration) var(--motion-ease-enter) both;
+  animation: motion-dialog-ai-shared-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
 
 .ai-shared-surface[data-motion-ready="true"][data-motion-state="closing"] {
   visibility: visible;
   will-change: transform, border-radius, background-color;
-  animation: motion-dialog-ai-shared-out var(--ai-dialog-exit-duration) var(--motion-ease-exit) both;
+  animation: motion-dialog-ai-shared-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
 }
 
 .ai-shared-origin-icon {
@@ -596,12 +738,12 @@
 
 .ai-shared-origin-icon[data-motion-ready="true"][data-motion-state="entering"] {
   visibility: visible;
-  animation: motion-dialog-ai-origin-icon-in var(--ai-dialog-enter-duration) var(--motion-ease-enter) both;
+  animation: motion-dialog-ai-origin-icon-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
 
 .ai-shared-origin-icon[data-motion-ready="true"][data-motion-state="closing"] {
   visibility: visible;
-  animation: motion-dialog-ai-origin-icon-out var(--ai-dialog-exit-duration) var(--motion-ease-exit) both;
+  animation: motion-dialog-ai-origin-icon-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
 }
 
 @keyframes motion-dialog-ai-shared-in {
@@ -694,11 +836,11 @@
 }
 
 .toast[data-motion-state="entering"] {
-  animation: motion-toast-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-toast-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .toast[data-motion-state="closing"] {
-  animation: motion-toast-out var(--motion-duration-fast) var(--motion-ease-exit) both;
+  animation: motion-toast-out var(--motion-duration-local-fast) var(--motion-ease-local-exit) both;
 }
 
 .toast[data-motion-state="idle"] {
@@ -740,9 +882,9 @@
     calc(var(--ai-orb-drag-y) + var(--ai-orb-settle-y)),
     0
   ) scale(var(--ai-orb-scale));
-  transition-duration: var(--motion-duration-base);
+  transition-duration: var(--motion-duration-local-slow);
   transition-property: transform;
-  transition-timing-function: var(--motion-ease-standard);
+  transition-timing-function: var(--motion-ease-local-enter);
 }
 
 .ai-orb[hidden] {
@@ -758,7 +900,7 @@
 .ai-orb[data-ai-orb-settling="true"] {
   transition-duration: 0s;
   transition-property: transform;
-  transition-timing-function: var(--motion-ease-standard);
+  transition-timing-function: var(--motion-ease-local-enter);
 }
 
 /* Override the legacy dragging transform so drag, FLIP, and press scale stay
@@ -782,32 +924,32 @@
 .parse-status-feedback,
 .library-status-feedback {
   --motion-status-distance: var(--motion-distance-small);
-  animation: motion-local-status-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-local-status-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .upload-success-mark,
 .library-status-success-mark {
-  animation: motion-success-mark-in var(--motion-duration-surface) var(--motion-ease-enter) both;
+  animation: motion-success-mark-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 /* Chapter confirmation only animates the local element whose state changed.
    Directory rows never use a shared stagger or screen-level transition. */
 .chapter-status-mark[data-motion-chapter-state="entering"] {
-  animation: motion-chapter-check-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-chapter-check-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .toc-entry[data-motion-chapter-selection="entering"] {
-  animation: motion-chapter-selection-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-chapter-selection-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .chapter-save-feedback[data-motion-chapter-save="entering"],
 .toc-directory-feedback[data-motion-chapter-feedback="entering"],
 .chapter-confirm-action-feedback[data-motion-chapter-action] {
-  animation: motion-chapter-feedback-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-chapter-feedback-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .course-ready-success-mark[data-motion-course-ready-state="entering"] {
-  animation: motion-course-ready-success-in var(--motion-duration-surface) var(--motion-ease-enter) both;
+  animation: motion-course-ready-success-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .course-ready-check-path {
@@ -816,7 +958,7 @@
 }
 
 .course-ready-success-mark[data-motion-course-ready-state="entering"] .course-ready-check-path {
-  animation: motion-course-ready-check-path var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-course-ready-check-path var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .success-hero-image[data-motion-image-state="loading"],
@@ -826,24 +968,24 @@
 
 .success-hero-image[data-motion-image-state="entering"],
 .course-cover-image[data-motion-image-state="entering"] {
-  animation: motion-stage3-image-in var(--motion-duration-base) var(--motion-ease-standard) both;
+  animation: motion-stage3-image-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 /* Stage 4A keeps entry feedback on explicitly named local nodes. Course cards
    use session history in React; CSS only provides the finite visual mapping. */
 [data-motion-course-card-state="entering"] {
-  animation: motion-course-card-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-course-card-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
   animation-delay: calc(var(--motion-course-card-index) * 30ms);
 }
 
 [data-motion-item="content"][data-motion-item-state="entering"] {
   --motion-local-item-x: 0px;
   --motion-local-item-y: var(--motion-distance-small);
-  animation: motion-local-item-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-local-item-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 [data-motion-item="source-page-content"][data-motion-item-state="entering"] {
-  animation: motion-source-page-in var(--motion-duration-base) var(--motion-ease-standard) both;
+  animation: motion-source-page-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .citation-media-image[data-motion-image-state="loading"],
@@ -853,7 +995,7 @@
 
 .citation-media-image[data-motion-image-state="entering"],
 .source-page-image[data-motion-image-state="entering"] {
-  animation: motion-stage3-image-in var(--motion-duration-base) var(--motion-ease-standard) both;
+  animation: motion-stage3-image-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 /* Stage 4C keeps the remaining screens at a single, explicit local surface.
@@ -863,27 +1005,27 @@
 }
 
 .community-cover-image[data-motion-image-state="entering"] {
-  animation: motion-stage3-image-in var(--motion-duration-base) var(--motion-ease-standard) both;
+  animation: motion-stage3-image-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 /* Stage 4B confines study-tool feedback to the one local control or result
    that actually changed. None of these selectors target a screen root, task
    list, source affordance, or assignment content outside its existing state. */
 .plan-date-selection-check[data-motion-plan-date-state="entering"] {
-  animation: motion-plan-date-check-in var(--motion-duration-fast) var(--motion-ease-standard) both;
+  animation: motion-plan-date-check-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .timeline-task-completion[data-motion-plan-task-state="entering"],
 .assignment-answer-check[data-motion-assignment-answer-state="entering"] {
-  animation: motion-stage-check-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-stage-check-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .assignment-card[data-motion-assignment-selection],
 .assignment-card[data-motion-assignment-submit],
 .assignment-primary-action .button[data-motion-assignment-submit] {
   transition-property: border-color, background-color;
-  transition-duration: var(--motion-duration-fast);
-  transition-timing-function: var(--motion-ease-standard);
+  transition-duration: var(--motion-duration-local-fast);
+  transition-timing-function: var(--motion-ease-local-state);
 }
 
 .assignment-card[data-motion-assignment-selection="selected"] {
@@ -927,19 +1069,24 @@
 }
 
 .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-3d {
-  animation: motion-flashcard-flip-to-back var(--motion-duration-flip) var(--motion-ease-standard) both;
+  animation: motion-flashcard-flip-to-back var(--motion-duration-local-slow) var(--motion-ease-local-state) both;
 }
 
 .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-3d {
-  animation: motion-flashcard-flip-to-front var(--motion-duration-flip) var(--motion-ease-standard) both;
+  animation: motion-flashcard-flip-to-front var(--motion-duration-local-slow) var(--motion-ease-local-state) both;
 }
 
 .memory-card-answer-motion[data-motion-flash-next-state="entering"] {
-  animation: motion-flashcard-next-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-flashcard-next-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .diagnosis-knowledge-progress-fill[data-motion-diagnosis-progress-state="entering"] {
-  animation: motion-diagnosis-progress-in var(--motion-duration-progress) var(--motion-ease-standard) both;
+  animation: motion-diagnosis-progress-in var(--motion-duration-local-slow) var(--motion-ease-progress) both;
+}
+
+.progress-fill {
+  transition-duration: var(--motion-duration-local-slow);
+  transition-timing-function: var(--motion-ease-progress);
 }
 
 @keyframes motion-local-status-in {
@@ -1185,44 +1332,36 @@
   }
 
   .sheet[data-sheet-type="chat"][data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-surface);
     animation-name: motion-panel-tablet-in;
   }
 
   .sheet[data-sheet-type="chat"][data-motion-state="closing"] {
-    animation-duration: var(--motion-duration-base);
     animation-name: motion-panel-tablet-out;
   }
 
   .ai-overlay[data-motion-state="entering"] {
-    animation-duration: var(--ai-dialog-enter-duration);
     animation-name: motion-dialog-ai-tablet-in;
   }
 
   .ai-overlay[data-motion-state="closing"] {
-    animation-duration: var(--ai-dialog-exit-duration);
     animation-name: motion-dialog-ai-tablet-out;
   }
 
   .sheet[data-sheet-type="source"][data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-base);
     animation-name: motion-dialog-source-in;
   }
 
   .sheet[data-sheet-type="source"][data-motion-state="closing"] {
-    animation-duration: var(--motion-duration-fast);
     animation-name: motion-dialog-source-out;
   }
 
   .sheet[data-sheet-type="note"][data-motion-state="entering"],
   .sheet[data-sheet-type="editChapter"][data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-base);
     animation-name: motion-dialog-center-in;
   }
 
   .sheet[data-sheet-type="note"][data-motion-state="closing"],
   .sheet[data-sheet-type="editChapter"][data-motion-state="closing"] {
-    animation-duration: var(--motion-duration-fast);
     animation-name: motion-dialog-center-out;
   }
 }
@@ -1252,52 +1391,28 @@
 
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-3d,
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-3d {
-    animation: none;
+    animation-name: none;
   }
 
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-face-front,
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-face-back {
-    animation: motion-flashcard-crossfade-out var(--motion-duration-base) var(--motion-ease-standard) both;
+    animation-name: motion-flashcard-crossfade-out;
   }
 
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="back"] .memory-card-answer-face-back,
   .memory-card-answer-motion[data-motion-flash-state="flipping"][data-motion-flash-side="front"] .memory-card-answer-face-front {
-    animation: motion-flashcard-crossfade-in var(--motion-duration-base) var(--motion-ease-standard) both;
-  }
-
-  .memory-card-answer-motion[data-motion-flash-next-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
-    animation-name: motion-flashcard-next-short-in;
-  }
-
-  [data-motion-course-card-state="entering"] {
-    animation-delay: 0ms;
-    animation-duration: var(--motion-duration-fast);
+    animation-name: motion-flashcard-crossfade-in;
   }
 
   [data-motion-item="content"][data-motion-item-state="entering"] {
     --motion-local-item-x: 0px;
     --motion-local-item-y: 4px;
-    animation-duration: var(--motion-duration-fast);
-  }
-
-  [data-motion-item="source-page-content"][data-motion-item-state="entering"],
-  .citation-media-image[data-motion-image-state="entering"],
-  .source-page-image[data-motion-image-state="entering"],
-  .community-cover-image[data-motion-image-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
   }
 
   .upload-status-feedback,
   .parse-status-feedback,
   .library-status-feedback {
     --motion-status-distance: 4px;
-    animation-duration: var(--motion-duration-fast);
-  }
-
-  .upload-success-mark,
-  .library-status-success-mark {
-    animation-duration: var(--motion-duration-base);
   }
 
   .chapter-status-mark[data-motion-chapter-state="entering"],
@@ -1306,46 +1421,28 @@
   .toc-directory-feedback[data-motion-chapter-feedback="entering"],
   .chapter-confirm-action-feedback[data-motion-chapter-action] {
     --motion-distance-small: 4px;
-    animation-duration: var(--motion-duration-fast);
   }
 
-  .timeline-task-completion[data-motion-plan-task-state="entering"],
-  .assignment-answer-check[data-motion-assignment-answer-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
-  }
-
-  .course-ready-success-mark[data-motion-course-ready-state="entering"] {
-    animation-duration: var(--motion-duration-base);
-  }
-
-  .success-hero-image[data-motion-image-state="entering"],
-  .course-cover-image[data-motion-image-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
+  .memory-card-answer-motion[data-motion-flash-next-state="entering"] {
+    animation-name: motion-flashcard-next-short-in;
   }
 
   .sheet[data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-base);
     animation-name: motion-sheet-short-in;
   }
 
   .sheet[data-motion-state="closing"] {
-    animation-duration: var(--motion-duration-fast);
     animation-name: motion-sheet-short-out;
   }
 
   .ai-overlay[data-motion-state="entering"] {
-    animation-duration: var(--ai-dialog-enter-duration);
     animation-name: motion-dialog-ai-short-in;
   }
 
   .ai-overlay[data-motion-state="closing"] {
-    animation-duration: var(--ai-dialog-exit-duration);
     animation-name: motion-dialog-ai-short-out;
   }
 
-  .toast[data-motion-state="entering"] {
-    animation-duration: var(--motion-duration-fast);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1484,13 +1581,11 @@
 .motion-state-swap-previous {
   opacity: 0;
   transform: translateY(calc(0px - var(--motion-distance-text)));
-  filter: blur(0);
 }
 
 .motion-state-swap-current {
   opacity: 1;
   transform: translateY(0);
-  filter: blur(0);
 }
 
 .motion-state-swap-measure {
@@ -1499,11 +1594,11 @@
 }
 
 .motion-state-swap[data-motion-text-state="swapping"] .motion-state-swap-previous {
-  animation: motion-text-swap-exit var(--motion-duration-fast) var(--motion-ease-exit) both;
+  animation: motion-text-swap-exit var(--motion-duration-local-fast) var(--motion-ease-local-exit) both;
 }
 
 .motion-state-swap[data-motion-text-state="swapping"] .motion-state-swap-current {
-  animation: motion-text-swap-enter var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-text-swap-enter var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 @keyframes motion-text-swap-exit {
@@ -1533,13 +1628,13 @@
 .motion-collapsible {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows var(--motion-duration-base) var(--motion-ease-exit);
+  transition: grid-template-rows var(--motion-duration-local-slow) var(--motion-ease-local-exit);
 }
 
 .motion-collapsible[data-motion-collapsible="expanded"] {
   grid-template-rows: 1fr;
-  transition-duration: var(--motion-duration-surface);
-  transition-timing-function: var(--motion-ease-enter);
+  transition-duration: var(--motion-duration-local-slow);
+  transition-timing-function: var(--motion-ease-local-enter);
 }
 
 .motion-collapsible-inner {
@@ -1555,9 +1650,7 @@
 
 .motion-skeleton-layer {
   min-width: 0;
-  transition:
-    opacity var(--motion-duration-surface) var(--motion-ease-enter),
-    filter var(--motion-duration-surface) var(--motion-ease-enter);
+  transition: opacity var(--motion-duration-local-slow) var(--motion-ease-local-enter);
 }
 
 .motion-skeleton-placeholder,
@@ -1569,7 +1662,6 @@
 
 .motion-skeleton-placeholder {
   opacity: 1;
-  filter: blur(0);
   z-index: 2;
   pointer-events: none;
 }
@@ -1578,7 +1670,6 @@
   position: relative;
   z-index: 1;
   opacity: 0;
-  filter: blur(var(--motion-blur-small));
   pointer-events: none;
 }
 
@@ -1589,18 +1680,16 @@
 }
 
 .motion-skeleton-reveal[data-motion-load-state="loading"] .motion-skeleton-placeholder > * {
-  animation: motion-skeleton-pulse var(--motion-duration-loading) var(--motion-ease-standard) infinite;
+  animation: motion-skeleton-pulse var(--motion-duration-loading) var(--motion-ease-local-state) infinite;
 }
 
 .motion-skeleton-reveal[data-motion-load-state="revealing"] .motion-skeleton-placeholder {
   opacity: 0;
-  filter: blur(var(--motion-blur-small));
 }
 
 .motion-skeleton-reveal[data-motion-load-state="revealing"] .motion-skeleton-content,
 .motion-skeleton-reveal[data-motion-load-state="ready"] .motion-skeleton-content {
   opacity: 1;
-  filter: blur(0);
   pointer-events: auto;
 }
 
@@ -1608,7 +1697,6 @@
 .motion-skeleton-reveal[data-motion-load-state="error"] .motion-skeleton-placeholder,
 .motion-skeleton-reveal[data-motion-load-state="error"] .motion-skeleton-content {
   opacity: 0;
-  filter: blur(0);
 }
 
 .motion-skeleton-reveal[data-motion-load-state="error"] .motion-skeleton-error {
@@ -1647,7 +1735,7 @@
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: color var(--motion-duration-surface) var(--motion-ease-enter);
+  transition: color var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 /* Preserve the legacy filter-pill contract while the indicator supplies the
@@ -1686,8 +1774,8 @@
   background: var(--color-surface, #fff);
   pointer-events: none;
   transition:
-    transform var(--motion-duration-surface) var(--motion-ease-enter),
-    width var(--motion-duration-surface) var(--motion-ease-enter);
+    transform var(--motion-duration-local-slow) var(--motion-ease-local-state),
+    width var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .motion-icon-swap {
@@ -1700,35 +1788,32 @@
   display: inline-grid;
   grid-area: 1 / 1;
   opacity: 0;
-  filter: blur(var(--motion-blur-small));
   transform: scale(var(--motion-scale-state));
   transition:
-    opacity var(--motion-duration-base) var(--motion-ease-enter),
-    filter var(--motion-duration-base) var(--motion-ease-enter),
-    transform var(--motion-duration-base) var(--motion-ease-enter);
+    opacity var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-state);
   pointer-events: none;
 }
 
 .motion-icon-swap-layer.is-active {
   opacity: 1;
-  filter: blur(0);
   transform: scale(1);
 }
 
 .motion-error-shake[data-motion-error-state="shaking"] {
-  animation: motion-error-shake var(--motion-duration-base) var(--motion-ease-standard) both;
+  animation: motion-error-shake var(--motion-duration-local-base) var(--motion-ease-local-state) both;
 }
 
 .export-check-visual {
   transition:
-    opacity var(--motion-duration-fast) var(--motion-ease-exit),
-    transform var(--motion-duration-fast) var(--motion-ease-exit),
-    background-color var(--motion-duration-fast) var(--motion-ease-enter),
-    border-color var(--motion-duration-fast) var(--motion-ease-enter);
+    opacity var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    background-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    border-color var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .export-check-visual[data-motion-checkbox-state="checked"] .export-check-path {
-  animation: motion-checkbox-check-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  animation: motion-checkbox-check-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .export-check-path {
@@ -1769,18 +1854,10 @@
   }
 }
 
-@media (max-height: 599px) and (orientation: landscape) {
-  .motion-sliding-filter-indicator {
-    transition-duration: var(--motion-duration-base);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-distance-text: 0px;
     --motion-distance-error: 0px;
-    --motion-blur-text: 0px;
-    --motion-blur-small: 0px;
     --motion-scale-state: 1;
   }
 

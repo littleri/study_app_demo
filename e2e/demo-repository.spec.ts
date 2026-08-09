@@ -1,4 +1,20 @@
-import { expect, test } from "playwright/test";
+import { expect, test, type Locator, type Page } from "playwright/test";
+
+async function expectScreenReady(page: Page, selector: string, label: string) {
+  const screen = page.locator(selector);
+  await expect(screen, `${label}: exactly one target screen is mounted`).toHaveCount(1);
+  await expect(screen, `${label}: target screen is visible`).toBeVisible();
+  await expect(page.locator(".motion-screen-transition"), `${label}: screen transition is settled`).toHaveAttribute("data-motion-state", "idle");
+  return screen;
+}
+
+async function clickUniqueAction(page: Page, action: Locator, label: string) {
+  await expect(page.locator(".motion-screen-transition"), `${label}: current screen is settled before interaction`).toHaveAttribute("data-motion-state", "idle");
+  await expect(action, `${label}: action is unique`).toHaveCount(1);
+  await expect(action, `${label}: action is visible`).toBeVisible();
+  await expect(action, `${label}: action is enabled`).toBeEnabled();
+  await action.click();
+}
 
 async function advanceAssignmentToShortAnswer(page: import("playwright/test").Page) {
   await page.locator(".assignment-judgment-options button").first().click();
@@ -12,25 +28,33 @@ async function advanceAssignmentToShortAnswer(page: import("playwright/test").Pa
 test.describe("local DemoRepository P0 flow", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
-  test("opens the grounded meiosis lesson and blocks an empty diagnosis submission", async ({ page }) => {
+  test("opens the meiosis chapter and blocks an empty diagnosis submission", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
 
-    await expect(page.getByRole("button", { name: "继续学习", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "继续学习", exact: true }).click();
+    await expectScreenReady(page, ".home-dashboard", "initial home");
+    const continueLearning = page.getByRole("button", { name: "继续学习", exact: true });
+    await clickUniqueAction(page, continueLearning, "continue the current chapter");
 
-    await expect(page.locator(".library-screen")).toBeVisible();
-    await page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }).click();
-
-    await expect(page.locator(".book-course-screen")).toBeVisible();
-    await page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }).click();
-    await expect(page.locator(".lesson-screen")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "同源染色体先分离", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "来自教材第 18 页", exact: true }).first()).toBeVisible();
-
-    await page.getByRole("button", { name: "做练习", exact: true }).click();
-    await expect(page.locator(".assignment-screen")).toBeVisible();
+    await expectScreenReady(page, ".book-course-screen", "study directory");
+    const secondChapter = page.getByRole("button", { name: "第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度 17%", exact: true });
+    if (await secondChapter.getAttribute("aria-expanded") !== "true") {
+      await clickUniqueAction(page, secondChapter, "expand the meiosis chapter");
+    }
+    const meiosisToggle = page.locator('.study-section-toggle[aria-label="第 1 节 减数分裂和受精作用 教材第 16-26 页"]');
+    await expect(meiosisToggle).toHaveCount(1);
+    await expect(meiosisToggle).toBeVisible();
+    if (await meiosisToggle.getAttribute("aria-expanded") !== "true") {
+      await clickUniqueAction(page, meiosisToggle, "expand the meiosis section");
+    }
+    const meiosisSection = page.locator(".study-section", { has: meiosisToggle });
+    await clickUniqueAction(
+      page,
+      meiosisSection.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }),
+      "open assignment diagnosis"
+    );
+    await expectScreenReady(page, ".assignment-screen", "assignment");
     await advanceAssignmentToShortAnswer(page);
-    await page.getByRole("button", { name: "提交作业", exact: true }).click();
+    await clickUniqueAction(page, page.getByRole("button", { name: "提交作业", exact: true }), "submit the empty assignment");
     await expect(page.locator("#assignment-answer-error")).toHaveText("请先填写答案，再提交作业诊断。");
     await expect(page.locator(".assignment-card textarea")).toBeFocused();
   });
@@ -46,8 +70,11 @@ test.describe("local DemoRepository P0 flow", () => {
 
     await page.goto("/?embedded=device-preview");
     appOrigin = new URL(page.url()).origin;
-    await page.locator(".nav-upload").click();
-    await expect(page.locator(".upload-sheet-screen")).toBeVisible();
+    await expectScreenReady(page, ".home-dashboard", "upload replay home");
+    const homeUploadAction = page.locator('[data-home-global-action="upload"]');
+    await expect(homeUploadAction).toHaveAccessibleName("上传新书，添加另一份教材");
+    await clickUniqueAction(page, homeUploadAction, "open upload");
+    await expectScreenReady(page, ".upload-sheet-screen", "upload");
 
     await page.locator("input[type=file]").setInputFiles({
       name: "biology-demo.pdf",
@@ -55,11 +82,11 @@ test.describe("local DemoRepository P0 flow", () => {
       buffer: Buffer.from("%PDF-1.4 local demo fixture")
     });
     await expect(page.locator(".upload-selection-summary")).toBeVisible();
-    await page.getByRole("button", { name: "上传并继续", exact: true }).click();
-    await expect(page.locator(".parse-ready-screen")).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "上传并继续", exact: true }), "confirm the selected upload");
+    await expectScreenReady(page, ".parse-ready-screen", "parse ready");
 
-    await page.locator(".parse-actions .button").first().click();
-    await expect(page.locator(".processing-flow-screen")).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "开始后台解析", exact: true }), "start parsing");
+    await expectScreenReady(page, ".processing-flow-screen", "processing");
     for (const progress of [18, 46, 74]) {
       await expect.poll(
         async () => page.locator(".processing-card .progress-wrap").getAttribute("aria-label"),
@@ -67,40 +94,57 @@ test.describe("local DemoRepository P0 flow", () => {
       ).toBe(`解析进度 ${progress}%`);
     }
 
-    await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 15_000 });
-    const confirmCourseButton = page.locator(".chapter-confirm-actions .button");
-    await expect(confirmCourseButton).toBeEnabled();
-    await confirmCourseButton.click();
+    await expectScreenReady(page, ".chapter-confirm-screen", "chapter confirmation");
+    const confirmCourseButton = page.getByRole("button", { name: "确认生成课程", exact: true });
+    await clickUniqueAction(page, confirmCourseButton, "confirm chapters and generate the course");
 
-    await expect(page.locator(".course-ready-screen")).toBeVisible({ timeout: 10_000 });
-    await page.locator(".course-ready-actions .button").first().click();
-    await expect(page.locator(".book-course-screen")).toBeVisible();
-    await page.locator(".chapter-row").first().click();
-    await expect(page.locator(".lesson-screen")).toBeVisible();
-
-    await page.locator(".lesson-action-grid button").last().click();
-    await expect(page.locator(".assignment-screen")).toBeVisible();
+    await expectScreenReady(page, ".course-ready-screen", "course ready");
+    await clickUniqueAction(page, page.getByRole("button", { name: "进入学习", exact: true }), "enter the generated course");
+    await expectScreenReady(page, ".book-course-screen", "generated study directory");
+    const generatedSecondChapter = page.getByRole("button", { name: "第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度 17%", exact: true });
+    if (await generatedSecondChapter.getAttribute("aria-expanded") !== "true") {
+      await clickUniqueAction(page, generatedSecondChapter, "expand the generated chapter");
+    }
+    const generatedMeiosisToggle = page.locator('.study-section-toggle[aria-label="第 1 节 减数分裂和受精作用 教材第 16-26 页"]');
+    await expect(generatedMeiosisToggle).toHaveCount(1);
+    await expect(generatedMeiosisToggle).toBeVisible();
+    if (await generatedMeiosisToggle.getAttribute("aria-expanded") !== "true") {
+      await clickUniqueAction(page, generatedMeiosisToggle, "expand the generated meiosis section");
+    }
+    await clickUniqueAction(
+      page,
+      page.locator(".study-section", { has: generatedMeiosisToggle })
+        .getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }),
+      "open generated assignment diagnosis"
+    );
+    await expectScreenReady(page, ".assignment-screen", "generated assignment");
     await advanceAssignmentToShortAnswer(page);
-    await page.locator(".assignment-card textarea").fill("同源染色体在减数第一次分裂后期分离，姐妹染色单体在第二次分裂后期分离。");
-    await page.locator(".assignment-primary-action .button").click();
-    await expect(page.locator(".diagnosis-screen")).toBeVisible();
+    const assignmentAnswer = page.locator(".assignment-card textarea");
+    await expect(assignmentAnswer, "assignment answer is unique").toHaveCount(1);
+    await expect(assignmentAnswer, "assignment answer is visible").toBeVisible();
+    await expect(assignmentAnswer, "assignment answer is enabled").toBeEnabled();
+    await assignmentAnswer.fill("同源染色体在减数第一次分裂后期分离，姐妹染色单体在第二次分裂后期分离。");
+    await clickUniqueAction(page, page.getByRole("button", { name: "提交作业", exact: true }), "submit the assignment for diagnosis");
+    await expectScreenReady(page, ".diagnosis-screen", "diagnosis result");
     await expect(page.locator(".diagnosis-card")).toContainText("卡点");
 
-    await page.locator(".diagnosis-actions .button").last().click();
-    await expect(page.locator(".mistake-book-screen")).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "查看错题本", exact: true }), "open the mistake book");
+    await expectScreenReady(page, ".mistake-book-screen", "mistake book");
     await expect(page.locator(".mistake-list-item")).toHaveCount(1);
     await expect(page.locator(".mistake-detail-card")).toBeVisible();
     await expect(page.locator(".mistake-detail-card")).toContainText("1 条引用来源已记录");
 
-    await page.locator(".mistake-actions > .button").click();
-    await expect(page.locator(".flashcard-screen")).toBeVisible();
-    await page.locator(".memory-reveal").click();
+    await clickUniqueAction(page, page.getByRole("button", { name: "用闪卡巩固", exact: true }), "open mistake flashcards");
+    await expectScreenReady(page, ".flashcard-screen", "flashcards");
+    await clickUniqueAction(page, page.getByRole("button", { name: /点击查看答案/ }), "reveal the flashcard answer");
     await expect(page.locator(".memory-reveal")).toHaveAttribute("aria-pressed", "true");
-    await page.locator(".flashcard-context-card .button-row .button").first().click();
-    await expect(page.locator(".lesson-screen")).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "返回", exact: true }), "return to the mistake book");
+    await expectScreenReady(page, ".mistake-book-screen", "returned mistake book");
+    await clickUniqueAction(page, page.getByRole("button", { name: "查看原文", exact: true }), "return to the lesson");
+    await expectScreenReady(page, ".lesson-screen", "lesson");
 
-    await page.locator(".lesson-bottom-actions .button").last().click();
-    await expect(page.locator(".report-screen")).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "完成章节", exact: true }), "complete the chapter");
+    await expectScreenReady(page, ".report-screen", "report");
     await expect(page.locator(".report-score-ring")).toContainText("82%");
 
     await page.reload();
