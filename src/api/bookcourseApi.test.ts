@@ -25,6 +25,21 @@ describe("demo repository boundary", () => {
     expect(final.status).toBe("done");
   });
 
+  it("starts retries with distinct job identities and independent progress", async () => {
+    bookcourseApi.reset();
+    const firstJob = await bookcourseApi.startParse("book_biology_2");
+    await bookcourseApi.getJob(firstJob.job_id);
+    const retryJob = await bookcourseApi.startParse("book_biology_2");
+    const retryFirstPoll = await bookcourseApi.getJob(retryJob.job_id);
+
+    expect(retryJob.job_id).not.toBe(firstJob.job_id);
+    expect(retryFirstPoll).toMatchObject({
+      job_id: retryJob.job_id,
+      progress: 18,
+      status: "processing"
+    });
+  });
+
   it("keeps mistake records grounded in an existing MinerU chunk", async () => {
     const chunks = await bookcourseApi.getChunks("book_biology_2");
     const mistakes = await bookcourseApi.getMistakes("local_user", "book_biology_2");

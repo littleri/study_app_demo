@@ -38,7 +38,8 @@ describe("upload confirmation flow", () => {
       name: "biology.pdf",
       sizeBytes: 2048,
       contentType: "application/pdf",
-      uploadedAt: 123
+      uploadedAt: 123,
+      origin: "local-upload"
     });
   });
 

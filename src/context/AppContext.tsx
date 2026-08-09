@@ -19,6 +19,8 @@ export type CourseSummariesLoadState = "loading" | "ready" | "error";
 export type CourseSummariesReadyKind = "content" | "empty";
 
 export type AppContextValue = AppActions & {
+  /** Enables local display-only shelf metadata in the bundled demo app. */
+  demoShelfEnabled?: boolean;
   selectedUpload: boolean;
   setSelectedUpload: (value: boolean) => void;
   uploadedFile: UploadedCourseFile | null;
@@ -32,9 +34,14 @@ export type AppContextValue = AppActions & {
   courseSummariesReadyKind: CourseSummariesReadyKind;
   courseSummariesError: string | null;
   courseSummariesRefreshing: boolean;
+  loadedBookId: string | null;
+  clearLoadedCourse: (expectedBookId?: string) => boolean;
+  clearCourseSession: (expectedBookId?: string) => boolean;
+  pendingBookId: string | null;
   courseSelectionLoadingId: string | null;
   selectedCommunityBookId: string;
   selectCommunityBook: (bookId: string) => void;
+  cancelCourseSelection: () => void;
   refreshCourses: () => Promise<void>;
   parsedScanResult: ScanResult | null;
   setParsedScanResult: (value: ScanResult | null) => void;

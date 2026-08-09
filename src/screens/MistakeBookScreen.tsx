@@ -23,8 +23,8 @@ import {
 import { runtimeConfig } from "../config/runtime";
 import type { MistakeRecord } from "../types/api";
 import { Button, Card, Pill } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { SlidingFilterGroup, useLocalMotionItem } from "../motion";
 
 const allMistakesFilter = "全部";
@@ -92,6 +92,7 @@ function loadLocalMastery(bookId: string): Record<string, LocalMastery> {
 }
 
 export function MistakeBookScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { go, showToast, uploadedFile } = useAppContext();
   const [mode, setMode] = useState<MistakeMode>("overview");
   const [filter, setFilter] = useState(allMistakesFilter);
@@ -172,7 +173,7 @@ export function MistakeBookScreen() {
     let active = true;
     setLoadingMistakes(true);
     setMistakeError(null);
-    bookcourseApi
+    bookcourseRepository
       .getMistakes(runtimeConfig.defaultUserId, uploadedFile.bookId)
       .then((records) => {
         if (!active) return;
@@ -190,7 +191,7 @@ export function MistakeBookScreen() {
     return () => {
       active = false;
     };
-  }, [reloadKey, uploadedFile]);
+  }, [bookcourseRepository, reloadKey, uploadedFile]);
 
   useEffect(() => {
     if (selectedMistakeId && !filteredMistakes.some((mistake) => mistake.mistake_id === selectedMistakeId)) {

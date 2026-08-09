@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { ApiChunk } from "../types/api";
 
 export function useChunks(bookId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [chunks, setChunks] = useState<ApiChunk[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -11,7 +12,7 @@ export function useChunks(bookId: string | null) {
     if (!bookId) return;
     let active = true;
     setLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getChunks(bookId)
       .then((result) => {
         if (!active) return;
@@ -29,7 +30,7 @@ export function useChunks(bookId: string | null) {
     return () => {
       active = false;
     };
-  }, [bookId]);
+  }, [bookcourseRepository, bookId]);
 
   return { chunks, loading, error };
 }

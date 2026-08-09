@@ -31,7 +31,8 @@ export async function uploadConfirmedCourseFile(
     name: file.name,
     sizeBytes: file.size,
     contentType: file.type || "application/octet-stream",
-    uploadedAt
+    uploadedAt,
+    origin: "local-upload"
   };
 }
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { AssignmentSubmitRequest, DiagnosisResponse, MistakeRecord } from "../types/api";
 
 export function useAssignmentDiagnosis() {
+  const bookcourseRepository = useBookCourseRepository();
   const [diagnosis, setDiagnosis] = useState<DiagnosisResponse | null>(null);
   const [mistakeRecorded, setMistakeRecorded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -11,8 +12,8 @@ export function useAssignmentDiagnosis() {
   async function submitAndDiagnose(assignmentId: string, payload: AssignmentSubmitRequest) {
     setLoading(true);
     try {
-      const submission = await bookcourseApi.submitAssignment(assignmentId, payload);
-      const result = await bookcourseApi.diagnoseAssignment(assignmentId, submission.submission_id);
+      const submission = await bookcourseRepository.submitAssignment(assignmentId, payload);
+      const result = await bookcourseRepository.diagnoseAssignment(assignmentId, submission.submission_id);
       setDiagnosis(result);
       setMistakeRecorded(result.mistake_recorded);
       setError(null);
@@ -30,6 +31,7 @@ export function useAssignmentDiagnosis() {
 }
 
 export function useMistakes(userId: string | null, bookId?: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export function useMistakes(userId: string | null, bookId?: string | null) {
     if (!userId) return;
     let active = true;
     setLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getMistakes(userId, bookId ?? undefined)
       .then((result) => {
         if (!active) return;
@@ -57,7 +59,7 @@ export function useMistakes(userId: string | null, bookId?: string | null) {
     return () => {
       active = false;
     };
-  }, [bookId, reloadKey, userId]);
+  }, [bookcourseRepository, bookId, reloadKey, userId]);
 
   return { mistakes, loading, error, retry: () => setReloadKey((value) => value + 1) };
 }

@@ -12,8 +12,8 @@ import {
   Pill,
   ProgressBar
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import {
   coursePreparationSteps,
   formatFileSize,
@@ -22,7 +22,8 @@ import {
 import { startConfirmedCourseParse } from "./uploadFlow";
 
 export function ParseReadyScreen() {
-  const { go, parseJobId, parseJobStatus, selectedUpload, uploadedFile, setActiveChapterId, setCurrentStudyPlan, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLatestDiagnosis, setLessonBuildJobId, setLessonBuildJobStatus, setParseJobId, setParseJobStatus, setParsedAssets, setParsedChapters, setParsedChunks, setParsedScanResult, setUploadedFile, setSelectedUpload, showToast } = useAppContext();
+  const bookcourseRepository = useBookCourseRepository();
+  const { clearCourseSession, clearLoadedCourse, go, parseJobId, parseJobStatus, selectedUpload, uploadedFile, setParseJobId, setParseJobStatus, setSelectedUpload, showToast } = useAppContext();
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function ParseReadyScreen() {
     setParsing(true);
     setParseError(null);
     try {
-      const job = await startConfirmedCourseParse(uploadedFile, bookcourseApi);
+      const job = await startConfirmedCourseParse(uploadedFile, bookcourseRepository);
       setParseJobId(job.job_id);
       setParseJobStatus({
         job_id: job.job_id,
@@ -45,18 +46,7 @@ export function ParseReadyScreen() {
         message: "后台 OCR/解析任务已创建",
         error: null
       });
-      setActiveChapterId(null);
-      setCurrentStudyPlan(null);
-      setLatestDiagnosis(null);
-      setParsedAssets(null);
-      setParsedChapters(null);
-      setParsedChunks(null);
-      setParsedScanResult(null);
-      setGeneratedLessons(null);
-      setGeneratedFlashcards(null);
-      setGeneratedQuizzes(null);
-      setLessonBuildJobId(null);
-      setLessonBuildJobStatus(null);
+      clearLoadedCourse();
       showToast("后台解析已开始；你可以安全离开，进度会保留");
       go("processing");
     } catch (err) {
@@ -110,7 +100,14 @@ export function ParseReadyScreen() {
       : parseJobId
         ? "后台处理中"
       : "等待你开始";
-  const primaryActionText = parseJobStatus?.status === "done" ? "查看目录" : parseJobId ? "查看后台进度" : "开始后台解析";
+  const retryable = parseError !== null || parseJobStatus?.status === "failed";
+  const primaryActionText = parseJobStatus?.status === "done"
+    ? "查看目录"
+    : retryable
+      ? "重新解析"
+      : parseJobId
+        ? "查看后台进度"
+        : "开始后台解析";
 
   return (
     <div className="screen-stack parse-ready-screen parse-flow-screen">
@@ -175,6 +172,10 @@ export function ParseReadyScreen() {
               go("chapterConfirm");
               return;
             }
+            if (retryable) {
+              void startParse();
+              return;
+            }
             if (parseJobId) {
               go("processing");
               return;
@@ -191,16 +192,8 @@ export function ParseReadyScreen() {
           variant="secondary"
           disabled={parsing}
           onClick={() => {
-            setParseJobId(null);
-            setParseJobStatus(null);
-            setActiveChapterId(null);
-            setCurrentStudyPlan(null);
-            setLatestDiagnosis(null);
-            setParsedAssets(null);
-            setParsedChapters(null);
-            setParsedChunks(null);
-            setParsedScanResult(null);
-            setUploadedFile(null);
+            clearLoadedCourse();
+            clearCourseSession();
             setSelectedUpload(false);
             go("upload");
           }}

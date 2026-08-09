@@ -6,6 +6,9 @@ html {
   min-height: 100%;
   background: #f5f1ff;
   font-family: var(--font-app);
+  -webkit-font-smoothing: antialiased;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
   color: var(--color-text);
   letter-spacing: 0;
 }
@@ -2606,6 +2609,11 @@ textarea:focus-visible {
   padding-bottom: 8px;
 }
 
+.chat-sheet-transcript,
+.chat-sheet-composer {
+  display: contents;
+}
+
 .chat-bubble {
   max-width: 92%;
   border-radius: 18px;
@@ -4073,14 +4081,6 @@ html {
   color: #66758d;
   font-size: 12px;
   line-height: 1.5;
-}
-
-.plan-percent {
-  position: absolute;
-  right: 18px;
-  bottom: 28px;
-  color: #1677ff;
-  font-size: 20px;
 }
 
 .plan-date-row {

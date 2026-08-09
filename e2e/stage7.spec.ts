@@ -1,5 +1,4 @@
 import type { Locator, Page } from "playwright/test";
-import type { BookCourseApiFixture } from "./fixtures/bookcourse-api";
 import { expect, test } from "./fixtures";
 import type { CssViewport } from "./fixtures/viewports";
 
@@ -12,46 +11,20 @@ type Bounds = {
   width: number;
 };
 
-const preparedCourseSession = {
-  uploadedFile: {
-    bookId: "book_stage3",
-    name: "stage3-biology.pdf",
-    sizeBytes: 1024,
-    contentType: "application/pdf",
-    uploadedAt: 1
-  },
-  parseJobId: "job_stage3",
-  parseJobStatus: {
-    job_id: "job_stage3",
-    book_id: "book_stage3",
-    status: "pending",
-    stage: "queued",
-    progress: 1,
-    message: "Stage 7 local fixture prepares the course",
-    error: null
-  }
-};
-
-const sourceReaderBaselineSession = {
-  ...preparedCourseSession,
-  parseJobStatus: {
-    ...preparedCourseSession.parseJobStatus,
-    status: "done",
-    stage: "complete",
-    progress: 100,
-    message: "解析完成"
-  }
-};
-
 const targetViewports: readonly CssViewport[] = [
+  { width: 320, height: 700 },
+  { width: 375, height: 667 },
+  { width: 393, height: 852 },
   { width: 402, height: 681 },
   { width: 402, height: 874 },
+  { width: 430, height: 932 },
   { width: 756, height: 352 },
   { width: 874, height: 402 },
   { width: 834, height: 1194 },
   { width: 834, height: 1210 },
   { width: 1194, height: 834 },
-  { width: 1210, height: 834 }
+  { width: 1210, height: 834 },
+  { width: 1440, height: 900 }
 ];
 
 const breakpointViewports: readonly CssViewport[] = [
@@ -77,6 +50,30 @@ function expectedRail(viewport: CssViewport) {
 function overlaps(first: Bounds, second: Bounds) {
   return Math.min(first.right, second.right) - Math.max(first.left, second.left) > 0
     && Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top) > 0;
+}
+
+async function expectShortLandscapeHomePriorityGeometry(page: Page) {
+  const viewport = page.viewportSize();
+  if (!viewport || viewport.width <= viewport.height || viewport.height >= 600) return;
+  const geometry = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>(".home-topline");
+    const cover = document.querySelector<HTMLElement>(".home-book-option.is-selected .home-book-cover");
+    const summary = document.querySelector<HTMLElement>(".home-book-selection-summary");
+    const navigation = document.querySelector<HTMLElement>(".primary-nav");
+    if (!header || !cover || !summary || !navigation) {
+      throw new Error("Short-landscape Home priority geometry is incomplete");
+    }
+    return {
+      cover: cover.getBoundingClientRect().toJSON() as Bounds,
+      header: header.getBoundingClientRect().toJSON() as Bounds,
+      navigation: navigation.getBoundingClientRect().toJSON() as Bounds,
+      summary: summary.getBoundingClientRect().toJSON() as Bounds
+    };
+  });
+  expect(geometry.header.top, "short-landscape Home keeps the greeting in the visual viewport").toBeGreaterThanOrEqual(0);
+  expect(geometry.header.bottom, "short-landscape greeting precedes the selected book").toBeLessThanOrEqual(geometry.cover.top);
+  expect(geometry.cover.bottom, "short-landscape navigation does not cover the selected book").toBeLessThanOrEqual(geometry.navigation.top - 2);
+  expect(geometry.summary.bottom, "short-landscape navigation does not cover the selected-book summary").toBeLessThanOrEqual(geometry.navigation.top - 2);
 }
 
 async function expectNoHorizontalOverflow(page: Page, label: string) {
@@ -165,6 +162,35 @@ async function waitForVisualMotionToSettle(page: Page) {
   }).toBe(true);
 }
 
+async function clickAfterMotionAndScrollSettle(locator: Locator, label: string) {
+  const page = locator.page();
+  await waitForVisualMotionToSettle(page);
+  await expect(locator, `${label}: action is unique`).toHaveCount(1);
+  await expect(locator, `${label}: action is visible`).toBeVisible();
+  await expect(locator, `${label}: action is enabled`).toBeEnabled();
+  await locator.evaluate(async (element) => {
+    const action = element as HTMLElement;
+    const scroller = action.closest<HTMLElement>(".screen-content");
+    const previousScrollBehavior = scroller?.style.scrollBehavior ?? "";
+    if (scroller) scroller.style.scrollBehavior = "auto";
+    action.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+
+    const readBounds = () => {
+      const bounds = action.getBoundingClientRect();
+      return [bounds.bottom, bounds.left, bounds.right, bounds.top];
+    };
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    const firstFrame = readBounds();
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    const secondFrame = readBounds();
+    if (firstFrame.some((value, index) => value !== secondFrame[index])) {
+      throw new Error("Stage 7 action did not settle across two animation frames");
+    }
+    if (scroller) scroller.style.scrollBehavior = previousScrollBehavior;
+  });
+  await locator.click();
+}
+
 async function beginOverlayScrollAudit(page: Page) {
   await page.evaluate(() => {
     const screenContent = document.querySelector<HTMLElement>(".screen-content");
@@ -211,101 +237,94 @@ async function expectVisualBaseline(page: Page, name: string) {
   await captureVisualBaseline(page, name);
 }
 
-async function loadStageFiveCourse(
-  page: Page,
-  bookCourseApi: BookCourseApiFixture,
-  session = preparedCourseSession
-) {
-  bookCourseApi.useStageFiveFlow();
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
-  }, session);
-  await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".daily-task-copy .button").first()).toBeVisible();
+async function loadProductionCourse(page: Page, scenario = "default") {
+  await page.goto(`/e2e/production-repository-harness.html?scenario=${scenario}&embedded=device-preview`);
+  await expect(page.locator(".home-dashboard")).toBeVisible();
+  await expect(page.locator('.home-book-workspace[data-loaded="true"]')).toBeVisible();
+  await waitForVisualMotionToSettle(page);
 }
 
-async function loadStageSixCourse(page: Page, bookCourseApi: BookCourseApiFixture) {
-  bookCourseApi.useStageSixFlow();
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
-  }, preparedCourseSession);
-  await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".daily-task-copy .button").first()).toBeVisible();
-}
-
-async function openStageFiveLibrary(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await loadStageFiveCourse(page, bookCourseApi);
-  await page.locator(".daily-task-copy .button").first().click();
+async function openProductionLibrary(page: Page, scenario = "default") {
+  await loadProductionCourse(page, scenario);
+  await clickAfterMotionAndScrollSettle(
+    page.getByRole("button", { name: /全部教材/ }),
+    "open production Library"
+  );
   await expect(page.locator(".library-course-grid")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
-async function openStageFiveCourse(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await openStageFiveLibrary(page, bookCourseApi);
-  await page.locator(".library-course-grid .course-space-card .button").first().click();
+async function openProductionStudy(page: Page, scenario = "default") {
+  await loadProductionCourse(page, scenario);
+  await clickAfterMotionAndScrollSettle(
+    page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action'),
+    "open production Study"
+  );
   await expect(page.locator(".book-course-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
-async function openStageFiveLesson(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await openStageFiveCourse(page, bookCourseApi);
-  await page.locator(".course-action-grid .quick-action").nth(1).click();
+async function openProductionLesson(page: Page, scenario = "default") {
+  await openProductionStudy(page, scenario);
+  await clickAfterMotionAndScrollSettle(
+    page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
+    "open production Lesson"
+  );
   await expect(page.locator(".lesson-layout")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
-async function openStageFiveSourceReaderForVisualBaseline(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await loadStageFiveCourse(page, bookCourseApi, sourceReaderBaselineSession);
-  await page.locator(".home-screen .section .inline-link").click();
-  await expect(page.locator(".library-course-grid")).toBeVisible();
-  await page.locator(".library-course-grid .course-space-card .button").first().click();
-  await expect(page.locator(".book-course-screen")).toBeVisible();
-  await page.locator(".course-action-grid .quick-action").nth(1).click();
-  await expect(page.locator(".lesson-layout")).toBeVisible();
-  await page.locator(".lesson-learning-tools > .button").first().click();
+async function openProductionSourceReader(page: Page, scenario = "default") {
+  await openProductionLesson(page, scenario);
+  await clickAfterMotionAndScrollSettle(
+    page.locator(".lesson-learning-tools > .button").first(),
+    "open production SourceReader"
+  );
   await expect(page.locator(".source-reader-screen")).toBeVisible();
-}
-
-async function openStageSixBook(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await loadStageSixCourse(page, bookCourseApi);
-  await page.locator(".daily-task-copy .button").first().click();
-  await expect(page.locator(".library-course-grid")).toBeVisible();
-  await waitForVisualMotionToSettle(page);
-  await page.locator(".library-course-grid .course-space-card .button").first().click();
-  await expect(page.locator(".book-course-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
-async function openStageSixLesson(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await openStageSixBook(page, bookCourseApi);
-  await page.locator(".course-action-grid .quick-action").nth(1).click();
-  await expect(page.locator(".lesson-layout")).toBeVisible();
-  await waitForVisualMotionToSettle(page);
-}
-
-async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixture) {
-  bookCourseApi.useStageFourFlow();
-  await page.addInitScript(() => {
-    window.localStorage.removeItem("bookcourse-active-parse-session");
-  });
-  await page.goto("/?embedded=device-preview");
-  await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
+async function openProductionUpload(page: Page) {
+  await loadProductionCourse(page);
+  const uploadAction = page.locator('[data-home-global-action="upload"]');
+  await expect(uploadAction, "Stage 4 upload uses the stable home action").toBeVisible();
+  await expect(uploadAction).toHaveAccessibleName("上传新书，添加另一份教材");
+  await uploadAction.click();
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
-async function openStageFourChapterConfirm(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await openStageFourUpload(page, bookCourseApi);
+async function openProductionChapterConfirm(page: Page) {
+  await page.addInitScript(() => {
+    const nativeSetTimeout = window.setTimeout.bind(window) as (...args: unknown[]) => number;
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args) => (
+      nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
+    )) as typeof window.setTimeout;
+  });
+  await page.goto("/e2e/processing-state-harness.html");
+  await expect(page.locator(".home-dashboard")).toBeVisible();
+  const uploadAction = page.locator('[data-home-global-action="upload"]');
+  await expect(uploadAction).toHaveAccessibleName("上传新书，添加另一份教材");
+  await clickAfterMotionAndScrollSettle(uploadAction, "open production Upload from ChapterConfirm flow");
+  await expect(page.locator(".upload-flow-screen")).toBeVisible();
+  await waitForVisualMotionToSettle(page);
   await page.locator('input[type="file"]').setInputFiles({
-    name: "stage7-visual-fixture.pdf",
+    name: `${"stage7-production-responsive-title-".repeat(2)}fixture.pdf`,
     mimeType: "application/pdf",
-    buffer: Buffer.from("stage seven visual fixture")
+    buffer: Buffer.from("stage seven production repository visual fixture")
   });
   await expect(page.locator(".upload-selection-summary")).toBeVisible();
-  await page.getByRole("button", { name: "上传并继续", exact: true }).click();
+  await clickAfterMotionAndScrollSettle(
+    page.getByRole("button", { name: "上传并继续", exact: true }),
+    "ChapterConfirm fixture upload"
+  );
   await expect(page.locator(".parse-ready-screen")).toBeVisible();
-  await page.locator(".parse-flow-actions .button").first().click();
-  await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 10_000 });
+  await page.evaluate(() => window.__processingStateHarness?.setPhase("done"));
+  await clickAfterMotionAndScrollSettle(
+    page.getByRole("button", { name: "开始后台解析", exact: true }),
+    "ChapterConfirm fixture parse start"
+  );
+  await expect(page.locator(".chapter-confirm-screen")).toBeVisible();
   await waitForVisualMotionToSettle(page);
 }
 
@@ -314,22 +333,97 @@ async function expectSurfaceContract(page: Page, label: string, primarySelector:
   await expectReachableTouchTarget(page.locator(primarySelector).first(), `${label}: primary action`);
 }
 
+async function expectInitialVisualViewportContainment(locator: Locator, label: string) {
+  await expect(locator, `${label}: control is visible`).toBeVisible();
+  const geometry = await locator.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const visualTop = window.visualViewport?.offsetTop ?? 0;
+    const visualBottom = visualTop + (window.visualViewport?.height ?? window.innerHeight);
+    return { bounds: bounds.toJSON() as Bounds, visualBottom, visualTop };
+  });
+  expect(geometry.bounds.top, `${label}: control begins inside the visual viewport`).toBeGreaterThanOrEqual(geometry.visualTop - 1);
+  expect(geometry.bounds.bottom, `${label}: control ends inside the visual viewport`).toBeLessThanOrEqual(geometry.visualBottom + 1);
+}
+
+async function expectUploadActionAboveHomeIndicator(page: Page) {
+  const geometry = await page.evaluate(() => {
+    const action = document.querySelector<HTMLElement>(".upload-flow-primary > .button");
+    const indicator = document.querySelector<HTMLElement>(".home-indicator span");
+    if (!action) throw new Error("Upload primary action is missing");
+    const actionBounds = action.getBoundingClientRect();
+    const indicatorBounds = indicator?.getBoundingClientRect();
+    return {
+      action: actionBounds.toJSON() as Bounds,
+      indicator: indicatorBounds && indicatorBounds.height > 0 ? indicatorBounds.toJSON() as Bounds : null
+    };
+  });
+  if (geometry.indicator) {
+    expect(geometry.action.bottom, "Upload: primary action clears the Home Indicator before scrolling").toBeLessThanOrEqual(geometry.indicator.top - 1);
+  }
+}
+
+async function expectChapterConfirmationOverlayStack(page: Page) {
+  await expect(page.getByRole("navigation", { name: "主导航" }), "Chapter confirmation is a focused task without a misleading active tab").toHaveCount(0);
+  const toast = page.locator(".toast");
+  await expect(toast, "Chapter confirmation completion Toast is mounted exactly once").toHaveCount(1);
+  await expect(toast, "Chapter confirmation completion Toast is visible").toBeVisible();
+  const geometry = await page.evaluate(() => {
+    const action = document.querySelector<HTMLElement>(".chapter-confirm-actions");
+    const toast = document.querySelector<HTMLElement>(".toast");
+    const indicator = document.querySelector<HTMLElement>(".home-indicator span");
+    if (!action || !toast) throw new Error("Chapter confirmation action/toast stack is missing");
+    const indicatorBounds = indicator?.getBoundingClientRect();
+    const visualTop = window.visualViewport?.offsetTop ?? 0;
+    const visualBottom = visualTop + (window.visualViewport?.height ?? window.innerHeight);
+    return {
+      action: action.getBoundingClientRect().toJSON() as Bounds,
+      toast: toast.getBoundingClientRect().toJSON() as Bounds,
+      indicator: indicatorBounds && indicatorBounds.height > 0 ? indicatorBounds.toJSON() as Bounds : null,
+      visualBottom,
+      visualTop
+    };
+  });
+  expect(geometry.toast.width, "Chapter confirmation Toast has a non-zero width").toBeGreaterThan(0);
+  expect(geometry.toast.height, "Chapter confirmation Toast has a non-zero height").toBeGreaterThan(0);
+  expect(
+    geometry.toast.top,
+    `Chapter confirmation Toast begins inside the visual viewport (${JSON.stringify(geometry)})`
+  ).toBeGreaterThanOrEqual(geometry.visualTop - 1);
+  expect(
+    geometry.toast.bottom,
+    `Chapter confirmation Toast ends inside the visual viewport (${JSON.stringify(geometry)})`
+  ).toBeLessThanOrEqual(geometry.visualBottom + 1);
+  expect(
+    overlaps(geometry.action, geometry.toast),
+    `Chapter confirmation: completion toast does not intersect the sticky action (${JSON.stringify(geometry)})`
+  ).toBeFalsy();
+  if (geometry.indicator) {
+    expect(geometry.toast.bottom, "Chapter confirmation: completion toast clears the Home Indicator").toBeLessThanOrEqual(geometry.indicator.top - 1);
+  }
+}
+
 async function expectViewportShellContract(page: Page, viewport: CssViewport, label: string) {
   await page.setViewportSize(viewport);
-  const primaryAction = page.locator(".daily-task-copy .button").first();
+  const primaryAction = page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action').first();
   await expect(primaryAction, `${label}: home primary action exists`).toBeVisible();
-  await primaryAction.scrollIntoViewIfNeeded();
+  await primaryAction.evaluate((element) => {
+    const container = element.closest<HTMLElement>(".screen-content");
+    const previousBehavior = container?.style.scrollBehavior ?? "";
+    if (container) container.style.scrollBehavior = "auto";
+    element.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    if (container) container.style.scrollBehavior = previousBehavior;
+  });
   await expectNoHorizontalOverflow(page, label);
 
   const metrics = await page.evaluate(() => {
     const shell = document.querySelector<HTMLElement>(".app-shell");
     const nav = document.querySelector<HTMLElement>(".primary-nav");
-    const primary = document.querySelector<HTMLElement>(".daily-task-copy .button");
+    const primary = document.querySelector<HTMLElement>(".home-book-workspace[data-loaded='true'] .home-primary-action");
     if (!shell || !nav || !primary) throw new Error("Stage 7 shell contract elements are missing");
     const serialize = (element: HTMLElement) => element.getBoundingClientRect().toJSON() as Bounds;
     return {
       homeActionButtons: Array.from(document.querySelectorAll<HTMLElement>(
-        ".home-screen .hero-actions .button, .daily-task-copy .button, .review-summary .button"
+        ".home-book-workspace[data-loaded='true'] .home-workspace-actions button, .home-global-action"
       )).map(serialize),
       nav: serialize(nav),
       navItems: Array.from(nav.querySelectorAll<HTMLElement>("button")).map(serialize),
@@ -354,7 +448,10 @@ async function expectViewportShellContract(page: Page, viewport: CssViewport, la
   expect(metrics.primary.height, `${label}: primary action is at least 44px high`).toBeGreaterThanOrEqual(44);
   expect(metrics.primary.top, `${label}: primary action remains within the shell`).toBeGreaterThanOrEqual(metrics.shell.top - 1);
   expect(metrics.primary.bottom, `${label}: primary action remains within the shell`).toBeLessThanOrEqual(metrics.shell.bottom + 1);
-  expect(overlaps(metrics.primary, metrics.nav), `${label}: primary action is not obscured by navigation`).toBeFalsy();
+  expect(
+    overlaps(metrics.primary, metrics.nav),
+    `${label}: primary action is not obscured by navigation (${JSON.stringify({ nav: metrics.nav, primary: metrics.primary, shell: metrics.shell })})`
+  ).toBeFalsy();
 }
 
 async function expectElementsInsideVisualViewport(page: Page, selectors: string[], label: string) {
@@ -413,85 +510,66 @@ test.describe("Stage 7 final responsive acceptance", () => {
 
   test("records the Home visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/?embedded=device-preview");
-    await expect(page.locator(".home-screen")).toBeVisible();
+    await loadProductionCourse(page);
+    await expect(page.locator(".home-dashboard")).toBeVisible();
+    await expectShortLandscapeHomePriorityGeometry(page);
     await expectVisualBaseline(page, "home.png");
-    await expectSurfaceContract(page, "Home", ".daily-task-copy .button");
+    await expectSurfaceContract(page, "Home", ".home-primary-action");
   });
 
   test("records the Library visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageFiveLibrary(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionLibrary(page, "library");
     await expectVisualBaseline(page, "library.png");
     await expectSurfaceContract(page, "Library", ".library-course-grid .course-space-card .button");
   });
 
   test("records the Upload visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageFourUpload(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionUpload(page);
+    await expectUploadActionAboveHomeIndicator(page);
     await expectVisualBaseline(page, "upload.png");
     await expectSurfaceContract(page, "Upload", ".upload-flow-primary .button");
   });
 
   test("records the ChapterConfirm visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageFourChapterConfirm(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionChapterConfirm(page);
+    await expectChapterConfirmationOverlayStack(page);
     await expectVisualBaseline(page, "chapter-confirm.png");
     await expectSurfaceContract(page, "Chapter confirmation", ".chapter-confirm-actions .button");
   });
 
   test("records the Lesson visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageFiveLesson(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionLesson(page);
     await expectVisualBaseline(page, "lesson.png");
     await expectSurfaceContract(page, "Lesson", ".lesson-learning-tools > .button");
   });
 
   test("records the SourceReader visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    let releaseParseCompletion: () => void = () => {};
-    const parseCompletionRelease = new Promise<void>((resolve) => {
-      releaseParseCompletion = resolve;
-    });
-    let markParseRequestHeld: () => void = () => {};
-    const parseRequestHeld = new Promise<void>((resolve) => {
-      markParseRequestHeld = resolve;
-    });
-    await page.route("**/api/jobs/job_stage3", async (route) => {
-      markParseRequestHeld();
-      await parseCompletionRelease;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          job_id: "job_stage3",
-          book_id: "book_stage3",
-          status: "done",
-          stage: "complete",
-          progress: 100,
-          message: "解析完成",
-          error: null
-        })
-      });
-    });
-    await openStageFiveSourceReaderForVisualBaseline(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionSourceReader(page);
     const sourceImage = page.locator(".source-page-media img");
-    const sourceMediaReady = Promise.all([
+    await Promise.all([
       expect(sourceImage).toBeVisible(),
-      expect.poll(() => sourceImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0)
-    ]);
-    const fontsReady = page.evaluate(async () => {
+      expect.poll(() => sourceImage.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0),
+      page.evaluate(async () => {
       await document.fonts.ready;
-    });
-    await Promise.all([sourceMediaReady, fontsReady, parseRequestHeld]);
-    // The app has reached the real SourceReader through its normal controls.
-    // Complete the held local parse response only now so this baseline captures
-    // the real, fresh 3200ms completion Toast rather than extending its timer.
-    releaseParseCompletion();
-    await expect(page.locator(".toast"), "fixture completion Toast remains visible for its approved SourceReader baseline").toBeVisible();
+      })
+    ]);
     await waitForVisualMotionToSettle(page);
     await captureVisualBaseline(page, "source-reader.png");
     await expectSurfaceContract(page, "Source reader", ".source-reader-toolbar button");
   });
 
   test("records the StudyPlan visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageSixBook(page, bookCourseApi);
-    await page.locator(".course-action-grid .quick-action").first().click();
+    void bookCourseApi;
+    await openProductionStudy(page, "plan-sparse");
+    await clickAfterMotionAndScrollSettle(
+      page.locator(".study-plan-summary button"),
+      "open production StudyPlan"
+    );
     await expect(page.locator(".study-plan-screen")).toBeVisible();
     await expectVisualBaseline(page, "study-plan.png");
     await expectSurfaceContract(page, "Study plan", ".study-plan-calendar .plan-date-row button");
@@ -507,27 +585,51 @@ test.describe("Stage 7 final responsive acceptance", () => {
         nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
       )) as typeof window.setTimeout;
     });
-    await openStageSixLesson(page, bookCourseApi);
-    await page.locator(".lesson-action-grid .button").nth(2).click();
+    void bookCourseApi;
+    await openProductionLesson(page);
+    await clickAfterMotionAndScrollSettle(
+      page.locator(".lesson-action-grid .button").nth(2),
+      "open production Assignment"
+    );
     await expect(page.locator(".assignment-screen")).toBeVisible();
+    const initialAssignmentGeometry = await page.evaluate(() => {
+      const action = document.querySelector<HTMLElement>(".assignment-primary-action");
+      const prompt = document.querySelector<HTMLElement>(".assignment-card > p");
+      if (!action || !prompt) throw new Error("Assignment prompt/action geometry is missing");
+      return {
+        action: action.getBoundingClientRect().toJSON() as Bounds,
+        prompt: prompt.getBoundingClientRect().toJSON() as Bounds
+      };
+    });
+    expect(
+      overlaps(initialAssignmentGeometry.action, initialAssignmentGeometry.prompt),
+      `Assignment: the initial submit action does not cover the diagnostic prompt (${JSON.stringify(initialAssignmentGeometry)})`
+    ).toBeFalsy();
     await expectVisualBaseline(page, "assignment.png");
     await expectSurfaceContract(page, "Assignment", ".assignment-primary-action .button");
   });
 
   test("records the ActionSheet visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
-    await openStageFiveLesson(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionLesson(page);
     await beginOverlayScrollAudit(page);
-    await page.locator(".lesson-action-grid .button").first().click();
+    await clickAfterMotionAndScrollSettle(
+      page.locator(".lesson-action-grid .button").first(),
+      "open production chat ActionSheet"
+    );
     await expect(page.locator(".sheet[data-sheet-type='chat']")).toBeVisible();
     await waitForVisualMotionToSettle(page);
     await expectOverlayScrollToRemainStable(page);
+    const chatSheet = page.locator(".sheet[data-sheet-type='chat']");
+    await expectInitialVisualViewportContainment(chatSheet.getByRole("textbox", { name: "继续提问" }), "Chat action sheet composer");
+    await expectInitialVisualViewportContainment(chatSheet.getByRole("button", { name: "发送问题", exact: true }), "Chat action sheet send action");
     await expectVisualBaseline(page, "action-sheet-chat.png");
     await expectSurfaceContract(page, "Chat action sheet", ".sheet[data-sheet-type='chat'] .icon-button");
   });
 
   test("records the AI chat visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
     void bookCourseApi;
-    await page.goto("/?embedded=device-preview");
+    await loadProductionCourse(page);
     const orb = page.locator(".ai-orb");
     await expect(orb).toBeVisible();
     await orb.click();
@@ -623,18 +725,22 @@ test.describe("Stage 7 final responsive acceptance", () => {
   test("keeps critical home and assignment flows usable under an effective 150 percent text scale", async ({ page, bookCourseApi }) => {
     const scale = 1.5;
     await page.setViewportSize({ width: 402, height: 681 });
-    await page.goto("/?embedded=device-preview");
-    const homeAction = page.locator(".daily-task-copy .button").first();
+    await loadProductionCourse(page);
+    const homeAction = page.locator(".home-primary-action").first();
     const homeBefore = await homeAction.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     const homeScale = await applyVisibleTextScale(page, scale);
     const homeAfter = await homeAction.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
     expect(homeScale.count, "text-scale harness changes visible semantic text rather than only the viewport").toBeGreaterThan(0);
     expect(homeScale.largestBefore, "text-scale harness has a measurable baseline").toBeGreaterThan(0);
     expect(homeAfter, "home action text is effectively magnified by 150 percent").toBeGreaterThanOrEqual(homeBefore * 1.49);
-    await expectSurfaceContract(page, "150 percent Home", ".daily-task-copy .button");
+    await expectSurfaceContract(page, "150 percent Home", ".home-primary-action");
 
-    await openStageSixLesson(page, bookCourseApi);
-    await page.locator(".lesson-action-grid .button").nth(2).click();
+    void bookCourseApi;
+    await openProductionLesson(page);
+    await clickAfterMotionAndScrollSettle(
+      page.locator(".lesson-action-grid .button").nth(2),
+      "open scaled production Assignment"
+    );
     await expect(page.locator(".assignment-screen")).toBeVisible();
     const assignmentAction = page.locator(".assignment-primary-action .button");
     const assignmentBefore = await assignmentAction.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -645,7 +751,8 @@ test.describe("Stage 7 final responsive acceptance", () => {
   });
 
   test("keeps keyboard focus, reduced motion, rotations, and visualViewport AI controls stable", async ({ page, bookCourseApi }) => {
-    await openStageFiveLesson(page, bookCourseApi);
+    void bookCourseApi;
+    await openProductionLesson(page);
     const sheetTrigger = page.locator(".lesson-action-grid .button").first();
     await sheetTrigger.focus();
     await sheetTrigger.click();
@@ -663,7 +770,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await expect(sheetTrigger, "closing the chat ActionSheet restores trigger focus").toBeFocused();
 
     await page.setViewportSize({ width: 402, height: 681 });
-    await page.goto("/?embedded=device-preview");
+    await loadProductionCourse(page);
     const orb = page.locator(".ai-orb");
     await orb.focus();
     await page.keyboard.press("Enter");

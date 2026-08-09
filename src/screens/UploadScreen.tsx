@@ -12,8 +12,8 @@ import {
   Button,
   Card
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import {
   QuickAction,
   acceptedCourseFileTypes,
@@ -24,27 +24,16 @@ import {
 import { uploadConfirmedCourseFile } from "./uploadFlow";
 
 export function UploadScreen() {
-  const { go, setParseJobId, setParseJobStatus, setActiveChapterId, setCurrentStudyPlan, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLatestDiagnosis, setLessonBuildJobId, setLessonBuildJobStatus, setParsedAssets, setParsedChapters, setParsedChunks, setParsedScanResult, setSelectedUpload, setUploadedFile, showToast } = useAppContext();
+  const bookcourseRepository = useBookCourseRepository();
+  const { clearCourseSession, clearLoadedCourse, go, setSelectedUpload, setUploadedFile, showToast } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   function resetCourseGenerationState() {
-    setParseJobId(null);
-    setParseJobStatus(null);
-    setActiveChapterId(null);
-    setCurrentStudyPlan(null);
-    setLatestDiagnosis(null);
-    setParsedAssets(null);
-    setParsedChapters(null);
-    setParsedChunks(null);
-    setParsedScanResult(null);
-    setGeneratedLessons(null);
-    setGeneratedFlashcards(null);
-    setGeneratedQuizzes(null);
-    setLessonBuildJobId(null);
-    setLessonBuildJobStatus(null);
+    clearLoadedCourse();
+    clearCourseSession();
   }
 
   function chooseFile() {
@@ -59,7 +48,7 @@ export function UploadScreen() {
     setUploading(true);
     setUploadError(null);
     try {
-      const uploadedFile = await uploadConfirmedCourseFile(selectedFile, bookcourseApi);
+      const uploadedFile = await uploadConfirmedCourseFile(selectedFile, bookcourseRepository);
       resetCourseGenerationState();
       setUploadedFile(uploadedFile);
       setSelectedUpload(true);

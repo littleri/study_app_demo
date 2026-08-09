@@ -15,8 +15,8 @@ import {
   Button,
   Card
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { MotionErrorShake, useOneShotFeedback, useReducedMotion } from "../motion";
 import {
   backendAssetUrl,
@@ -36,6 +36,7 @@ const exerciseIcons = {
 } as const;
 
 export function AssignmentScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { activeChapterId, answer, go, openSourcePage, openSheet, parsedAssets, parsedChapters, parsedChunks, setAnswer, setLatestDiagnosis, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [exerciseIndex, setExerciseIndex] = useState(0);
@@ -142,7 +143,7 @@ export function AssignmentScreen() {
         `选择题：${choiceAnswer ?? "未作答"}`,
         `简答题：${answer.trim()}`
       ].join("\n");
-      const submission = await bookcourseApi.submitAssignment(assignmentId, {
+      const submission = await bookcourseRepository.submitAssignment(assignmentId, {
         user_id: runtimeConfig.defaultUserId,
         book_id: uploadedFile.bookId,
         lesson_id: `lesson_${liveChapter.chapter_id}`,
@@ -150,7 +151,7 @@ export function AssignmentScreen() {
         question,
         answer: combinedAnswer
       });
-      const result = await bookcourseApi.diagnoseAssignment(assignmentId, submission.submission_id);
+      const result = await bookcourseRepository.diagnoseAssignment(assignmentId, submission.submission_id);
       setLatestDiagnosis(result);
       showToast("三题练习已完成，诊断已生成");
       go("diagnosis");

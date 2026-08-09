@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BookOpenCheck, Check, ChevronRight, LibraryBig, Plus } from "lucide-react";
 import { Button } from "../../components/ui";
 import { useAppContext } from "../../context/AppContext";
+import { hasCompleteLoadedCourseContext } from "../courseResourceIdentity";
 import { sourcePageImageUrl } from "../shared";
 
 function statusLabel(status: string) {
@@ -17,15 +18,36 @@ export function BookSwitcherSheetContent() {
     closeSheet,
     courseSelectionLoadingId,
     courseSummaries,
+    currentStudyPlan,
+    generatedFlashcards,
+    generatedLessons,
+    generatedQuizzes,
     go,
+    loadedBookId,
+    parsedAssets,
+    parsedChapters,
+    parsedChunks,
+    parsedScanResult,
     selectCourse,
     showToast,
     uploadedFile
   } = useAppContext();
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const hasLoadedContext = hasCompleteLoadedCourseContext({
+    loadedBookId,
+    uploadedFile,
+    parsedScanResult,
+    parsedChapters,
+    parsedChunks,
+    parsedAssets,
+    currentStudyPlan,
+    generatedLessons,
+    generatedFlashcards,
+    generatedQuizzes
+  });
 
   async function chooseCourse(bookId: string, status: string) {
-    if (bookId === uploadedFile?.bookId) {
+    if (hasLoadedContext && bookId === loadedBookId) {
       closeSheet();
       return;
     }
@@ -48,7 +70,7 @@ export function BookSwitcherSheetContent() {
       <p className="book-switcher-helper">切换后会回到这本教材上次展开的小节。</p>
       <div className="book-switcher-list">
         {courseSummaries.map((course) => {
-          const selected = course.book_id === uploadedFile?.bookId;
+          const selected = hasLoadedContext && course.book_id === loadedBookId;
           const loading = openingId === course.book_id || courseSelectionLoadingId === course.book_id;
           return (
             <button

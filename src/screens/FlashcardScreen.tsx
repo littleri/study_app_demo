@@ -13,8 +13,8 @@ import {
   Card,
   Pill
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { useReducedMotion } from "../motion";
 import {
   clampFlashcardDrag,
@@ -92,6 +92,7 @@ function getFlashcardThemeStyle(theme: (typeof flashcardThemes)[number]) {
 }
 
 export function FlashcardScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { activeChapterId, generatedFlashcards, generatedLessons, go, openSourcePage, setGeneratedFlashcards, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [index, setIndex] = useState(0);
@@ -195,7 +196,7 @@ export function FlashcardScreen() {
     }
     setBuildingCards(true);
     try {
-      const cards = await bookcourseApi.buildFlashcards(uploadedFile.bookId, {
+      const cards = await bookcourseRepository.buildFlashcards(uploadedFile.bookId, {
         chapter_ids: activeChapterId ? [activeChapterId] : undefined
       });
       setGeneratedFlashcards([...(generatedFlashcards ?? []).filter((card) => activeChapterId && card.chapter_id !== activeChapterId), ...cards]);
