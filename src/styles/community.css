@@ -98,7 +98,7 @@
   background: #d7dbe1;
   box-shadow: 0 -4px 8px rgba(32, 38, 58, 0.14);
   transform: translateX(-50%);
-  animation: community-keyboard-in 180ms var(--motion-ease-standard) both;
+  animation: community-keyboard-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
 .community-keyboard-suggestions {
@@ -169,9 +169,9 @@
   font-weight: 500;
   line-height: 1;
   transition:
-    transform 90ms var(--motion-ease-standard),
-    background-color 90ms var(--motion-ease-standard),
-    box-shadow 90ms var(--motion-ease-standard);
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    background-color var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    box-shadow var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 .community-search-keyboard .community-keyboard-row button:active {
@@ -312,8 +312,8 @@
   background-image: none;
   box-shadow: none;
   transition:
-    color var(--motion-duration-base) var(--motion-ease-standard),
-    border-color var(--motion-duration-base) var(--motion-ease-standard);
+    color var(--motion-duration-local-base) var(--motion-ease-local-state),
+    border-color var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
 .community-search-field:focus-within {
@@ -432,8 +432,8 @@
   line-height: 1;
   scroll-snap-align: start;
   transition:
-    color var(--motion-duration-base) var(--motion-ease-standard),
-    font-weight var(--motion-duration-base) var(--motion-ease-standard);
+    color var(--motion-duration-local-base) var(--motion-ease-local-state),
+    font-weight var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
 .community-category-button span {
@@ -495,7 +495,7 @@
 
 .community-category-more svg {
   position: relative;
-  transition: transform var(--motion-duration-base) var(--motion-ease-standard);
+  transition: transform var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .community-category-more[aria-expanded="true"] svg {
@@ -572,9 +572,9 @@
   -webkit-backdrop-filter: none;
   text-align: left;
   transition:
-    transform var(--motion-duration-base) var(--motion-ease-standard),
-    background-color var(--motion-duration-base) var(--motion-ease-standard),
-    box-shadow var(--motion-duration-base) var(--motion-ease-standard);
+    transform var(--motion-duration-local-base) var(--motion-ease-local-state),
+    background-color var(--motion-duration-local-base) var(--motion-ease-local-state),
+    box-shadow var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
 .screen-content .community-screen .community-book-card:active {
@@ -897,7 +897,7 @@
   background: transparent;
   box-shadow: none;
   container-type: inline-size;
-  transition: grid-template-rows var(--motion-duration-surface) var(--motion-ease-standard);
+  transition: grid-template-rows var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .community-detail-visual {
@@ -927,8 +927,8 @@
   transform: translateX(-50%);
   transform-origin: center top;
   transition:
-    opacity var(--motion-duration-fast) var(--motion-ease-standard),
-    transform var(--motion-duration-surface) var(--motion-ease-standard);
+    opacity var(--motion-duration-local-fast) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .community-detail-screen[data-collapsed="true"] .community-detail-visual .community-detail-cover,
@@ -962,7 +962,7 @@
   border-radius: 3.5rem 3.5rem 0 0;
   background: var(--color-surface);
   text-align: center;
-  transition: padding-top var(--motion-duration-surface) var(--motion-ease-standard);
+  transition: padding-top var(--motion-duration-local-slow) var(--motion-ease-local-state);
 }
 
 .community-detail-screen[data-collapsed="true"] .community-detail-summary {

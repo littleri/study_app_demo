@@ -22,8 +22,8 @@
   box-shadow: 0 4px 8px rgba(32, 38, 58, .12);
   text-align: left;
   transition:
-    box-shadow var(--motion-duration-base) var(--motion-ease-standard),
-    transform var(--motion-duration-base) var(--motion-ease-standard);
+    box-shadow var(--motion-duration-local-base) var(--motion-ease-local-state),
+    transform var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
 .study-tool-card[data-tool="flashcards"] {

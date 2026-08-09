@@ -13,7 +13,7 @@
     "test:state-motion": "playwright test e2e/state-motion.spec.ts",
     "test:e2e:demo": "playwright test e2e/demo-repository.spec.ts",
     "test:e2e": "playwright test",
-    "test:responsive": "playwright test e2e/responsive.spec.ts",
+    "test:responsive": "playwright test e2e/responsive.spec.ts e2e/device-preview.spec.ts",
     "demo:validate": "node scripts/validate-fixtures.mjs",
     "demo:content": "node scripts/build-demo-content.mjs",
     "demo:directory": "node scripts/sync-demo-directory.mjs",
@@ -37,6 +37,9 @@
     "eslint": "10.5.0",
     "globals": "17.6.0",
     "playwright": "1.61.0",
+    "postcss": "8.5.26",
+    "postcss-selector-parser": "7.1.5",
+    "postcss-value-parser": "4.2.0",
     "typescript-eslint": "8.61.1",
     "vitest": "4.1.9"
   }

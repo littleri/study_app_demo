@@ -3,6 +3,8 @@ import { defineConfig } from "playwright/test";
 import { responsiveProjects } from "./e2e/fixtures/viewports";
 
 const e2ePort = Number(env.E2E_PORT ?? 4173);
+const coreProjects = responsiveProjects.filter((project) => !project.name.startsWith("small-phone"));
+const smallProjects = responsiveProjects.filter((project) => project.name.startsWith("small-phone"));
 
 export default defineConfig({
   testDir: "./e2e",
@@ -28,11 +30,30 @@ export default defineConfig({
       VITE_BOOKCOURSE_USER_ID: "responsive_fixture_user"
     }
   },
-  projects: responsiveProjects.map((project) => ({
-    name: project.name,
-    use: {
-      browserName: "webkit",
-      viewport: project.initialViewport
+  projects: [
+    ...coreProjects.map((project) => ({
+      name: project.name,
+      testIgnore: /device-preview\.spec\.ts/,
+      use: {
+        browserName: "webkit" as const,
+        viewport: project.initialViewport
+      }
+    })),
+    ...smallProjects.map((project) => ({
+      name: project.name,
+      testMatch: /responsive\.spec\.ts/,
+      use: {
+        browserName: "webkit" as const,
+        viewport: project.initialViewport
+      }
+    })),
+    {
+      name: "device-preview-studio",
+      testMatch: /device-preview\.spec\.ts/,
+      use: {
+        browserName: "webkit" as const,
+        viewport: { width: 1440, height: 1200 }
+      }
     }
-  }))
+  ]
 });

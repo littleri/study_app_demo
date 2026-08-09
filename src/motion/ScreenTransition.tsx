@@ -1,24 +1,24 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { Screen } from "../types/app";
-import { motionPresenceMaxMs } from "./useMotionPresence";
-
-type ScreenMotionState = "entering" | "idle";
-
-type ScreenTransitionSnapshot = {
-  nonce: number;
-  state: ScreenMotionState;
-};
+import {
+  createScreenTransitionSnapshot,
+  reconcileScreenTransition,
+  settleScreenTransition,
+  type ScreenDirection,
+  type ScreenSurface
+} from "./screenTransitionMachine";
+import { globalMotionFallbackMs } from "./timing";
 
 export type ScreenTransitionProps = {
   screenKey: Screen;
-  direction: "forward" | "back" | "replace";
+  direction: ScreenDirection;
   nonce: number;
   initial: boolean;
   reducedMotion: boolean;
   children: ReactNode;
 };
 
-export const screenTransitionAnimationNames = [
+export const screenTransitionEnterAnimationNames = [
   "motion-screen-phone-forward-in",
   "motion-screen-phone-back-in",
   "motion-screen-replace-in",
@@ -27,13 +27,17 @@ export const screenTransitionAnimationNames = [
   "motion-screen-short-back-in"
 ] as const;
 
-function settleScreenTransition(
-  current: ScreenTransitionSnapshot,
-  nonce: number
-): ScreenTransitionSnapshot {
-  if (current.nonce !== nonce || current.state !== "entering") return current;
-  return { ...current, state: "idle" };
-}
+export const screenTransitionExitAnimationNames = [
+  "motion-screen-phone-forward-out",
+  "motion-screen-phone-back-out",
+  "motion-screen-replace-out",
+  "motion-screen-tablet-out",
+  "motion-screen-short-forward-out",
+  "motion-screen-short-back-out"
+] as const;
+
+/** @deprecated Prefer the explicit enter/exit animation-name sets. */
+export const screenTransitionAnimationNames = screenTransitionEnterAnimationNames;
 
 export function ScreenTransition({
   screenKey,
@@ -43,79 +47,99 @@ export function ScreenTransition({
   reducedMotion,
   children
 }: ScreenTransitionProps) {
-  const initialNonceRef = useRef(nonce);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-  const [snapshot, setSnapshot] = useState<ScreenTransitionSnapshot>(() => ({
-    nonce,
-    state: initial || reducedMotion ? "idle" : "entering"
-  }));
+  const request = { nonce, screen: screenKey, direction, initial, reducedMotion };
+  const [snapshot, setSnapshot] = useState(() => createScreenTransitionSnapshot(request));
+  const renderedSnapshot = reconcileScreenTransition(snapshot, request);
+  const currentSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const contentByNonceRef = useRef(new Map<number, ReactNode>());
 
-  const isNewNonce = snapshot.nonce !== nonce;
-  const isInitialNonce = initial && nonce === initialNonceRef.current;
-  const renderedSnapshot: ScreenTransitionSnapshot = isNewNonce
-    ? { nonce, state: reducedMotion || isInitialNonce ? "idle" : "entering" }
-    : reducedMotion && snapshot.state === "entering"
-      ? { ...snapshot, state: "idle" }
-      : snapshot;
+  // Screen content is retained by generation rather than by a keyed wrapper.
+  // Updating the current entry during render keeps same-screen data fresh; the
+  // entry becomes a frozen outgoing tree only when a later nonce arrives.
+  contentByNonceRef.current.set(nonce, children);
 
   useLayoutEffect(() => {
-    setSnapshot((current) => {
-      if (current.nonce !== nonce) {
-        const isInitialNonceForUpdate = initial && nonce === initialNonceRef.current;
-        return { nonce, state: reducedMotion || isInitialNonceForUpdate ? "idle" : "entering" };
-      }
-      if (reducedMotion && current.state === "entering") return { ...current, state: "idle" };
-      return current;
-    });
-  }, [initial, nonce, reducedMotion]);
+    setSnapshot((current) => reconcileScreenTransition(current, request));
+  }, [direction, initial, nonce, reducedMotion, screenKey]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    const retainedNonces = new Set([
+      renderedSnapshot.current.nonce,
+      renderedSnapshot.previous?.nonce
+    ]);
+    for (const retainedNonce of contentByNonceRef.current.keys()) {
+      if (!retainedNonces.has(retainedNonce)) contentByNonceRef.current.delete(retainedNonce);
+    }
+  }, [renderedSnapshot.current.nonce, renderedSnapshot.previous?.nonce]);
 
-    const root = rootRef.current;
-    if (!root) return;
+  useEffect(() => {
+    if (reducedMotion || renderedSnapshot.state !== "transitioning") return;
 
-    const activeNonce = renderedSnapshot.nonce;
-    const settleForCurrentNonce = (event: AnimationEvent) => {
+    const currentSurface = currentSurfaceRef.current;
+    if (!currentSurface) return;
+    const activeNonce = renderedSnapshot.current.nonce;
+    const settleCurrentSurface = (event: AnimationEvent) => {
       if (
-        event.target !== root
-        || !screenTransitionAnimationNames.includes(event.animationName as typeof screenTransitionAnimationNames[number])
+        event.target !== currentSurface
+        || currentSurfaceRef.current !== currentSurface
+        || !screenTransitionEnterAnimationNames.includes(
+          event.animationName as typeof screenTransitionEnterAnimationNames[number]
+        )
       ) {
         return;
       }
       setSnapshot((current) => settleScreenTransition(current, activeNonce));
     };
 
-    root.addEventListener("animationend", settleForCurrentNonce);
-    root.addEventListener("animationcancel", settleForCurrentNonce);
+    currentSurface.addEventListener("animationend", settleCurrentSurface);
+    currentSurface.addEventListener("animationcancel", settleCurrentSurface);
     return () => {
-      root.removeEventListener("animationend", settleForCurrentNonce);
-      root.removeEventListener("animationcancel", settleForCurrentNonce);
+      currentSurface.removeEventListener("animationend", settleCurrentSurface);
+      currentSurface.removeEventListener("animationcancel", settleCurrentSurface);
     };
-  }, [reducedMotion, renderedSnapshot.nonce]);
+  }, [reducedMotion, renderedSnapshot.current.nonce, renderedSnapshot.state]);
 
   useEffect(() => {
-    if (reducedMotion || renderedSnapshot.state !== "entering") return;
+    if (reducedMotion || renderedSnapshot.state !== "transitioning") return;
 
-    const activeNonce = renderedSnapshot.nonce;
+    const activeNonce = renderedSnapshot.current.nonce;
     const fallback = window.setTimeout(() => {
       setSnapshot((current) => settleScreenTransition(current, activeNonce));
-    }, motionPresenceMaxMs);
+    }, globalMotionFallbackMs);
 
     return () => window.clearTimeout(fallback);
-  }, [reducedMotion, renderedSnapshot.nonce, renderedSnapshot.state]);
+  }, [reducedMotion, renderedSnapshot.current.nonce, renderedSnapshot.state]);
+
+  const renderSurface = (surface: ScreenSurface, role: "current" | "previous") => {
+    const isPrevious = role === "previous";
+    return (
+      <div
+        key={surface.nonce}
+        ref={isPrevious ? undefined : currentSurfaceRef}
+        className="motion-screen-surface"
+        data-motion-direction={renderedSnapshot.direction}
+        data-motion-nonce={surface.nonce}
+        data-motion-state={renderedSnapshot.state}
+        data-motion-surface={role}
+        data-screen={surface.screen}
+        aria-hidden={isPrevious ? true : undefined}
+        inert={isPrevious ? true : undefined}
+      >
+        {contentByNonceRef.current.get(surface.nonce)}
+      </div>
+    );
+  };
 
   return (
     <div
-      key={renderedSnapshot.nonce}
-      ref={rootRef}
       className="motion-screen-transition"
-      data-motion-direction={direction}
-      data-motion-nonce={renderedSnapshot.nonce}
+      data-motion-direction={renderedSnapshot.direction}
+      data-motion-nonce={renderedSnapshot.current.nonce}
       data-motion-state={renderedSnapshot.state}
-      data-screen={screenKey}
+      data-screen={renderedSnapshot.current.screen}
     >
-      {children}
+      {renderedSnapshot.previous ? renderSurface(renderedSnapshot.previous, "previous") : null}
+      {renderSurface(renderedSnapshot.current, "current")}
     </div>
   );
 }

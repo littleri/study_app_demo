@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
-import { StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
+import { globalMotionFallbackMs, localSlowMotionDurationSeconds, localStateGsapEase, StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
 import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
 import { useDeviceLayout } from "../layouts/useDeviceLayout";
@@ -283,23 +283,36 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       && previousActiveIndexRef.current !== activeIndex
       && !layoutChanged
       && !reducedMotion;
-    const targetPosition = { x: target.offsetLeft, y: target.offsetTop };
+    const targetPosition = {
+      x: target.offsetLeft,
+      y: target.offsetTop,
+      width: target.offsetWidth,
+      height: target.offsetHeight
+    };
 
     gsap.killTweensOf(selection);
     gsap.set(selection, {
-      width: target.offsetWidth,
-      height: target.offsetHeight
+      width: targetPosition.width,
+      height: targetPosition.height
     });
 
     if (canAnimate) {
       gsap.to(selection, {
-        ...targetPosition,
-        duration: 0.24,
-        ease: "power2.out",
+        x: targetPosition.x,
+        y: targetPosition.y,
+        width: targetPosition.width,
+        height: targetPosition.height,
+        duration: localSlowMotionDurationSeconds,
+        ease: localStateGsapEase,
         overwrite: "auto"
       });
     } else {
-      gsap.set(selection, targetPosition);
+      gsap.set(selection, {
+        x: targetPosition.x,
+        y: targetPosition.y,
+        width: targetPosition.width,
+        height: targetPosition.height
+      });
     }
 
     previousActiveIndexRef.current = activeIndex;
@@ -667,7 +680,8 @@ function GlobalAIAssistant({
     requested: requestedDialog,
     getKey: getAiDialogKey,
     reducedMotion,
-    motionNames: aiDialogAnimationNames
+    motionNames: aiDialogAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
   });
   const previouslyRenderedDialogRef = useRef(false);
   const dialogVisible = dialogPresence.rendered !== null;

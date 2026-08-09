@@ -12,7 +12,7 @@ import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./conte
 import { communityBooks } from "./data/mockBook";
 import { useBookCourseRepository } from "./context/BookCourseRepositoryContext";
 import { demoRepository } from "./services/DemoRepository";
-import { ScreenTransition, useMotionPresence } from "./motion";
+import { globalMotionFallbackMs, ScreenTransition, useMotionPresence } from "./motion";
 import {
   createInitialNavigation,
   navigate,
@@ -879,7 +879,8 @@ export default function App() {
     requested: requestedSheetView,
     getKey: getSheetViewKey,
     reducedMotion,
-    motionNames: actionSheetAnimationNames
+    motionNames: actionSheetAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
   });
 
   const header = titles[screen];

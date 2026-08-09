@@ -12,6 +12,7 @@ import { ChevronDown, Search, SearchX, X } from "lucide-react";
 import { CommunitySearchKeyboard } from "../components/CommunitySearchKeyboard";
 import { communityBooks } from "../data/mockBook";
 import { useAppContext } from "../context/AppContext";
+import { useLocalMotionItem } from "../motion";
 import { CommunityCover } from "./CommunityCover";
 import {
   communityCategories,
@@ -21,6 +22,7 @@ import {
 
 export function CommunityScreen() {
   const { go, selectCommunityBook } = useAppContext();
+  const discoveryMotion = useLocalMotionItem("community:discovery");
   const searchInputId = useId();
   const categoryMenuId = useId();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -196,7 +198,7 @@ export function CommunityScreen() {
 
   return (
     <div className="screen-stack community-screen">
-      <div className="community-discovery-controls">
+      <div {...discoveryMotion.attributes} className="community-discovery-controls">
         <div className="community-search-panel" role="search">
           <label className="community-search-label" htmlFor={searchInputId}>
             搜索课程

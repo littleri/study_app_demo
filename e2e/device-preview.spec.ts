@@ -1,10 +1,6 @@
 import { expect, test } from "playwright/test";
 
 test.describe("device preview studio", () => {
-  test.beforeEach(async ({ page: _page }, testInfo) => {
-    test.skip(testInfo.project.name !== "iphone-17-pro", "The device studio matrix runs once in the canonical iPhone project.");
-  });
-
   test("uses the workbench as the only public entry and reserves the embedded entry for the inner app", async ({ page }) => {
     await page.goto("/");
     await expect(page.locator(".device-preview-studio")).toBeVisible();
@@ -150,7 +146,9 @@ test.describe("device preview studio", () => {
     }).toEqual({ height: 874, width: 402 });
 
     await embeddedFrame.getByRole("button", { name: "继续学习", exact: true }).click();
-    await expect(embeddedFrame.locator(".library-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
+    await embeddedFrame.locator(".primary-nav .nav-item").last().click();
+    await expect(embeddedFrame.locator(".profile-screen")).toBeVisible();
     const innerMain = await embeddedFrame.locator("main").elementHandle();
     if (!innerMain) throw new Error("The embedded app main landmark did not mount");
 
@@ -175,7 +173,7 @@ test.describe("device preview studio", () => {
       const frame = page.frames().find((candidate) => candidate.url().includes("embedded=device-preview"));
       return frame ? await frame.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth })) : null;
     }).toEqual({ height: 834, width: 1194 });
-    await expect(embeddedFrame.locator(".library-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".profile-screen")).toBeVisible();
     await expect(assistant).toBeVisible();
     await expect(assistant.getByRole("textbox", { name: "向 AI 助手提问" })).toHaveValue("唯一设备状态文本");
     await expect.poll(() => innerMain.evaluate((element) => element.isConnected)).toBe(true);
@@ -527,12 +525,12 @@ test.describe("device preview studio", () => {
     }).toEqual({ height: 874, width: 402 });
 
     await embeddedFrame.getByRole("button", { name: "继续学习", exact: true }).click();
-    await expect(embeddedFrame.locator(".library-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator(".device-preview-toolbar")).toBeVisible();
     await expect(page.getByTestId("device-preview-summary")).toBeVisible();
     await expect(page).toHaveURL(/chrome=1/);
-    await expect(embeddedFrame.locator(".library-screen")).toBeVisible();
+    await expect(embeddedFrame.locator(".book-course-screen")).toBeVisible();
     await expect.poll(() => iframeHandle.evaluate((element) => (
       element === element.ownerDocument.querySelector("iframe.device-preview-iframe")
     ))).toBe(true);
