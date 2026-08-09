@@ -1,8 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState, type AnimationEvent, type CSSProperties, type ReactNode } from "react";
+import { clampCourseCardMotionIndex, shouldAnimateCourseCard } from "./courseCardMotion";
 import { useMotionHistory } from "./MotionHistoryContext";
 import { useReducedMotion } from "./useReducedMotion";
-
-const maxAnimatedCourseCards = 6;
 
 export type CourseCardMotionState = "entering" | "idle";
 
@@ -33,7 +32,7 @@ export function useCourseCardMotion(bookId: string, index: number) {
 
     activeKeyRef.current = motionKey;
     const firstAppearance = history.consume(motionKey);
-    setState(!reducedMotion && firstAppearance && index < maxAnimatedCourseCards ? "entering" : "idle");
+    setState(!reducedMotion && firstAppearance && shouldAnimateCourseCard(index) ? "entering" : "idle");
   }, [history, index, motionKey, reducedMotion]);
 
   const onAnimationEnd = useCallback((event: AnimationEvent<HTMLElement>) => {
@@ -48,7 +47,7 @@ export function useCourseCardMotion(bookId: string, index: number) {
     "data-motion-course-card-state": state,
     onAnimationEnd,
     style: {
-      "--motion-course-card-index": Math.min(Math.max(index, 0), maxAnimatedCourseCards - 1)
+      "--motion-course-card-index": clampCourseCardMotionIndex(index)
     } as CSSProperties
   } satisfies CourseCardMotionAttributes;
 }

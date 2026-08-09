@@ -310,7 +310,6 @@ textarea:focus-visible {
   background: var(--glass-nav-selection);
   box-shadow: var(--glass-nav-selection-shadow);
   transform-origin: center;
-  will-change: transform;
 }
 
 .home-indicator {
@@ -353,7 +352,6 @@ textarea:focus-visible {
   text-shadow: 0 1px 8px rgba(255, 255, 255, 0.48);
   transform: translateY(-14px);
   transform-origin: center;
-  transition: color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
 .nav-icon {
@@ -362,7 +360,6 @@ textarea:focus-visible {
   display: grid;
   place-items: center;
   transform-origin: center;
-  transition: transform 160ms ease;
 }
 
 .nav-icon svg {
@@ -444,7 +441,6 @@ textarea:focus-visible {
   padding: 12px 18px;
   font-weight: 700;
   color: var(--color-text);
-  transition: transform 160ms ease, opacity 160ms ease, box-shadow 160ms ease;
 }
 
 .button:active {
@@ -486,16 +482,6 @@ textarea:focus-visible {
   color: rgba(36, 37, 44, 0.46);
   background: rgba(255, 255, 255, 0.62);
   box-shadow: none;
-}
-
-.spin {
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .hero-card,
@@ -952,8 +938,6 @@ textarea:focus-visible {
   transform: scaleX(0);
   transform-origin: left center;
   transition-property: transform;
-  transition-duration: var(--motion-duration-progress);
-  transition-timing-function: var(--motion-ease-standard);
 }
 
 .pill {
@@ -2112,7 +2096,6 @@ textarea:focus-visible {
   cursor: grab;
   touch-action: none;
   user-select: none;
-  transition: top 180ms ease, left 180ms ease, right 180ms ease, transform 160ms ease;
 }
 
 .screen-content.without-nav + .ai-orb {
@@ -2247,24 +2230,12 @@ textarea:focus-visible {
   overflow-y: auto;
   border-radius: 32px 32px 0 0;
   padding: 10px 18px 24px;
-  animation: sheetIn 220ms ease-out both;
 }
 
 .sheet.glass-sheet {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.99), rgba(255, 255, 255, 0.93)),
     rgba(255, 255, 255, 0.96);
-}
-
-@keyframes sheetIn {
-  from {
-    transform: translateY(18px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 .sheet-handle {
@@ -2335,18 +2306,6 @@ textarea:focus-visible {
   align-items: center;
   gap: 9px;
   color: var(--color-text);
-  animation: toastIn 180ms ease-out;
-}
-
-@keyframes toastIn {
-  from {
-    transform: translate(-50%, 10px);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
 }
 
 /* Figma jiemian high-fidelity theme */

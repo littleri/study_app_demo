@@ -1,5 +1,21 @@
 export { MotionHistoryProvider, useMotionHistory, type MotionHistory } from "./MotionHistoryContext";
-export { ScreenTransition, screenTransitionAnimationNames, type ScreenTransitionProps } from "./ScreenTransition";
+export {
+  ScreenTransition,
+  screenTransitionAnimationNames,
+  screenTransitionEnterAnimationNames,
+  screenTransitionExitAnimationNames,
+  type ScreenTransitionProps
+} from "./ScreenTransition";
+export {
+  createScreenTransitionSnapshot,
+  reconcileScreenTransition,
+  settleScreenTransition,
+  type ScreenDirection,
+  type ScreenMotionState,
+  type ScreenSurface,
+  type ScreenTransitionRequest,
+  type ScreenTransitionSnapshot
+} from "./screenTransitionMachine";
 export {
   createPresenceSnapshot,
   reconcilePresence,
@@ -9,6 +25,14 @@ export {
   type PresenceSnapshot
 } from "./presenceMachine";
 export { reducedMotionMediaQuery, useReducedMotion } from "./useReducedMotion";
+export {
+  globalMotionDurationMs,
+  globalMotionFallbackMs,
+  localMotionFallbackMs,
+  localMotionMaxMs,
+  localSlowMotionDurationSeconds,
+  localStateGsapEase
+} from "./timing";
 export {
   useLocalMotionItem,
   type LocalMotionItemAttributes,
@@ -22,6 +46,14 @@ export {
   type CourseCardMotionAttributes,
   type CourseCardMotionState
 } from "./useCourseCardMotion";
+export {
+  clampCourseCardMotionIndex,
+  courseCardStaggerStepMs,
+  getCourseCardStaggerDelayMs,
+  maxAnimatedCourseCards,
+  maxCourseCardStaggerDelayMs,
+  shouldAnimateCourseCard
+} from "./courseCardMotion";
 export {
   useImageMotion,
   useStageThreeImageMotion,

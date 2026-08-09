@@ -10,7 +10,7 @@ import { bookcourseApi } from "./api/bookcourseApi";
 import { runtimeConfig } from "./config/runtime";
 import { AppProvider } from "./context/AppContext";
 import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./context/AppContext";
-import { ScreenTransition, useMotionPresence } from "./motion";
+import { globalMotionFallbackMs, ScreenTransition, useMotionPresence } from "./motion";
 import {
   createInitialNavigation,
   navigate,
@@ -689,7 +689,8 @@ export default function App() {
     requested: requestedSheetView,
     getKey: getSheetViewKey,
     reducedMotion,
-    motionNames: actionSheetAnimationNames
+    motionNames: actionSheetAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
   });
 
   const header = titles[screen];

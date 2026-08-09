@@ -208,8 +208,6 @@ body {
 }
 
 .ai-overlay-layer {
-  --ai-dialog-enter-duration: 380ms;
-  --ai-dialog-exit-duration: 280ms;
   position: absolute;
   z-index: 45;
   inset: 0;
@@ -245,7 +243,6 @@ body {
   align-content: normal;
   gap: 12px;
   pointer-events: auto;
-  animation: overlayPanelIn 180ms ease-out both;
 }
 
 .ai-overlay-head {
@@ -382,7 +379,6 @@ body {
   max-height: calc(var(--overlay-visual-height) - var(--safe-area-top) - var(--safe-area-bottom) - var(--space-layout));
   border-radius: 28px 28px 0 0;
   padding: 10px var(--space-inline) calc(var(--safe-area-bottom) + var(--space-layout));
-  animation: overlaySheetIn 180ms ease-out both;
 }
 
 .toast {
@@ -395,48 +391,9 @@ body {
   max-width: 340px;
   margin-inline: auto;
   transform: none;
-  animation: toastInResponsive 180ms ease-out both;
-}
-
-@keyframes overlayPanelIn {
-  from {
-    transform: translateY(14px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes overlaySheetIn {
-  from {
-    transform: translateY(18px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes toastInResponsive {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 @media (min-width: 768px) and (min-height: 600px) {
-  .ai-overlay-layer {
-    --ai-dialog-enter-duration: 340ms;
-    --ai-dialog-exit-duration: 250ms;
-  }
-
   .ai-overlay {
     top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--space-layout));
     right: calc(var(--safe-area-right) + var(--space-inline));
@@ -491,13 +448,6 @@ body {
     left: auto;
     width: min(340px, calc(100% - var(--safe-area-left) - var(--safe-area-right) - var(--nav-rail-width) - var(--space-layout) - var(--space-layout) - var(--space-inline)));
     margin: 0;
-  }
-}
-
-@media (max-height: 599px) and (orientation: landscape) {
-  .ai-overlay-layer {
-    --ai-dialog-enter-duration: 240ms;
-    --ai-dialog-exit-duration: 180ms;
   }
 }
 

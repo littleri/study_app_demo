@@ -165,7 +165,7 @@
   border-radius: inherit;
   background: #6f72f5;
   transform-origin: left center;
-  transition: transform var(--motion-duration-progress) var(--motion-ease-enter);
+  transition: transform var(--motion-duration-local-slow) var(--motion-ease-progress);
 }
 
 .home-primary-action {

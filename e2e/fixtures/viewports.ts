@@ -29,6 +29,16 @@ export const responsiveProjects: readonly ResponsiveProject[] = [
     name: "ipad-pro-11-landscape",
     initialViewport: { width: 1194, height: 834 },
     pairedViewport: { width: 1210, height: 834 }
+  },
+  {
+    name: "small-phone-portrait",
+    initialViewport: { width: 360, height: 640 },
+    pairedViewport: { width: 360, height: 780 }
+  },
+  {
+    name: "small-phone-short-landscape",
+    initialViewport: { width: 667, height: 320 },
+    pairedViewport: { width: 740, height: 360 }
   }
 ];
 
