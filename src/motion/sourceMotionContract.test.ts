@@ -211,9 +211,10 @@ describe("source motion contract", () => {
     expect(auditCssMotion(cssFixture(css)).join("\n")).toContain(expected);
   });
 
-  it("accepts only the three explicit loading loops, including a valid longhand list", () => {
+  it("accepts only the explicit loading loops, including Sprite Strip and a valid longhand list", () => {
     const failures = auditCssMotion(cssFixture(`
       .spinner { animation: motion-spinner var(--motion-duration-loading) linear infinite; }
+      .sprite { animation: processing-cloud-sprite-loading var(--motion-duration-loading) var(--motion-ease-sprite) infinite; }
       .skeleton {
         animation-name: motion-skeleton-pulse;
         animation-duration: var(--motion-duration-loading);

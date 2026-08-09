@@ -9,21 +9,34 @@ import {
   Button,
   Card,
   Metric,
-  Pill,
   ProgressBar
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import {
-  coursePreparationSteps,
+  fileTitleBeforeParenthesis,
   formatFileSize,
   getFileKind
 } from "./shared";
 import { startConfirmedCourseParse } from "./uploadFlow";
 
+const uploadedCoverRules = [
+  { keywords: ["生物", "遗传与进化"], source: "/assets/textbook/biology-cover.webp" },
+  { keywords: ["化学"], source: "/assets/book-covers/chemistry-required-2.webp" },
+  { keywords: ["物理"], source: "/assets/book-covers/physics-required-3.webp" },
+  { keywords: ["理论力学"], source: "/assets/book-covers/theoretical-mechanics-1.webp" },
+  { keywords: ["高等数学", "高数"], source: "/assets/book-covers/advanced-mathematics-1.webp" },
+  { keywords: ["数学"], source: "/assets/book-covers/high-school-math-required-2.webp" },
+  { keywords: ["英语"], source: "/assets/book-covers/english-required-3.webp" }
+] as const;
+
+function resolveUploadedCover(fileName: string) {
+  return uploadedCoverRules.find(({ keywords }) => keywords.some((keyword) => fileName.includes(keyword)))?.source ?? null;
+}
+
 export function ParseReadyScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { clearCourseSession, clearLoadedCourse, go, parseJobId, parseJobStatus, selectedUpload, uploadedFile, setParseJobId, setParseJobStatus, setSelectedUpload, showToast } = useAppContext();
+  const { clearLoadedCourse, go, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus, showToast } = useAppContext();
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -74,96 +87,81 @@ export function ParseReadyScreen() {
   }
 
   const fileKind = getFileKind(uploadedFile.name, uploadedFile.contentType);
+  const displayTitle = fileTitleBeforeParenthesis(uploadedFile.name);
+  const coverSource = resolveUploadedCover(uploadedFile.name);
   const uploadTime = new Intl.DateTimeFormat("zh-CN", {
     hour: "2-digit",
     minute: "2-digit"
   }).format(uploadedFile.uploadedAt);
   const jobProgress = Math.max(0, Math.min(100, parseJobStatus?.progress ?? (parseJobId ? 5 : 0)));
-  const jobMessage = parseError
+  const retryable = parseError !== null || parseJobStatus?.status === "failed";
+  const errorMessage = parseError
     ?? (parseJobStatus?.status === "failed"
       ? parseJobStatus.error ?? parseJobStatus.message ?? "解析失败，请检查文件后重试"
-      : parseJobStatus?.message ?? (parseJobId ? "后台正在整理教材，完成后会自动生成目录。你可以安全离开，稍后回来查看。" : "文件已上传。点击下方按钮后才会开始后台解析；开始后可以安全离开。"));
-  const parseStatus = parseError
-    ? "start-error"
-    : parseJobStatus?.status === "failed"
-      ? "failed"
-      : parseJobStatus?.status === "done"
-        ? "complete"
-        : parseJobId
-          ? "running"
-          : "ready";
-  const jobTone = parseStatus === "failed" || parseStatus === "start-error" ? "orange" : parseStatus === "complete" ? "mint" : "sky";
-  const parseStatusLabel = parseStatus === "complete"
-    ? "已完成"
-    : parseStatus === "failed" || parseStatus === "start-error"
-      ? "解析失败"
-      : parseJobId
-        ? "后台处理中"
-      : "等待你开始";
-  const retryable = parseError !== null || parseJobStatus?.status === "failed";
+      : null);
   const primaryActionText = parseJobStatus?.status === "done"
     ? "查看目录"
     : retryable
       ? "重新解析"
       : parseJobId
-        ? "查看后台进度"
-        : "开始后台解析";
+        ? "查看解析进度"
+        : "开始解析";
 
   return (
-    <div className="screen-stack parse-ready-screen parse-flow-screen">
-      <div className="parse-flow-primary">
-      <Card className="parse-file-card">
-        <span className="parse-file-icon">
-          <FileText size={28} aria-hidden="true" />
-        </span>
-        <div>
-          <div className="parse-upload-heading">
-            <Pill tone="sky">已上传，待确认</Pill>
-            {selectedUpload ? <span className="upload-success-mark" aria-hidden="true"><CheckCircle2 size={16} /></span> : null}
+    <div className="screen-stack community-detail-screen parse-ready-screen">
+      <div className="community-detail-workspace parse-ready-workspace">
+        <article className="community-detail-overview parse-ready-overview">
+          <div className="community-detail-visual parse-ready-visual">
+            {coverSource ? (
+              <img className="community-detail-cover parse-ready-cover-image" src={coverSource} alt="" />
+            ) : (
+              <div className="community-detail-cover-fallback parse-ready-cover" aria-hidden="true">
+                <span className="parse-ready-cover-icon">
+                  <FileText size={56} />
+                </span>
+                <strong>{fileKind}</strong>
+                <span>AI 课程资料</span>
+              </div>
+            )}
           </div>
-          <h2>{uploadedFile.name}</h2>
-          <p>{fileKind} · {formatFileSize(uploadedFile.sizeBytes)} · {uploadTime}</p>
-        </div>
-      </Card>
-      </div>
 
-      <aside className="parse-flow-support" aria-label="解析状态与支持信息">
-      <div className="parse-info-grid">
-        <Metric label="文件类型" value={fileKind} />
-        <Metric label="文件大小" value={formatFileSize(uploadedFile.sizeBytes)} />
-        <Metric label="下一步" value="后台解析" />
-      </div>
+          <div className="community-detail-summary parse-ready-summary">
+            <p className="community-detail-owner parse-ready-owner">
+              <span className="upload-success-mark" aria-hidden="true"><CheckCircle2 size={15} /></span>
+              <span>已上传 · 待解析</span>
+            </p>
+            <h2 title={uploadedFile.name}>{displayTitle}</h2>
+            <p className="community-detail-edition">
+              {fileKind} · {formatFileSize(uploadedFile.sizeBytes)} · {uploadTime}
+            </p>
 
-      <div className="parse-checklist">
-        {coursePreparationSteps.map((item, index) => (
-          <div className="parse-check-row" key={item}>
-            <span>{index === 0 ? <CheckCircle2 size={18} aria-hidden="true" /> : index + 1}</span>
-            <strong>{item}</strong>
+            <div className="parse-info-grid" aria-label="教材解析信息">
+              <Metric label="文件类型" value={fileKind} />
+              <Metric label="文件大小" value={formatFileSize(uploadedFile.sizeBytes)} />
+              <Metric label="下一步" value="后台解析" />
+            </div>
+
+            {errorMessage ? (
+              <p className="parse-ready-error" role="alert">
+                <CircleAlert size={17} aria-hidden="true" />
+                <span>{errorMessage}</span>
+              </p>
+            ) : null}
+
+            <div
+              className="parse-status-feedback motion-visually-hidden"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span>{errorMessage ?? "文件已上传，等待开始解析"}</span>
+              <ProgressBar value={jobProgress} label={`解析进度 ${jobProgress}%`} />
+            </div>
           </div>
-        ))}
-        <p className="helper-text">这些步骤会在你明确开始后在后台完成，不必停留在这个页面等待。</p>
+        </article>
       </div>
 
-      <div
-        key={`parse-status:${parseStatus}`}
-        className="parse-status-feedback"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <Card className="insight-card">
-          <div className="parse-status-heading">
-            <Pill tone={jobTone}>{parseStatusLabel}</Pill>
-            {parseStatus === "failed" || parseStatus === "start-error" ? <CircleAlert size={16} aria-hidden="true" /> : null}
-          </div>
-          <p>{jobMessage}</p>
-          <ProgressBar value={jobProgress} label={`解析进度 ${jobProgress}%`} />
-        </Card>
-      </div>
-
-      </aside>
-      <div className="parse-flow-actions">
-      <div className="parse-actions">
+      <div className="community-detail-actions parse-flow-actions parse-ready-actions">
         <Button
           loading={parsing}
           disabled={parsing}
@@ -185,22 +183,6 @@ export function ParseReadyScreen() {
         >
           {primaryActionText}
         </Button>
-        <Button variant="secondary" disabled={parsing} onClick={() => go("home")}>
-          稍后开始
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={parsing}
-          onClick={() => {
-            clearLoadedCourse();
-            clearCourseSession();
-            setSelectedUpload(false);
-            go("upload");
-          }}
-        >
-          更换文件
-        </Button>
-      </div>
       </div>
     </div>
   );

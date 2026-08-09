@@ -2,13 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import {
   CheckCircle2,
   FileText,
-  Upload,
-  WandSparkles
+  Upload
 } from "lucide-react";
 import {
   Button,
-  Card,
-  ProgressBar
+  Card
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { StateSwapText, useMotionHistory, useReducedMotion } from "../motion";
@@ -56,7 +54,7 @@ function StageCompletionCheck({
 }
 
 export function ProcessingScreen() {
-  const { go, parseJobId, parseJobStatus, parsedChapters, uploadedFile } = useAppContext();
+  const { go, parseJobId, parseJobStatus, parsedChapters } = useAppContext();
   const { consume } = useMotionHistory();
   const reducedMotion = useReducedMotion();
   const stageCompletionSnapshotRef = useRef<StageCompletionSnapshot | null>(null);
@@ -156,23 +154,29 @@ export function ProcessingScreen() {
   return (
     <div className="screen-stack processing-flow-screen">
       <div className="processing-flow-primary">
-        <Card surface="celebration" className="processing-card">
-          <WandSparkles size={32} aria-hidden="true" />
-          <h2>正在构建 RAG 知识库</h2>
-          <p>{uploadedFile?.name ?? "后端解析任务"}</p>
-          <strong>
-            <StateSwapText value={`${liveProgress}%`} reserveValues={["100%"]} />
-          </strong>
-          <ProgressBar value={liveProgress} label={`解析进度 ${liveProgress}%`} />
-        </Card>
+        <div className="processing-animation-stage" aria-hidden="true">
+          <div className="processing-sprite-viewport" aria-hidden="true">
+            <img
+              className="processing-sprite-strip"
+              src="/assets/brand/loading/cloud-course-loading-strip-v1.png"
+              alt=""
+            />
+          </div>
+        </div>
       </div>
       <div className="processing-flow-support">
         <div className="stage-list" aria-label="解析处理阶段">
           {stages.map((stage, index) => {
             const completed = completedStages[index];
             const active = !isDone && index === activeStage;
+            const stageStatus = completed ? "已完成" : active ? "处理中" : "等待中";
             return (
-            <div className={`stage-row ${completed ? "done" : ""} ${active ? "is-processing" : ""}`} key={stage}>
+            <div
+              className={`stage-row ${completed ? "done" : ""} ${active ? "is-processing" : ""}`}
+              data-stage-status={completed ? "done" : active ? "processing" : "waiting"}
+              aria-current={active ? "step" : undefined}
+              key={stage}
+            >
               <span>
                 {completed ? (
                   <StageCompletionCheck
@@ -182,19 +186,15 @@ export function ProcessingScreen() {
                   />
                 ) : index + 1}
               </span>
-              <div>
-                <strong>{stage}</strong>
-                <small>{completed ? "已完成" : active ? "处理中" : "等待中"}</small>
-              </div>
+              <strong>{stage}</strong>
+              <small className="stage-status">{stageStatus}</small>
             </div>
             );
           })}
         </div>
-        <Card className="insight-card processing-status-card">
-          <p>
-            <StateSwapText value={processingStatusText} reserveValues={["解析失败，请重新上传或检查文件格式"]} />
-          </p>
-        </Card>
+        <p className={`processing-status-message ${parseError ? "is-error" : ""}`}>
+          <StateSwapText value={processingStatusText} reserveValues={["解析失败，请重新上传或检查文件格式"]} />
+        </p>
       </div>
       <p className="motion-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
         {processingLiveAnnouncement}

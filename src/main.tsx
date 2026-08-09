@@ -18,6 +18,10 @@ import "./styles/motion.css";
 import "./styles/device-preview.css";
 import "./styles/card-system.css";
 import "./styles/community.css";
+import "./styles/upload.css";
+import "./styles/parse-ready.css";
+import "./styles/processing.css";
+import "./styles/chapter-confirm.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isEmbeddedPreview = searchParams.get("embedded") === "device-preview";

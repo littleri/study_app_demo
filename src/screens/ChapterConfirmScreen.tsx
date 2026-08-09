@@ -53,8 +53,8 @@ import {
   averageConfidence,
   ChapterEvidenceSummary,
   ChapterEvidenceReasons,
+  fileTitleBeforeParenthesis,
   sourceUnitCountLabel,
-  sourceUnitName
 } from "./shared";
 
 const reviewedStatuses = new Set(["匹配良好", "已人工校对", "已确认"]);
@@ -277,21 +277,20 @@ function ChapterDirectoryNode({
         >
           <span className="toc-entry-title-copy">
             <strong>{node.chapter.source_title}</strong>
-            {hasChildren ? <small>{node.children.length} 个下级目录</small> : null}
+            <small>
+              <span>第 {chapterPageLabel(node)} 页</span>
+              {hasChildren ? <span>{node.children.length} 个下级目录</span> : null}
+              {conflictCount > 0 ? (
+                <em className="toc-entry-issue conflict"><AlertTriangle size={12} aria-hidden="true" />页码冲突</em>
+              ) : isUnassigned ? (
+                <em className="toc-entry-issue">未归类</em>
+              ) : needsReview ? (
+                <em className="toc-entry-issue">需检查</em>
+              ) : null}
+            </small>
           </span>
           <ChapterStatusMark bookId={bookId} chapterId={chapterId} status={node.chapter.status} />
         </button>
-
-        <div className="toc-entry-meta">
-          <span>第 {chapterPageLabel(node)} 页</span>
-          {conflictCount > 0 ? (
-            <em className="toc-entry-issue conflict"><AlertTriangle size={12} aria-hidden="true" />页码冲突</em>
-          ) : isUnassigned ? (
-            <em className="toc-entry-issue">未归类</em>
-          ) : needsReview ? (
-            <em className="toc-entry-issue">需检查</em>
-          ) : null}
-        </div>
 
         <button
           className="toc-edit-button"
@@ -300,7 +299,7 @@ function ChapterDirectoryNode({
           onClick={() => onEdit(chapterId, evidenceByChapter.get(chapterId))}
         >
           <PencilLine size={14} aria-hidden="true" />
-          编辑
+          <span>编辑</span>
         </button>
       </div>
 
@@ -622,7 +621,6 @@ export function ChapterConfirmScreen() {
   const reducedMotion = useReducedMotion();
   const [generatingCourse, setGeneratingCourse] = useState(false);
   const [tocAnalysis, setTocAnalysis] = useState<TocAnalysis | null>(null);
-  const [tocLoading, setTocLoading] = useState(false);
   const [expandedChapterIds, setExpandedChapterIds] = useState<Set<string>>(() => new Set());
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selectionFeedback, setSelectionFeedback] = useState<SelectionFeedback | null>(null);
@@ -637,21 +635,13 @@ export function ChapterConfirmScreen() {
   const confidence = averageConfidence(displayChapters);
   const reviewCount = displayChapters.filter((chapter) => chapter.status !== "匹配良好").length;
   const documentTitle = uploadedFile?.name ?? parsedScanResult?.filename ?? "未选择教材";
+  const displayDocumentTitle = fileTitleBeforeParenthesis(documentTitle);
   const pageCount = parsedScanResult?.page_count ?? 0;
   const sourceCount = sourceUnitCountLabel(parsedScanResult);
-  const sourceUnit = sourceUnitName(parsedScanResult?.source_unit);
-  const bestTocPage = tocAnalysis?.toc_pages[0] ?? null;
-  const mappedPages = tocAnalysis?.page_map.filter((item) => item.confidence >= 50).length ?? 0;
   const chapterRangeConflicts = findChapterRangeConflicts(parsedChapters ?? []);
   const conflictChapterIds = new Set(chapterRangeConflicts.flatMap((conflict) => [conflict.chapterId, conflict.otherChapterId]));
   const chaptersById = new Map((parsedChapters ?? []).map((chapter) => [chapter.chapter_id, chapter]));
   const chapterTree = buildChapterTree(parsedChapters ?? []);
-  const flatChapterTree = flattenChapterTree(chapterTree);
-  const expandableChapterIds = flatChapterTree
-    .filter((node) => node.children.length > 0)
-    .map((node) => node.chapter.chapter_id);
-  const allDirectoryExpanded = expandableChapterIds.length > 0
-    && expandableChapterIds.every((chapterId) => expandedChapterIds.has(chapterId));
   const conflictParentIds = [...new Set([...conflictChapterIds]
     .map((chapterId) => chaptersById.get(chapterId)?.parent_id)
     .filter((parentId): parentId is string => Boolean(parentId)))];
@@ -660,7 +650,6 @@ export function ChapterConfirmScreen() {
   useEffect(() => {
     if (!uploadedFile) return;
     let active = true;
-    setTocLoading(true);
     bookcourseRepository
       .getTocAnalysis(uploadedFile.bookId)
       .then((analysis) => {
@@ -668,9 +657,6 @@ export function ChapterConfirmScreen() {
       })
       .catch((err) => {
         if (active) showToast(err instanceof Error ? err.message : "目录证据加载失败", "warning");
-      })
-      .finally(() => {
-        if (active) setTocLoading(false);
       });
     return () => {
       active = false;
@@ -758,17 +744,18 @@ export function ChapterConfirmScreen() {
   function toggleChapter(chapterId: string) {
     setExpandedChapterIds((current) => {
       const next = new Set(current);
+      const rootNode = chapterTree.find((node) => node.chapter.chapter_id === chapterId);
+      if (rootNode) {
+        if (next.has(chapterId)) {
+          chapterTreeIds(rootNode).forEach((id) => next.delete(id));
+        } else {
+          chapterTree.flatMap(chapterTreeIds).forEach((id) => next.delete(id));
+          next.add(chapterId);
+        }
+        return next;
+      }
       if (next.has(chapterId)) next.delete(chapterId);
       else next.add(chapterId);
-      return next;
-    });
-  }
-
-  function toggleAllChapters() {
-    setExpandedChapterIds((current) => {
-      const next = new Set(current);
-      if (allDirectoryExpanded) expandableChapterIds.forEach((chapterId) => next.delete(chapterId));
-      else expandableChapterIds.forEach((chapterId) => next.add(chapterId));
       return next;
     });
   }
@@ -833,7 +820,7 @@ export function ChapterConfirmScreen() {
         </span>
         <div>
           <Pill tone="purple">{isLiveResult ? "本次文件解析结果" : "等待后端解析结果"}</Pill>
-          <h2 title={documentTitle}>{documentTitle}</h2>
+          <h2 title={documentTitle}>{displayDocumentTitle}</h2>
           <p>
             {displayChapters.length > 0
               ? `已识别 ${displayChapters.length} 个目录项 · ${sourceCount} · 平均置信度 ${confidence}%`
@@ -846,21 +833,6 @@ export function ChapterConfirmScreen() {
         <Metric label="来源定位" value={isLiveResult ? sourceCount : "20 节"} />
         <Metric label="需检查" value={`${reviewCount} 项`} />
       </div>
-      {isLiveResult ? (
-        <Card className="insight-card">
-          <div className="section-head">
-            <h3>扫描版目录识别证据</h3>
-            <Pill tone={tocAnalysis?.status === "ready" ? "mint" : "orange"}>{tocLoading ? "加载中" : tocAnalysis?.status ?? "待分析"}</Pill>
-          </div>
-          <p>
-            {bestTocPage
-              ? `候选目录页：第 ${bestTocPage.page} 页 · 结构分 ${bestTocPage.score}% · 识别 ${bestTocPage.line_count} 行目录项`
-              : "未找到高置信目录页，系统会退回正文标题规则，并要求人工复核。"}
-          </p>
-          <p>{parsedScanResult?.source_unit === "page" ? `印刷页码映射：${mappedPages}/${pageCount} 页达到可用置信度。` : `当前使用 ${sourceUnit} 语义定位，不虚构 PDF 页码。`}确认后会按当前章/节来源范围重建 RAG chunk 归属。</p>
-          {tocAnalysis?.warnings.length ? <p className="helper-text">{tocAnalysis.warnings.join("；")}</p> : null}
-        </Card>
-      ) : null}
       {chapterRangeConflicts.length > 0 ? (
         <Card className="chapter-conflict-card">
           <div className="chapter-conflict-heading">
@@ -898,13 +870,8 @@ export function ChapterConfirmScreen() {
       <Section
         className="chapter-confirm-directory"
         title="本次解析目录"
-        action={expandableChapterIds.length > 0 ? (
-          <button className="toc-toggle-all" type="button" onClick={toggleAllChapters}>
-            {allDirectoryExpanded ? "全部收起" : "全部展开"}
-          </button>
-        ) : null}
+        action={chapterTree.length > 0 ? <span className="toc-directory-count">{chapterTree.length} 章</span> : null}
       >
-        <p className="toc-directory-helper">点击章名选择要查看的章节；点击箭头展开或收起下级目录；需要修改、移动或删除时请点“编辑”。</p>
         {directoryFeedback ? (
           <p
             key={`chapter-directory-feedback:${directoryFeedback.sequence}`}
@@ -957,7 +924,7 @@ export function ChapterConfirmScreen() {
               chapters={parsedChapters}
               draft={selectedDraft}
               evidence={evidenceByChapter.get(selectedChapter.chapter_id)}
-              pageCount={parsedScanResult?.page_count}
+              pageCount={pageCount}
               saveFeedback={saveFeedback}
               onDraftChange={(nextDraft) => {
                 setChapterDrafts((current) => ({

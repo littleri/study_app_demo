@@ -135,6 +135,7 @@
   --motion-ease-local-exit: cubic-bezier(.32, 0, .67, 0);
   --motion-ease-local-state: cubic-bezier(.65, 0, .35, 1);
   --motion-ease-progress: cubic-bezier(.4, 0, .2, 1);
+  --motion-ease-sprite: steps(8,end);
   --motion-ease-standard: cubic-bezier(.2, .8, .2, 1);
   --motion-ease-enter: cubic-bezier(.16, 1, .3, 1);
   --motion-ease-exit: cubic-bezier(.4, 0, 1, 1);

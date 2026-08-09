@@ -294,13 +294,7 @@ async function openProductionUpload(page: Page) {
   await waitForVisualMotionToSettle(page);
 }
 
-async function openProductionChapterConfirm(page: Page) {
-  await page.addInitScript(() => {
-    const nativeSetTimeout = window.setTimeout.bind(window) as (...args: unknown[]) => number;
-    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args) => (
-      nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
-    )) as typeof window.setTimeout;
-  });
+async function openProductionParseReady(page: Page) {
   await page.goto("/e2e/processing-state-harness.html");
   await expect(page.locator(".home-dashboard")).toBeVisible();
   const uploadAction = page.locator('[data-home-global-action="upload"]');
@@ -313,15 +307,26 @@ async function openProductionChapterConfirm(page: Page) {
     mimeType: "application/pdf",
     buffer: Buffer.from("stage seven production repository visual fixture")
   });
-  await expect(page.locator(".upload-selection-summary")).toBeVisible();
+  await expect(page.locator(".upload-add-tile.has-selection")).toContainText("文件一");
   await clickAfterMotionAndScrollSettle(
     page.getByRole("button", { name: "上传并继续", exact: true }),
     "ChapterConfirm fixture upload"
   );
   await expect(page.locator(".parse-ready-screen")).toBeVisible();
+  await waitForVisualMotionToSettle(page);
+}
+
+async function openProductionChapterConfirm(page: Page) {
+  await page.addInitScript(() => {
+    const nativeSetTimeout = window.setTimeout.bind(window) as (...args: unknown[]) => number;
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args) => (
+      nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
+    )) as typeof window.setTimeout;
+  });
+  await openProductionParseReady(page);
   await page.evaluate(() => window.__processingStateHarness?.setPhase("done"));
   await clickAfterMotionAndScrollSettle(
-    page.getByRole("button", { name: "开始后台解析", exact: true }),
+    page.getByRole("button", { name: "开始解析", exact: true }),
     "ChapterConfirm fixture parse start"
   );
   await expect(page.locator(".chapter-confirm-screen")).toBeVisible();
@@ -360,6 +365,40 @@ async function expectUploadActionAboveHomeIndicator(page: Page) {
   if (geometry.indicator) {
     expect(geometry.action.bottom, "Upload: primary action clears the Home Indicator before scrolling").toBeLessThanOrEqual(geometry.indicator.top - 1);
   }
+}
+
+async function expectParseReadyBottomSurface(page: Page) {
+  const content = page.locator('.screen-content[data-screen="parseReady"]');
+  await content.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect.poll(() => content.evaluate((element) => {
+    const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
+    return Math.abs(element.scrollTop - maxScrollTop) <= 1;
+  })).toBe(true);
+
+  const bottomSurface = await page.evaluate(() => {
+    const contentElement = document.querySelector<HTMLElement>('.screen-content[data-screen="parseReady"]');
+    const infoGrid = document.querySelector<HTMLElement>(".parse-ready-summary .parse-info-grid");
+    const summary = document.querySelector<HTMLElement>(".parse-ready-summary");
+    const actions = document.querySelector<HTMLElement>(".parse-ready-actions");
+    if (!contentElement || !infoGrid || !summary || !actions) throw new Error("ParseReady bottom surface is incomplete");
+    return {
+      actionBackground: getComputedStyle(actions).backgroundColor,
+      actionTop: actions.getBoundingClientRect().top,
+      contentBackground: getComputedStyle(contentElement).backgroundColor,
+      contentBottom: contentElement.getBoundingClientRect().bottom,
+      infoGridBottom: infoGrid.getBoundingClientRect().bottom,
+      summaryBackground: getComputedStyle(summary).backgroundColor,
+      summaryBottom: summary.getBoundingClientRect().bottom
+    };
+  });
+
+  expect(bottomSurface.actionBackground, "ParseReady floating action container stays transparent").toBe("rgba(0, 0, 0, 0)");
+  expect(bottomSurface.contentBackground, "ParseReady page remains white below the rounded sheet").toBe("rgb(255, 255, 255)");
+  expect(bottomSurface.summaryBackground, "ParseReady content sheet remains white at the bottom").toBe("rgb(255, 255, 255)");
+  expect(bottomSurface.summaryBottom, "ParseReady white sheet stays inside its scrolling surface").toBeLessThanOrEqual(bottomSurface.contentBottom + 1);
+  expect(bottomSurface.infoGridBottom, "ParseReady information cards clear the floating action after scrolling").toBeLessThanOrEqual(bottomSurface.actionTop - 8);
 }
 
 async function expectChapterConfirmationOverlayStack(page: Page) {
@@ -530,6 +569,16 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await expectUploadActionAboveHomeIndicator(page);
     await expectVisualBaseline(page, "upload.png");
     await expectSurfaceContract(page, "Upload", ".upload-flow-primary .button");
+  });
+
+  test("records the ParseReady visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {
+    void bookCourseApi;
+    await openProductionParseReady(page);
+    await expect(page.getByRole("button", { name: "开始解析", exact: true })).toBeVisible();
+    await expect(page.locator(".toast")).toHaveCount(0);
+    await expectVisualBaseline(page, "parse-ready.png");
+    await expectSurfaceContract(page, "ParseReady", ".parse-ready-actions .button");
+    await expectParseReadyBottomSurface(page);
   });
 
   test("records the ChapterConfirm visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   acceptedCourseFileTypes,
+  fileTitleBeforeParenthesis,
   getFileKind,
   liveBookTitle,
   sourceUnitCountLabel,
@@ -49,5 +50,13 @@ describe("stage 5 upload format contract", () => {
       contentType: "application/pdf",
       uploadedAt: 0
     })).toBe("人教版高中生物必修二遗传与进化");
+  });
+
+  it("shows only the uploaded title before its first parenthesis", () => {
+    expect(fileTitleBeforeParenthesis(
+      "人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所.pdf"
+    )).toBe("人教版高中生物必修2遗传与进化");
+    expect(fileTitleBeforeParenthesis("高等数学（同济大学）.pdf")).toBe("高等数学");
+    expect(fileTitleBeforeParenthesis("普通文件.pdf")).toBe("普通文件.pdf");
   });
 });

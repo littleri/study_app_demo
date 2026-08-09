@@ -88,8 +88,8 @@ function loadStudyLocations(): Record<string, StudyLocation> {
 
 const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
   home: {},
-  upload: { title: "上传书籍", subtitle: "把教材变成 AI 课程", back: true, hideNav: true },
-  parseReady: { title: "解析教材", subtitle: "确认资料后开始生成", back: true, hideNav: true },
+  upload: { title: "上传书籍", back: true, hideNav: true },
+  parseReady: { title: "解析教材", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
   courseReady: { title: "生成成功", back: true, hideNav: true },

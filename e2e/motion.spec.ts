@@ -1141,14 +1141,16 @@ test.describe("3. DemoRepository upload, success, image, and card lifecycle", ()
     await page.locator(".parse-flow-actions .button").first().click();
     await expect(page.locator(".processing-flow-screen")).toBeVisible();
     await settleScreen(page);
-    const progress = page.locator(".processing-card .progress-fill");
-    const progressTransition = await readTransition(progress);
-    expect(progressTransition.duration).toBe("0.2s");
-    expect(normalizeTimingFunction(progressTransition.timing)).toBe(curves.progress);
-    await expect(page.locator('.processing-card [role="progressbar"]')).toHaveAttribute("aria-label", /18%/);
-    await expect(page.locator('.processing-card [role="progressbar"]')).toHaveAttribute("aria-label", /46%/, { timeout: 8_000 });
+    const processingSprite = page.locator(".processing-sprite-strip");
+    const spriteAnimation = await readAnimation(processingSprite);
+    expect(spriteAnimation).toMatchObject({
+      duration: "1.2s",
+      name: "processing-cloud-sprite-loading",
+      playState: "running"
+    });
+    expect(spriteAnimation.timing).toContain("steps(8");
     const stageChecks = page.locator(".stage-completion-check");
-    await expect(stageChecks).toHaveCount(2);
+    await expect(stageChecks).toHaveCount(2, { timeout: 8_000 });
     const firstStage = await stageChecks.nth(0).elementHandle();
     const secondStage = await stageChecks.nth(1).elementHandle();
     if (!firstStage || !secondStage) throw new Error("Processing 46% stage roots are missing");
@@ -1159,8 +1161,7 @@ test.describe("3. DemoRepository upload, success, image, and card lifecycle", ()
       await dispatchAnimation(check, "animationend", "motion-stage-check-in");
       await expect(check).toHaveAttribute("data-motion-stage-state", "idle");
     }
-    await expect(page.locator('.processing-card [role="progressbar"]')).toHaveAttribute("aria-label", /74%/, { timeout: 8_000 });
-    await expect(stageChecks).toHaveCount(3);
+    await expect(stageChecks).toHaveCount(3, { timeout: 8_000 });
     expect(await firstStage.evaluate((element) => element === document.querySelectorAll(".stage-completion-check")[0]), "same processing status keeps stage 1 identity").toBe(true);
     expect(await secondStage.evaluate((element) => element === document.querySelectorAll(".stage-completion-check")[1]), "same processing status keeps stage 2 identity").toBe(true);
     await expect(stageChecks.nth(0), "same-status progress does not replay stage 1").toHaveAttribute("data-motion-stage-state", "idle");
@@ -1218,17 +1219,15 @@ test.describe("3. DemoRepository upload, success, image, and card lifecycle", ()
     await page.locator(".parse-flow-actions .button").first().click();
     await expect(page.locator(".processing-flow-screen")).toBeVisible();
     await settleScreen(page);
-    expect((await readTransition(page.locator(".processing-card .progress-fill"))).duration).toBe("0s");
-    await expect(page.locator('.processing-card [role="progressbar"]')).toHaveAttribute("aria-label", /46%/, { timeout: 8_000 });
+    expect((await readAnimation(page.locator(".processing-sprite-strip"))).name).toBe("none");
     let stageChecks = page.locator(".stage-completion-check");
-    await expect(stageChecks).toHaveCount(2);
+    await expect(stageChecks).toHaveCount(2, { timeout: 8_000 });
     for (let index = 0; index < await stageChecks.count(); index += 1) {
       await expect(stageChecks.nth(index), `reduced Processing stage ${index + 1} is direct`).toHaveAttribute("data-motion-stage-state", "idle");
       expect((await readAnimation(stageChecks.nth(index))).name).toBe("none");
     }
-    await expect(page.locator('.processing-card [role="progressbar"]')).toHaveAttribute("aria-label", /74%/, { timeout: 8_000 });
     stageChecks = page.locator(".stage-completion-check");
-    await expect(stageChecks).toHaveCount(3);
+    await expect(stageChecks).toHaveCount(3, { timeout: 8_000 });
     for (let index = 0; index < await stageChecks.count(); index += 1) {
       await expect(stageChecks.nth(index), `reduced Processing stage ${index + 1} remains direct`).toHaveAttribute("data-motion-stage-state", "idle");
       expect((await readAnimation(stageChecks.nth(index))).name).toBe("none");

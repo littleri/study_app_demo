@@ -36,6 +36,20 @@ export async function uploadConfirmedCourseFile(
   };
 }
 
+export async function uploadConfirmedCourseFiles(
+  files: readonly File[],
+  api: UploadConfirmationApi,
+  uploadedAt = Date.now()
+): Promise<UploadedCourseFile> {
+  const [primaryFile, ...supportingFiles] = files;
+  if (!primaryFile) throw new Error("请先选择学习资料");
+  const uploaded = await uploadConfirmedCourseFile(primaryFile, api, uploadedAt);
+  for (const file of supportingFiles) {
+    await api.uploadFile(uploaded.bookId, file);
+  }
+  return uploaded;
+}
+
 export function startConfirmedCourseParse(
   uploadedFile: UploadedCourseFile,
   api: ParseStarterApi

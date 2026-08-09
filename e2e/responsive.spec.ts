@@ -700,7 +700,8 @@ test.describe("current DemoRepository responsive matrix", () => {
     const status = page.locator(".upload-status-feedback");
     await expect(status).toBeVisible();
     await expect(status).toHaveCSS("animation-name", "none");
-    await expect(page.locator(".upload-selection-summary")).toBeVisible();
+    await expect(page.locator(".upload-add-tile.has-selection")).toContainText("文件一");
+    await expect(page.locator(".upload-selection-summary")).toHaveCount(0);
     await expectReachable(page.locator(".upload-flow-primary > .button"), `${project.name} reduced upload action`);
     await expectNoShellOverflow(page, `${project.name} reduced upload`);
   });

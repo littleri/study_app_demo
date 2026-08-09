@@ -25,6 +25,11 @@ import "../src/styles/chapter-tools.css";
 import "../src/styles/study.css";
 import "../src/styles/motion.css";
 import "../src/styles/card-system.css";
+import "../src/styles/community.css";
+import "../src/styles/upload.css";
+import "../src/styles/parse-ready.css";
+import "../src/styles/processing.css";
+import "../src/styles/chapter-confirm.css";
 
 type ProductionScenario =
   | "default"

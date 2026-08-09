@@ -64,6 +64,11 @@ export function liveBookTitle(uploadedFile?: UploadedCourseFile | null, scan?: S
   return isBiologyGeneticsBookTitle(title) ? BIOLOGY_BOOK_DISPLAY_NAME : title;
 }
 
+export function fileTitleBeforeParenthesis(fileName: string) {
+  const [titleBeforeParenthesis] = fileName.split(/[（(]/u, 1);
+  return titleBeforeParenthesis.trim() || fileName.trim();
+}
+
 
 export function QuickAction({ icon, title, helper, onClick }: { icon: ReactNode; title: string; helper: string; onClick: () => void }) {
   return (

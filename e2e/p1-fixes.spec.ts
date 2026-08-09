@@ -77,30 +77,50 @@ test.describe("P1 learning flow safeguards", () => {
     await page.locator(".nav-upload").click();
     await expect(page.locator(".upload-flow-screen")).toBeVisible();
 
+    const sourceCopy = page.locator(".upload-source-copy");
+    const emptySourceCopy = await sourceCopy.innerText();
+
     await page.locator('input[type="file"]').setInputFiles({
       name: "biology-confirmation.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 confirmation fixture")
     });
-    await expect(page.locator(".upload-selection-summary")).toContainText("biology-confirmation.pdf");
-    await expect(page.locator(".upload-selection-summary")).toContainText("PDF 教材");
+    const selectedFileTile = page.locator(".upload-add-tile.has-selection");
+    await expect(selectedFileTile).toContainText("文件一");
+    await expect(selectedFileTile).not.toContainText("biology-confirmation.pdf");
+    await expect(selectedFileTile).toHaveAccessibleName("已选择 1 份学习资料");
+    await expect(selectedFileTile.locator(".upload-selected-file-icon")).toBeVisible();
+    await expect(selectedFileTile.locator(".upload-add-icon")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "添加更多学习资料", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "删除文件一", exact: true })).toBeVisible();
+    await expect(page.locator(".upload-selection-summary")).toHaveCount(0);
     await expect(page.locator(".parse-ready-screen")).toHaveCount(0);
+    expect(await sourceCopy.innerText()).toBe(emptySourceCopy);
     await expectNoHorizontalOverflow(page);
 
-    await page.getByRole("button", { name: "取消选择", exact: true }).click();
-    await expect(page.locator(".upload-selection-summary")).toHaveCount(0);
-
-    await page.locator('input[type="file"]').setInputFiles({
-      name: "biology-confirmation.pdf",
+    const replacementChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "添加更多学习资料", exact: true }).click();
+    await (await replacementChooser).setFiles({
+      name: "biology-replacement (publisher).pdf",
       mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4 confirmation fixture")
+      buffer: Buffer.from("%PDF-1.4 replacement fixture")
     });
+    await expect(selectedFileTile).toContainText("文件二");
+    await expect(selectedFileTile).not.toContainText("biology-replacement (publisher).pdf");
+    await page.getByRole("button", { name: "删除文件一", exact: true }).click();
+    await expect(selectedFileTile).toHaveAccessibleName("已选择 1 份学习资料");
+    await expect(selectedFileTile).toContainText("文件一");
+    await expect(selectedFileTile).not.toContainText("文件二");
+
     await page.getByRole("button", { name: "上传并继续", exact: true }).click();
     await expect(page.locator(".parse-ready-screen")).toBeVisible();
-    await expect(page.getByText("点击下方按钮后才会开始后台解析", { exact: false })).toBeVisible();
+    await expect(page.locator(".parse-info-grid")).toContainText("后台解析");
+    await expect(page.locator(".parse-ready-summary h2")).toHaveText("biology-replacement");
+    await expect(page.locator(".parse-ready-summary h2")).toHaveAttribute("title", "biology-replacement (publisher).pdf");
+    await expect(page.locator(".parse-checklist")).toHaveCount(0);
     await expect(page.locator(".processing-flow-screen")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "开始后台解析", exact: true }).click();
+    await page.getByRole("button", { name: "开始解析", exact: true }).click();
     await expect(page.locator(".processing-flow-screen")).toBeVisible();
   });
 

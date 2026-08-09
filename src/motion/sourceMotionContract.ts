@@ -22,7 +22,8 @@ const easingTokens = new Map([
   ["--motion-ease-local-enter", "cubic-bezier(.22, 1, .36, 1)"],
   ["--motion-ease-local-exit", "cubic-bezier(.32, 0, .67, 0)"],
   ["--motion-ease-local-state", "cubic-bezier(.65, 0, .35, 1)"],
-  ["--motion-ease-progress", "cubic-bezier(.4, 0, .2, 1)"]
+  ["--motion-ease-progress", "cubic-bezier(.4, 0, .2, 1)"],
+  ["--motion-ease-sprite", "steps(8,end)"]
 ]);
 
 const loadingAnimations = new Map([
@@ -30,6 +31,7 @@ const loadingAnimations = new Map([
   ["mistake-loading-pulse", "--motion-ease-local-state"],
   ["motion-spinner", "linear"],
   ["motion-skeleton-pulse", "--motion-ease-local-state"],
+  ["processing-cloud-sprite-loading", "--motion-ease-sprite"],
   ["study-loading-shimmer", "linear"]
 ]);
 
@@ -731,5 +733,6 @@ export const semanticMotionTokenFixture = `
   --motion-ease-local-exit: cubic-bezier(.32, 0, .67, 0);
   --motion-ease-local-state: cubic-bezier(.65, 0, .35, 1);
   --motion-ease-progress: cubic-bezier(.4, 0, .2, 1);
+  --motion-ease-sprite: steps(8,end);
 }
 `;

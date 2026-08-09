@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { validateCourseFile } from "./shared";
-import { startConfirmedCourseParse, uploadConfirmedCourseFile } from "./uploadFlow";
+import { startConfirmedCourseParse, uploadConfirmedCourseFile, uploadConfirmedCourseFiles } from "./uploadFlow";
 
 const selectedPdf = {
   name: "biology.pdf",
@@ -60,5 +60,36 @@ describe("upload confirmation flow", () => {
     expect(startParse).not.toHaveBeenCalled();
     await startConfirmedCourseParse(uploadedFile, { startParse });
     expect(startParse).toHaveBeenCalledWith("book_selected");
+  });
+
+  it("adds supporting materials to the primary upload before parsing", async () => {
+    const supportingPdf = {
+      name: "biology-notes.pdf",
+      size: 1024,
+      type: "application/pdf"
+    } as File;
+    const initUpload = vi.fn().mockResolvedValue({
+      book_id: "book_selected",
+      upload_url: "demo://selected",
+      max_upload_bytes: 20_000_000
+    });
+    const uploadFile = vi.fn().mockResolvedValue({
+      book_id: "book_selected",
+      filename: selectedPdf.name,
+      size_bytes: selectedPdf.size,
+      status: "uploaded"
+    });
+
+    const uploaded = await uploadConfirmedCourseFiles(
+      [selectedPdf, supportingPdf],
+      { initUpload, uploadFile },
+      456
+    );
+
+    expect(initUpload).toHaveBeenCalledTimes(1);
+    expect(uploadFile).toHaveBeenNthCalledWith(1, "book_selected", selectedPdf);
+    expect(uploadFile).toHaveBeenNthCalledWith(2, "book_selected", supportingPdf);
+    expect(uploaded.name).toBe("biology.pdf");
+    expect(uploaded.uploadedAt).toBe(456);
   });
 });
