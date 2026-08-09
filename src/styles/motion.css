@@ -70,7 +70,15 @@
 .motion-screen-transition[data-motion-state="transitioning"] > .motion-screen-surface {
   animation-duration: var(--motion-duration-global);
   animation-fill-mode: both;
-  will-change: opacity, transform;
+  will-change: transform;
+}
+
+/* Screen bodies use translucent surfaces, so cross-fading two live trees makes
+   text and cards visibly double-expose. Keep the outgoing tree mounted only for
+   generation-safe cleanup; the fully opaque current tree owns every painted
+   transition frame. */
+.motion-screen-transition[data-motion-state="transitioning"] {
+  overflow: clip;
 }
 
 .motion-screen-transition[data-motion-state="transitioning"]
@@ -85,6 +93,7 @@
   position: absolute;
   z-index: 0;
   inset: 0;
+  visibility: hidden;
   pointer-events: none;
   animation-timing-function: var(--motion-ease-global-exit);
 }
@@ -135,12 +144,10 @@
 
 @keyframes motion-screen-phone-forward-in {
   from {
-    opacity: 0;
     transform: translateX(var(--motion-distance-medium));
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }
@@ -159,12 +166,10 @@
 
 @keyframes motion-screen-phone-back-in {
   from {
-    opacity: 0;
     transform: translateX(calc(0px - var(--motion-distance-medium)));
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }
@@ -183,12 +188,10 @@
 
 @keyframes motion-screen-replace-in {
   from {
-    opacity: 0;
     transform: translateY(var(--motion-screen-replace-distance));
   }
 
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }
@@ -207,12 +210,10 @@
 
 @keyframes motion-screen-tablet-in {
   from {
-    opacity: 0;
     transform: translateY(var(--motion-distance-small));
   }
 
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }
@@ -231,12 +232,10 @@
 
 @keyframes motion-screen-short-forward-in {
   from {
-    opacity: 0;
     transform: translateX(var(--motion-distance-small));
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }
@@ -255,12 +254,10 @@
 
 @keyframes motion-screen-short-back-in {
   from {
-    opacity: 0;
     transform: translateX(calc(0px - var(--motion-distance-small)));
   }
 
   to {
-    opacity: 1;
     transform: translateX(0);
   }
 }

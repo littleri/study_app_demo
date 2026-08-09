@@ -55,8 +55,10 @@ async function readAnimation(locator: Locator) {
       duration: style.animationDuration,
       fillMode: style.animationFillMode,
       name: style.animationName,
+      opacity: style.opacity,
       playState: style.animationPlayState,
       timing: style.animationTimingFunction,
+      visibility: style.visibility,
       willChange: style.willChange
     };
   });
@@ -525,14 +527,18 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     const previous = root.locator(':scope > [data-motion-surface="previous"]');
     await expect(current).toHaveCount(1);
     await expect(previous).toHaveCount(1);
-    const entering = await readAnimation(current);
-    const exiting = await readAnimation(previous);
+    const [entering, exiting] = await Promise.all([
+      readAnimation(current),
+      readAnimation(previous)
+    ]);
     expect(entering).toMatchObject({ duration: "0.35s", fillMode: "both", playState: "paused" });
     expect(exiting).toMatchObject({ duration: "0.35s", fillMode: "both", playState: "paused" });
     expect(normalizeTimingFunction(entering.timing)).toBe(curves.globalEnter);
     expect(normalizeTimingFunction(exiting.timing)).toBe(curves.globalExit);
     await expect(previous).toHaveAttribute("aria-hidden", "true");
     await expect(previous).toHaveAttribute("inert", "");
+    expect(exiting.visibility, "the retained outgoing tree never paints behind translucent destination content").toBe("hidden");
+    expect(entering.opacity, "the destination owns every transition frame without cross-fading").toBe("1");
     await dispatchAnimation(previous, "animationend");
     await expect(root).toHaveAttribute("data-motion-state", "transitioning");
     await dispatchAnimation(current, "animationend", "motion-toast-in");
