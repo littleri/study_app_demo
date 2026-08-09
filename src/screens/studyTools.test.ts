@@ -6,7 +6,8 @@ describe("study tool registry", () => {
     expect(studyToolDefinitions.map((tool) => tool.id)).toEqual([
       "source",
       "assignment",
-      "flashcards"
+      "flashcards",
+      "mistakes"
     ]);
   });
 

@@ -93,7 +93,7 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   lesson: { title: "章节学习", subtitle: "第 2 章 1 节", back: true, hideNav: true },
   assignment: { title: "作业练习", subtitle: "按顺序练习，定位卡点", back: true, hideNav: true },
   diagnosis: { title: "作业诊断", subtitle: "看懂原因，马上巩固", back: true, hideNav: true },
-  mistakes: { title: "错题本", subtitle: "按知识点复习", back: true, hideNav: true },
+  mistakes: { title: "错题集", subtitle: "重做卡点，直到真正掌握", back: true, hideNav: true },
   notes: { title: "导学笔记", subtitle: "沉淀学习产出", back: true, hideNav: true },
   source: { title: "原文文档", subtitle: "定位到引用页", back: true, hideNav: true },
   export: { title: "导出预览", subtitle: "选择要导出的模块", back: true, hideNav: true },

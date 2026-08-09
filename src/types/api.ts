@@ -383,6 +383,13 @@ export type MistakeRecord = {
   stuck_point: string;
   knowledge_points: string[];
   citation_ids: string[];
+  correct_answer?: string | null;
+  explanation?: string | null;
+  mistake_reason?: "knowledge_gap" | "misread" | "calculation" | "method_unfamiliar" | "unknown" | null;
+  error_count?: number | null;
+  last_wrong_at?: string | null;
+  next_review_at?: string | null;
+  mastery?: "due" | "learning" | "repeated" | "mastered" | null;
 };
 
 export type StudyTask = {

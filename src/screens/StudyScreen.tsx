@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   BookOpenText,
+  BookX,
   Check,
   ChevronDown,
   ChevronRight,
@@ -31,7 +32,8 @@ import { calculateChapterProgress } from "./studyProgress";
 const toolIcons: Record<StudyToolId, ComponentType<{ size?: number; "aria-hidden"?: boolean }>> = {
   source: BookOpenText,
   assignment: ClipboardCheck,
-  flashcards: Layers3
+  flashcards: Layers3,
+  mistakes: BookX
 };
 
 function getDefaultLocation(chapters: ApiChapter[]): StudyLocation {
@@ -102,7 +104,11 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
       });
       return;
     }
-    go(toolId === "assignment" ? "assignment" : "flashcards");
+    if (toolId === "assignment") {
+      go("assignment");
+      return;
+    }
+    go(toolId === "mistakes" ? "mistakes" : "flashcards");
   }
 
   return (
@@ -135,6 +141,15 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
                     <small>知识检测</small>
                     <strong>这一节的核心概念是？</strong>
                     <span><b>A</b>选择你的答案</span>
+                  </span>
+                ) : tool.id === "mistakes" ? (
+                  <span className="study-mistake-preview">
+                    <span className="study-mistake-preview-head">
+                      <small>今日待复习</small>
+                      <strong>3 道</strong>
+                    </span>
+                    <span className="study-mistake-preview-row"><i />减数分裂 <b>错 2 次</b></span>
+                    <span className="study-mistake-preview-row"><i />同源染色体 <b>待复习</b></span>
                   </span>
                 ) : (
                   <span className="study-flashcard-preview">
