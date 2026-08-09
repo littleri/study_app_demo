@@ -59,10 +59,17 @@ test.describe("study directory flow", () => {
 
     await expect(page.getByRole("button", { name: "更多功能 预留新学习工具", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "进入学习", exact: true }).click();
+    await expect(page.locator(".lesson-screen")).toBeVisible();
+    await expect(page.locator(".lesson-title-card h2")).toContainText("减数分裂和受精作用");
+    await page.getByRole("button", { name: "查看引用", exact: true }).click();
     await expect(page.getByRole("heading", { name: "原文文档", exact: true })).toBeVisible();
-    await expect(page.getByText("教材第 16-26 页（PDF 第 11-21 页）", { exact: false })).toBeVisible();
+    await expect(page.getByText("教材第 16 页（PDF 第 11 页）", { exact: false })).toBeVisible();
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+    await expect(page.locator(".lesson-screen")).toBeVisible();
+    await page.getByRole("button", { name: "返回学习目录", exact: true }).click();
+    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+    await expect(page.locator(".book-course-screen")).toBeVisible();
     await expect(secondChapter).toHaveAttribute("aria-expanded", "true");
 
     await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();

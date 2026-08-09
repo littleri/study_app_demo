@@ -1,201 +1,280 @@
-import {
-  ArrowRight,
-  BookOpen,
-  CalendarDays,
-  CircleAlert,
-  ClipboardCheck,
-  Cloud,
-  FileText,
-  Play,
-  Upload
-} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, CalendarDays, CircleAlert, Upload } from "lucide-react";
+import { HomeBookCarousel } from "../components/home/HomeBookCarousel";
+import { SelectedBookWorkspace } from "../components/home/SelectedBookWorkspace";
+import type { ChapterToolId } from "../components/study/ChapterToolCards";
 import { useAppContext } from "../context/AppContext";
-import { CourseCardMotion, SkeletonReveal } from "../motion";
+import { demoShelfBooks } from "../data/demoShelfBooks";
+import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
+import {
+  buildHomeBookModels,
+  canOpenHomeBookOriginal,
+  resolveHomeBookListState,
+  resolveHomeBookSelection,
+  resolveHomeBookStatusAction,
+  type HomeBookModel
+} from "./homeBookModel";
+import { buildHomeGlobalActions, type HomeGlobalActionId } from "./homeGlobalActions";
+import { resolveHomeNextStep } from "./homeNextStep";
 
-type JourneyStepState = "done" | "active" | "error" | "pending";
+function globalActionIcon(actionId: HomeGlobalActionId) {
+  switch (actionId) {
+    case "plan":
+      return <CalendarDays size={20} aria-hidden="true" />;
+    case "mistakes":
+      return <CircleAlert size={20} aria-hidden="true" />;
+    case "upload":
+      return <Upload size={20} aria-hidden="true" />;
+  }
+}
 
 export function HomeScreen() {
   const {
+    cancelCourseSelection,
     courseSummaries,
     courseSummariesError,
     courseSummariesLoadState,
     courseSummariesReadyKind,
     courseSummariesRefreshing,
+    currentStudyPlan,
+    demoShelfEnabled,
+    generatedFlashcards,
+    generatedLessons,
+    generatedQuizzes,
     go,
-    parsedChapters,
+    loadedBookId,
+    openSourcePage,
     parseJobId,
     parseJobStatus,
+    parsedAssets,
+    parsedChapters,
+    parsedChunks,
+    parsedScanResult,
+    pendingBookId,
     refreshCourses,
+    selectCourse,
+    setActiveChapterId,
+    studyLocations,
+    updateStudyLocation,
     uploadedFile
   } = useAppContext();
-  const uploadedCourse = uploadedFile
-    ? courseSummaries.find((course) => course.book_id === uploadedFile.bookId) ?? null
-    : null;
-  const latestCourse = uploadedCourse ?? courseSummaries[0] ?? null;
-  const courseCardBookId = uploadedFile?.bookId ?? latestCourse?.book_id ?? null;
-  const hasLiveCourse = Boolean(uploadedFile || latestCourse);
-  const localJobMatches = Boolean(
-    parseJobId
-      && uploadedFile
-      && (!parseJobStatus || parseJobStatus.book_id === uploadedFile.bookId)
+  const books = useMemo(() => buildHomeBookModels({
+    courses: courseSummaries,
+    uploadedFile,
+    parseJobId,
+    parseJobStatus,
+    loadedBookId,
+    loadedChapterCount: loadedBookId === uploadedFile?.bookId ? parsedChapters?.length ?? 0 : 0,
+    catalogBooks: demoShelfEnabled && courseSummariesLoadState === "ready"
+      ? demoShelfBooks
+      : undefined
+  }), [
+    courseSummaries,
+    courseSummariesLoadState,
+    demoShelfEnabled,
+    loadedBookId,
+    parseJobId,
+    parseJobStatus,
+    parsedChapters,
+    uploadedFile
+  ]);
+  const [selectedBookId, setSelectedBookId] = useState<string | null>(null);
+  const hasUserSelectedBookRef = useRef(false);
+  const booksRef = useRef(books);
+  const selectCourseRef = useRef(selectCourse);
+  booksRef.current = books;
+  selectCourseRef.current = selectCourse;
+  const [failedSelectionBookId, setFailedSelectionBookId] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const listState = resolveHomeBookListState({
+    bookCount: books.length,
+    loadState: courseSummariesLoadState,
+    readyKind: courseSummariesReadyKind
+  });
+  const selectedBook = books.find((book) => book.bookId === selectedBookId) ?? null;
+  const hasLocalSelectedUpload = Boolean(
+    selectedBook
+    && uploadedFile?.bookId === selectedBook.bookId
+    && uploadedFile.origin !== "remote-course"
   );
-  const localJobState = localJobMatches ? parseJobStatus?.status ?? "processing" : null;
-  const courseStatus = parsedChapters?.length
-    ? "ready"
-    : localJobState === "pending" || localJobState === "processing"
-      ? "processing"
-      : localJobState === "failed"
-        ? "error"
-        : latestCourse?.status ?? (uploadedFile ? "uploaded" : "empty");
-  const isProcessing = courseStatus === "processing";
-  const isReady = courseStatus === "ready";
-  const needsReview = courseStatus === "needs_review";
-  const hasError = courseStatus === "error";
-  const parseProgress = Math.max(
-    0,
-    Math.min(100, localJobMatches ? parseJobStatus?.progress ?? 1 : latestCourse?.parse_job_progress ?? 1)
+  const canOpenSelectedOriginal = Boolean(
+    selectedBook && canOpenHomeBookOriginal(selectedBook, uploadedFile)
   );
-  const courseTitle = uploadedFile?.name ?? latestCourse?.title ?? "还没有课程";
-  const courseCount = parsedChapters?.length ?? latestCourse?.chapter_count ?? 0;
-  const progressTarget = parseJobId ? "processing" : "library";
-  const primaryTarget = !hasLiveCourse
-    ? "upload"
-    : isProcessing || hasError
-      ? progressTarget
-      : courseStatus === "uploaded" && uploadedFile
-        ? "parseReady"
-        : isReady
-          ? "study"
-          : "library";
-  const primaryLabel = !hasLiveCourse
-    ? "上传第一本教材"
-    : isProcessing
-      ? "查看解析进度"
-      : hasError
-        ? "处理解析问题"
-        : needsReview
-          ? "确认课程目录"
-          : isReady
-            ? "继续学习"
-            : "继续生成课程";
-  const nextTitle = isProcessing
-    ? parseJobStatus?.message ?? latestCourse?.parse_job_message ?? "正在把教材整理成可学习的课程"
-    : hasError
-      ? parseJobStatus?.error ?? latestCourse?.parse_job_error ?? "解析遇到问题，需要你的确认"
-      : parsedChapters?.[0]?.ai_title
-        ?? latestCourse?.next_title
-        ?? (hasLiveCourse ? "等待生成课程目录" : "把手边的教材变成一条清晰的学习路径");
-  const focusDescription = isProcessing
-    ? "任务会在后台继续，完成后自动生成原书目录。"
-    : hasError
-      ? "查看具体原因后可以继续处理或重新上传。"
-      : isReady
-        ? `已保留原书结构，共识别 ${courseCount} 个目录项。`
-        : needsReview
-          ? "确认章节边界后，计划、问答与诊断会一起解锁。"
-          : hasLiveCourse
-            ? "下一步会保留原书章节，并建立可追溯的知识库。"
-            : "支持 PDF、图片和 Office 文档，解析过程清晰可追踪。";
-  const focusStateLabel = isProcessing
-    ? `生成中 ${parseProgress}%`
-    : hasError
-      ? "需要处理"
-      : isReady
-        ? "学习路径已就绪"
-        : needsReview
-          ? "等待确认"
-          : hasLiveCourse
-            ? "准备生成"
-            : "等待教材";
+  const selectedLoadedReady = Boolean(
+    selectedBook?.status === "ready"
+    && hasCompleteLoadedCourseContext({
+      loadedBookId,
+      uploadedFile,
+      parsedScanResult,
+      parsedChapters,
+      parsedChunks,
+      parsedAssets,
+      currentStudyPlan,
+      generatedLessons,
+      generatedFlashcards,
+      generatedQuizzes
+    }, selectedBook.bookId)
+  );
+  const nextStep = useMemo(() => (
+    selectedLoadedReady && loadedBookId
+      ? resolveHomeNextStep({
+          chapters: parsedChapters ?? [],
+          location: studyLocations[loadedBookId],
+          plan: currentStudyPlan,
+          lessons: generatedLessons
+        })
+      : null
+  ), [
+    currentStudyPlan,
+    generatedLessons,
+    loadedBookId,
+    parsedChapters,
+    selectedLoadedReady,
+    studyLocations
+  ]);
+
+  useEffect(() => {
+    setSelectedBookId((current) => {
+      if (
+        !hasUserSelectedBookRef.current
+        && loadedBookId
+        && books.some((book) => book.bookId === loadedBookId)
+      ) {
+        return loadedBookId;
+      }
+      return resolveHomeBookSelection(books, current, loadedBookId);
+    });
+  }, [books, loadedBookId]);
+
+  useEffect(() => {
+    if (pendingBookId && !books.some((book) => book.bookId === pendingBookId)) {
+      cancelCourseSelection();
+    }
+  }, [books, cancelCourseSelection, pendingBookId]);
+
+  useEffect(() => {
+    if (failedSelectionBookId && !books.some((book) => book.bookId === failedSelectionBookId)) {
+      setFailedSelectionBookId(null);
+      setSelectionError(null);
+    }
+  }, [books, failedSelectionBookId]);
+
+  useEffect(() => {
+    if (
+      !selectedBook
+      || selectedBook.status !== "ready"
+      || selectedBook.bookId === loadedBookId
+      || selectedBook.bookId === failedSelectionBookId
+    ) return;
+
+    let active = true;
+    const candidateBookId = selectedBook.bookId;
+    const previousLoadedBookId = loadedBookId;
+    void selectCourseRef.current(candidateBookId).then((opened) => {
+      if (!active || opened) return;
+      setFailedSelectionBookId(candidateBookId);
+      const previousBook = previousLoadedBookId
+        ? booksRef.current.find((book) => book.bookId === previousLoadedBookId) ?? null
+        : null;
+      if (previousBook) {
+        setSelectedBookId(previousBook.bookId);
+        setSelectionError(`未能打开《${selectedBook.title}》，已回到《${previousBook.title}》。`);
+      } else {
+        setSelectionError(`未能打开《${selectedBook.title}》。请检查连接后重试。`);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [failedSelectionBookId, loadedBookId, selectedBook?.bookId, selectedBook?.status, selectedBook?.title]);
+
+  function handleSelectBook(bookId: string) {
+    const nextBook = books.find((book) => book.bookId === bookId);
+    if (!nextBook) return;
+    if (bookId === selectedBookId) return;
+    hasUserSelectedBookRef.current = true;
+    if (pendingBookId && pendingBookId !== bookId) cancelCourseSelection();
+    setFailedSelectionBookId(null);
+    setSelectionError(null);
+    setSelectedBookId(bookId);
+  }
+
+  function retrySelectedBook() {
+    setSelectionError(null);
+    setFailedSelectionBookId(null);
+    if (failedSelectionBookId && books.some((book) => book.bookId === failedSelectionBookId)) {
+      setSelectedBookId(failedSelectionBookId);
+    }
+  }
+
+  async function openBookStatus(book: HomeBookModel) {
+    const action = resolveHomeBookStatusAction({ book, uploadedFile, parseJobId, parseJobStatus });
+    if (action === "chapterConfirm") {
+      if (await selectCourse(book.bookId)) go("chapterConfirm");
+    } else {
+      go(action);
+    }
+  }
+
+  function restartSelectedBook() {
+    go(hasLocalSelectedUpload ? "parseReady" : "upload");
+  }
+
+  function openSelectedOriginal() {
+    if (!selectedBook || !canOpenSelectedOriginal) return;
+    openSourcePage({
+      bookId: selectedBook.bookId,
+      title: selectedBook.title,
+      pageStart: 1,
+      pageEnd: 1,
+      from: "home"
+    });
+  }
+
+  function setNextStepContext() {
+    if (!selectedLoadedReady || !loadedBookId || !nextStep) return false;
+    setActiveChapterId(nextStep.chapter.chapter_id);
+    updateStudyLocation(loadedBookId, {
+      expandedChapterId: nextStep.expandedChapterId,
+      expandedSectionId: nextStep.chapter.chapter_id
+    });
+    return true;
+  }
+
+  function continueNextStep() {
+    if (!setNextStepContext()) return;
+    go("study");
+  }
+
+  function openNextStepSource() {
+    if (!setNextStepContext() || !loadedBookId || !nextStep) return;
+    openSourcePage({
+      bookId: loadedBookId,
+      title: nextStep.chapter.source_title,
+      pageStart: nextStep.chapter.page_start,
+      pageEnd: nextStep.chapter.page_end,
+      printedPageStart: nextStep.chapter.printed_page_start,
+      printedPageEnd: nextStep.chapter.printed_page_end,
+      from: "home"
+    });
+  }
+
+  function openNextStepTool(toolId: ChapterToolId) {
+    if (!setNextStepContext()) return;
+    go(toolId === "assignment" ? "assignment" : "flashcards");
+  }
+
+  const globalActions = buildHomeGlobalActions({
+    listState,
+    selectedBookId: selectedBook?.bookId ?? null,
+    selectedLoadedReady,
+    plan: currentStudyPlan
+  });
+
   const courseErrorMessage = courseSummariesError?.includes("Failed to fetch")
     ? "暂时无法连接课程服务"
     : courseSummariesError ?? "请稍后重试";
-
-  const firstStepState: JourneyStepState = hasError
-    ? "error"
-    : isProcessing
-      ? "active"
-      : isReady || needsReview || courseCount > 0
-        ? "done"
-        : "pending";
-  const secondStepState: JourneyStepState = courseCount > 0
-    ? "done"
-    : isProcessing
-      ? "pending"
-      : "pending";
-  const thirdStepState: JourneyStepState = isReady
-    ? "done"
-    : needsReview
-      ? "active"
-      : "pending";
-  const journeySteps: Array<{
-    label: string;
-    detail: string;
-    state: JourneyStepState;
-    target: Parameters<typeof go>[0];
-  }> = [
-    {
-      label: "解析教材",
-      detail: isProcessing ? `${parseProgress}%` : hasError ? "异常" : firstStepState === "done" ? "完成" : "未开始",
-      state: firstStepState,
-      target: hasLiveCourse ? progressTarget : "upload"
-    },
-    {
-      label: "生成目录",
-      detail: courseCount > 0 ? `${courseCount} 项` : isProcessing ? "等待解析" : "未开始",
-      state: secondStepState,
-      target: hasLiveCourse ? primaryTarget : "upload"
-    },
-    {
-      label: "建立知识库",
-      detail: isReady ? "可提问" : needsReview ? "待确认" : "未开始",
-      state: thirdStepState,
-      target: isReady ? "study" : primaryTarget
-    }
-  ];
-
-  const tools = [
-    {
-      icon: <Upload size={20} aria-hidden="true" />,
-      title: "上传新书",
-      helper: "生成 AI 课程",
-      onClick: () => go("upload"),
-      tone: "sky"
-    },
-    {
-      icon: <CalendarDays size={20} aria-hidden="true" />,
-      title: "学习计划",
-      helper: isReady ? "按进度安排" : "课程就绪后可用",
-      onClick: () => go(isReady && parsedChapters?.length ? "plan" : primaryTarget),
-      tone: "violet"
-    },
-    {
-      icon: <ClipboardCheck size={20} aria-hidden="true" />,
-      title: "作业诊断",
-      helper: isReady ? "带原文引用" : "课程就绪后可用",
-      onClick: () => go(isReady && parsedChapters?.length ? "assignment" : primaryTarget),
-      tone: "mint"
-    },
-    {
-      icon: <CircleAlert size={20} aria-hidden="true" />,
-      title: "错题复习",
-      helper: isReady ? "回到薄弱点" : "暂无记录",
-      onClick: () => go(isReady && parsedChapters?.length ? "mistakes" : primaryTarget),
-      tone: "coral"
-    }
-  ] as const;
-
-  const courseError = (
-    <div className="home-course-error" role="alert">
-      <span>
-        <strong>课程列表暂时不可用</strong>
-        <small>{courseErrorMessage}</small>
-      </span>
-      <button type="button" disabled={courseSummariesRefreshing} onClick={() => void refreshCourses()}>
-        {courseSummariesRefreshing ? "重试中…" : "重试"}
-      </button>
-    </div>
-  );
 
   return (
     <div className="home-dashboard">
@@ -204,142 +283,90 @@ export function HomeScreen() {
           <h1>Hi，小明同学</h1>
           <p>今天，沿着原书继续前进</p>
         </div>
-        <span className={`home-presence is-${courseStatus}`}>
-          <Cloud size={16} aria-hidden="true" />
-          {focusStateLabel}
-        </span>
+        <button
+          className="home-import-course-action"
+          type="button"
+          aria-label="导入课程"
+          onClick={() => go("upload")}
+        >
+          <Upload size={16} aria-hidden="true" />
+          <span>导入课程</span>
+        </button>
       </header>
 
-      <section className={`home-focus-panel is-${courseStatus}`} data-brand-moment="home-task" aria-labelledby="home-focus-title">
-        <div className="home-focus-content">
-          <div className="home-focus-label">
-            <CalendarDays size={16} aria-hidden="true" />
-            <span>今日下一步</span>
-          </div>
-          <p className="home-focus-course" title={courseTitle}>{courseTitle}</p>
-          <h2 id="home-focus-title">{nextTitle}</h2>
-          <p className="home-focus-description">{focusDescription}</p>
-          {isProcessing ? (
-            <div className="home-focus-progress" aria-label={`解析进度 ${parseProgress}%`}>
-              <span style={{ transform: `scaleX(${parseProgress / 100})` }} />
-            </div>
-          ) : null}
-          <button className="home-primary-action" type="button" onClick={() => go(primaryTarget)}>
-            {hasLiveCourse ? <Play size={17} aria-hidden="true" /> : <Upload size={17} aria-hidden="true" />}
-            <span>{primaryLabel}</span>
-            <ArrowRight size={16} aria-hidden="true" />
+      {listState === "error" || Boolean(courseSummariesError && listState === "content") ? (
+        <div className="home-course-error" role="alert">
+          <span>
+            <strong>教材列表暂时无法更新</strong>
+            <small>{courseErrorMessage}</small>
+          </span>
+          <button type="button" disabled={courseSummariesRefreshing} onClick={() => void refreshCourses()}>
+            {courseSummariesRefreshing ? "重试中…" : "重新加载"}
           </button>
         </div>
+      ) : null}
 
-        <div className="home-learning-path" aria-label="课程生成路径">
-          {journeySteps.map((step, index) => (
-            <button
-              className={`home-path-step is-${step.state}`}
-              key={step.label}
-              type="button"
-              onClick={() => go(step.target)}
-            >
-              <span className="home-path-marker" aria-hidden="true">{index + 1}</span>
-              <span>
-                <strong>{step.label}</strong>
-                <small>{step.detail}</small>
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
+      {listState !== "error" ? (
+        <>
+          <HomeBookCarousel
+            books={books}
+            selectedBookId={selectedBookId}
+            listState={listState}
+            onSelectBook={handleSelectBook}
+            onAddBook={() => go("upload")}
+            onOpenLibrary={() => go("library")}
+          />
 
-      <div className="home-overview-grid">
-        <section className="home-course-panel" aria-labelledby="home-course-heading">
+          <SelectedBookWorkspace
+            book={selectedBook}
+            canOpenOriginal={canOpenSelectedOriginal}
+            hasLocalUploadSession={hasLocalSelectedUpload}
+            listState={listState}
+            loadedBookId={loadedBookId}
+            pendingBookId={pendingBookId}
+            selectionError={selectionError}
+            nextStep={nextStep}
+            onContinue={continueNextStep}
+            onOpenOriginal={openSelectedOriginal}
+            onOpenSource={openNextStepSource}
+            onRestart={restartSelectedBook}
+            onRetrySelection={retrySelectedBook}
+            onSelectTool={openNextStepTool}
+            onViewStatus={(book) => void openBookStatus(book)}
+            onUpload={() => go("upload")}
+          />
+        </>
+      ) : null}
+
+      {globalActions.length > 0 ? (
+        <section className="home-global-section" aria-labelledby="home-global-heading">
           <div className="home-section-heading">
             <div>
-              <h2 id="home-course-heading">我的课程</h2>
-              <p>最近学习</p>
-            </div>
-            <button type="button" onClick={() => go("library")}>
-              全部 <ArrowRight size={15} aria-hidden="true" />
-            </button>
-          </div>
-
-          {courseSummariesError && courseSummariesLoadState === "ready" ? courseError : null}
-          <SkeletonReveal
-            state={courseSummariesLoadState}
-            readyKind={courseSummariesReadyKind}
-            skeleton={(
-              <div className="home-course-skeleton" aria-hidden="true">
-                <span />
-                <span />
-                <span />
-              </div>
-            )}
-            error={courseError}
-            minBlockSize="66px"
-          >
-            {hasLiveCourse && courseCardBookId ? (
-              <CourseCardMotion bookId={courseCardBookId} index={0}>
-                {(motionAttributes) => {
-                  return (
-                    <button
-                      {...motionAttributes}
-                      className="home-course-row"
-                      type="button"
-                      onClick={() => go(primaryTarget)}
-                    >
-                      <span className="home-course-icon"><BookOpen size={21} aria-hidden="true" /></span>
-                      <span className="home-course-copy">
-                        <strong title={courseTitle}>{courseTitle}</strong>
-                        <small>
-                          {isProcessing
-                            ? `教材解析 ${parseProgress}%`
-                            : courseCount > 0
-                              ? `${courseCount} 个目录项 · ${isReady ? "可以继续学习" : "等待确认"}`
-                              : "等待生成目录"}
-                        </small>
-                      </span>
-                      <ArrowRight size={17} aria-hidden="true" />
-                    </button>
-                  );
-                }}
-              </CourseCardMotion>
-            ) : (
-              <button className="home-course-row is-empty" type="button" onClick={() => go("upload")}>
-                <span className="home-course-icon"><FileText size={21} aria-hidden="true" /></span>
-                <span className="home-course-copy">
-                  <strong>把第一本书变成课程</strong>
-                  <small>上传教材后，从原书目录开始学习</small>
-                </span>
-                <ArrowRight size={17} aria-hidden="true" />
-              </button>
-            )}
-          </SkeletonReveal>
-        </section>
-
-        <nav className="home-tools-panel" aria-labelledby="home-tools-heading">
-          <div className="home-section-heading">
-            <div>
-              <h2 id="home-tools-heading">学习工具</h2>
-              <p>{isReady ? "围绕原书继续" : "随课程逐步解锁"}</p>
+              <h2 id="home-global-heading">学习安排</h2>
+              <p>计划、复习与新教材</p>
             </div>
           </div>
-          <div className="home-tool-grid">
-            {tools.map((tool) => (
+          <div className="home-global-action-list">
+            {globalActions.map((action) => (
               <button
-                className={`home-tool-button is-${tool.tone}`}
-                key={tool.title}
+                className={`home-global-action is-${action.id}`}
+                data-home-global-action={action.id}
+                key={action.id}
                 type="button"
-                aria-label={`${tool.title}，${tool.helper}`}
-                onClick={tool.onClick}
+                aria-label={`${action.title}，${action.helper}`}
+                onClick={() => go(action.target)}
               >
-                <span className="home-tool-icon">{tool.icon}</span>
-                <span>
-                  <strong>{tool.title}</strong>
-                  <small>{tool.helper}</small>
+                <span className="home-global-action-icon">{globalActionIcon(action.id)}</span>
+                <span className="home-global-action-copy">
+                  <strong>{action.title}</strong>
+                  <small>{action.helper}</small>
                 </span>
+                <ArrowRight className="home-global-action-arrow" size={18} aria-hidden="true" />
               </button>
             ))}
           </div>
-        </nav>
-      </div>
+        </section>
+      ) : null}
     </div>
   );
 }

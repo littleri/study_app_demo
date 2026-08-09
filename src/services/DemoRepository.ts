@@ -119,11 +119,13 @@ function asCitation(chapterId: string, chunkId: string, quote: string) {
 export class DemoRepository {
   private readonly jobs = new Map<string, DemoJob>();
   private readonly lessonJobs = new Map<string, number>();
+  private parseJobSequence = 0;
   private state: DemoState = clone(seed);
 
   reset() {
     this.jobs.clear();
     this.lessonJobs.clear();
+    this.parseJobSequence = 0;
     this.state = clone(seed);
   }
 
@@ -179,7 +181,8 @@ export class DemoRepository {
 
   async startParse(bookId: string): Promise<ParseJobResponse> {
     await wait();
-    const jobId = "parse_job_demo";
+    this.parseJobSequence += 1;
+    const jobId = `parse_job_demo_${this.parseJobSequence}`;
     this.jobs.set(jobId, { jobId, bookId, pollCount: 0 });
     return { book_id: bookId, job_id: jobId, status: "pending" };
   }

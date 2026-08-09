@@ -460,7 +460,12 @@ export function AppShell({
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
         {active !== "study" && active !== "book" ? (
-          <GlobalAIAssistant containerElement={appShellElement} containerRef={appShellRef} reducedMotion={motionReduced} />
+          <GlobalAIAssistant
+            containerElement={appShellElement}
+            containerRef={appShellRef}
+            homeLayout={active === "home"}
+            reducedMotion={motionReduced}
+          />
         ) : null}
         {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
         {overlays}
@@ -616,10 +621,12 @@ function getOrbMetrics(shell: HTMLElement): OrbMetrics {
 function GlobalAIAssistant({
   containerElement,
   containerRef,
+  homeLayout,
   reducedMotion
 }: {
   containerElement: HTMLDivElement | null;
   containerRef: RefObject<HTMLDivElement | null>;
+  homeLayout: boolean;
   reducedMotion: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -698,8 +705,12 @@ function GlobalAIAssistant({
     const useLeftDock = shell.clientHeight < 600 && shell.clientWidth > shell.clientHeight;
 
     setOrbPosition((current) => {
-      const defaultTop = metrics.topMin + ((metrics.topMax - metrics.topMin) * 0.65);
-      const nextTop = clamp(current.top || defaultTop, metrics.topMin, metrics.topMax);
+      const defaultTopRatio = homeLayout
+        ? (metrics.visibleHeight < 760 ? .69 : .82)
+        : .65;
+      const defaultTop = metrics.topMin + ((metrics.topMax - metrics.topMin) * defaultTopRatio);
+      const requestedTop = hasDraggedOrbRef.current ? (current.top || defaultTop) : defaultTop;
+      const nextTop = clamp(requestedTop, metrics.topMin, metrics.topMax);
       const nextLeft = current.left === null ? null : clamp(current.left, metrics.leftMin, metrics.leftMax);
       const nextSide = current.left === null && !hasDraggedOrbRef.current
         ? (useLeftDock ? "left" : "right")
@@ -707,7 +718,7 @@ function GlobalAIAssistant({
       if (nextTop === current.top && nextLeft === current.left && nextSide === current.side) return current;
       return { ...current, side: nextSide, top: nextTop, left: nextLeft };
     });
-  }, [containerRef]);
+  }, [containerRef, homeLayout]);
 
   const cancelOrbInteraction = useCallback(() => {
     clearOrbMotion();

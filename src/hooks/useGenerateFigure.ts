@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { ImageGenerationJobResponse, ImageGenerationRequest } from "../types/api";
 
 export function useGenerateFigure() {
+  const bookcourseRepository = useBookCourseRepository();
   const [job, setJob] = useState<ImageGenerationJobResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export function useGenerateFigure() {
     if (!job || job.status === "done" || job.status === "failed") return;
     let active = true;
     const timer = window.setTimeout(() => {
-      bookcourseApi
+      bookcourseRepository
         .getImageGenerationJob(job.job_id)
         .then((result) => {
           if (!active) return;
@@ -31,7 +32,7 @@ export function useGenerateFigure() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [job]);
+  }, [bookcourseRepository, job]);
 
   async function generateForLesson(lessonId: string, payload: ImageGenerationRequest) {
     if (pendingJobIdRef.current || loading || (job && job.status !== "done" && job.status !== "failed")) {
@@ -40,7 +41,7 @@ export function useGenerateFigure() {
     lastRequestRef.current = { lessonId, payload };
     setLoading(true);
     try {
-      const result = await bookcourseApi.generateLessonFigure(lessonId, payload);
+      const result = await bookcourseRepository.generateLessonFigure(lessonId, payload);
       if (result.status !== "done" && result.status !== "failed") {
         pendingJobIdRef.current = result.job_id;
       }
@@ -57,7 +58,7 @@ export function useGenerateFigure() {
   }
 
   async function refresh(jobId: string) {
-    const result = await bookcourseApi.getImageGenerationJob(jobId);
+    const result = await bookcourseRepository.getImageGenerationJob(jobId);
     if (result.status === "done" || result.status === "failed") {
       pendingJobIdRef.current = null;
     }

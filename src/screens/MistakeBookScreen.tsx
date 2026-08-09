@@ -8,8 +8,8 @@ import {
   Card,
   Pill
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { SlidingFilterGroup, useLocalMotionItem } from "../motion";
 
 const allMistakesFilter = "全部";
@@ -21,6 +21,7 @@ const mistakeFilterDefinitions = [
 ] as const;
 
 export function MistakeBookScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { go, uploadedFile } = useAppContext();
   const [filter, setFilter] = useState(allMistakesFilter);
   const [mistakes, setMistakes] = useState<MistakeRecord[]>([]);
@@ -52,7 +53,7 @@ export function MistakeBookScreen() {
     let active = true;
     setLoadingMistakes(true);
     setMistakeError(null);
-    bookcourseApi
+    bookcourseRepository
       .getMistakes(runtimeConfig.defaultUserId, uploadedFile.bookId)
       .then((records) => {
         if (!active) return;
@@ -70,7 +71,7 @@ export function MistakeBookScreen() {
     return () => {
       active = false;
     };
-  }, [uploadedFile]);
+  }, [bookcourseRepository, uploadedFile]);
 
   useEffect(() => {
     if (selectedMistakeId && !filteredMistakes.some((mistake) => mistake.mistake_id === selectedMistakeId)) {

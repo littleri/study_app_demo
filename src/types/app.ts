@@ -47,6 +47,11 @@ export type UploadedCourseFile = {
   sizeBytes: number;
   contentType: string;
   uploadedAt: number;
+  /**
+   * Missing values are treated as local uploads for compatibility with
+   * persisted sessions created before this discriminator was introduced.
+   */
+  origin?: "local-upload" | "remote-course";
 };
 
 export type SourcePageTarget = {

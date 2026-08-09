@@ -23,8 +23,8 @@ import {
   Pill,
   Section
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import {
   CollapsibleRegion,
   MotionErrorShake,
@@ -617,6 +617,7 @@ function ChapterDetailEditor({
 }
 
 export function ChapterConfirmScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { go, openSheet, parsedChapters, parsedScanResult, setActiveChapterId, setCurrentStudyPlan, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLessonBuildJobId, setLessonBuildJobStatus, setParsedChapters, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [generatingCourse, setGeneratingCourse] = useState(false);
@@ -660,7 +661,7 @@ export function ChapterConfirmScreen() {
     if (!uploadedFile) return;
     let active = true;
     setTocLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getTocAnalysis(uploadedFile.bookId)
       .then((analysis) => {
         if (active) setTocAnalysis(analysis);
@@ -674,7 +675,7 @@ export function ChapterConfirmScreen() {
     return () => {
       active = false;
     };
-  }, [showToast, uploadedFile]);
+  }, [bookcourseRepository, showToast, uploadedFile]);
 
   useEffect(() => {
     if (!conflictParentKey) return;
@@ -783,9 +784,9 @@ export function ChapterConfirmScreen() {
     }
     setGeneratingCourse(true);
     try {
-      const confirmedChapters = await bookcourseApi.confirmChapters(uploadedFile.bookId, parsedChapters ?? []);
+      const confirmedChapters = await bookcourseRepository.confirmChapters(uploadedFile.bookId, parsedChapters ?? []);
       setParsedChapters(confirmedChapters);
-      const lessonJob = await bookcourseApi.buildLessons(uploadedFile.bookId, {
+      const lessonJob = await bookcourseRepository.buildLessons(uploadedFile.bookId, {
         force: true
       });
       setLessonBuildJobId(lessonJob.job_id);
@@ -793,7 +794,7 @@ export function ChapterConfirmScreen() {
       let finalJob = lessonJob;
       for (let attempt = 0; attempt < 50 && !isLessonBuildTerminal(finalJob.status); attempt += 1) {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        finalJob = await bookcourseApi.getLessonJob(lessonJob.job_id);
+        finalJob = await bookcourseRepository.getLessonJob(lessonJob.job_id);
         setLessonBuildJobStatus(finalJob);
       }
       if (finalJob.status === "failed") {
@@ -805,9 +806,9 @@ export function ChapterConfirmScreen() {
       }
       const lessons = finalJob.lessons;
       const [cards, quizzes, plan] = await Promise.all([
-        bookcourseApi.buildFlashcards(uploadedFile.bookId, { chapter_ids: finalChapterIds }),
-        bookcourseApi.buildQuizzes(uploadedFile.bookId, { chapter_ids: finalChapterIds }),
-        bookcourseApi.createStudyPlan(uploadedFile.bookId, { user_id: runtimeConfig.defaultUserId })
+        bookcourseRepository.buildFlashcards(uploadedFile.bookId, { chapter_ids: finalChapterIds }),
+        bookcourseRepository.buildQuizzes(uploadedFile.bookId, { chapter_ids: finalChapterIds }),
+        bookcourseRepository.createStudyPlan(uploadedFile.bookId, { user_id: runtimeConfig.defaultUserId })
       ]);
       setGeneratedLessons(lessons);
       setGeneratedFlashcards(cards);
@@ -832,7 +833,7 @@ export function ChapterConfirmScreen() {
         </span>
         <div>
           <Pill tone="purple">{isLiveResult ? "本次文件解析结果" : "等待后端解析结果"}</Pill>
-          <h2>{documentTitle}</h2>
+          <h2 title={documentTitle}>{documentTitle}</h2>
           <p>
             {displayChapters.length > 0
               ? `已识别 ${displayChapters.length} 个目录项 · ${sourceCount} · 平均置信度 ${confidence}%`

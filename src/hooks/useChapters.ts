@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { ApiChapter, ChapterUpdate } from "../types/api";
 
 export function useChapters(bookId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [chapters, setChapters] = useState<ApiChapter[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +13,7 @@ export function useChapters(bookId: string | null) {
     if (!bookId) return;
     let active = true;
     setLoading(true);
-    bookcourseApi
+    bookcourseRepository
       .getChapters(bookId)
       .then((result) => {
         if (!active) return;
@@ -29,12 +30,13 @@ export function useChapters(bookId: string | null) {
     return () => {
       active = false;
     };
-  }, [bookId, reloadKey]);
+  }, [bookcourseRepository, bookId, reloadKey]);
 
   return { chapters, loading, error, retry: () => setReloadKey((value) => value + 1) };
 }
 
 export function useUpdateChapter(bookId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +44,7 @@ export function useUpdateChapter(bookId: string | null) {
     if (!bookId) throw new Error("bookId is required");
     setLoading(true);
     try {
-      const result = await bookcourseApi.updateChapter(bookId, chapterId, payload);
+      const result = await bookcourseRepository.updateChapter(bookId, chapterId, payload);
       setError(null);
       return result;
     } catch (err) {

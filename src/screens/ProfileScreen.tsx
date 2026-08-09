@@ -14,18 +14,26 @@ import {
   Card,
   Metric
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { useLocalMotionItem } from "../motion";
 import {
   SettingsRow
 } from "./shared";
+import { resolveLatestCourseTitle } from "./courseResourceIdentity";
 
 export function ProfileScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { courseSummaries, currentStudyPlan, go, showToast, uploadedFile } = useAppContext();
   const [learningState, setLearningState] = useState<LearningState | null>(null);
-  const courseCount = courseSummaries.length + (uploadedFile && !courseSummaries.some((course) => course.book_id === uploadedFile.bookId) ? 1 : 0);
-  const latestCourseTitle = uploadedFile?.name ?? courseSummaries[0]?.title;
+  const courseCount = courseSummaries.length + (
+    uploadedFile
+    && uploadedFile.origin !== "remote-course"
+    && !courseSummaries.some((course) => course.book_id === uploadedFile.bookId)
+      ? 1
+      : 0
+  );
+  const latestCourseTitle = resolveLatestCourseTitle(uploadedFile, courseSummaries);
   const courseHelper = courseCount > 0
     ? `${courseCount} 门后端课程 · ${latestCourseTitle ?? "管理已导入内容"}`
     : "暂无后端课程 · 上传后自动生成";
@@ -34,13 +42,13 @@ export function ProfileScreen() {
   useEffect(() => {
     if (!uploadedFile) return;
     let active = true;
-    bookcourseApi.getLearningState(runtimeConfig.defaultUserId).then((state) => {
+    bookcourseRepository.getLearningState(runtimeConfig.defaultUserId).then((state) => {
       if (active) setLearningState(state);
     });
     return () => {
       active = false;
     };
-  }, [uploadedFile]);
+  }, [bookcourseRepository, uploadedFile]);
 
   return (
     <div className="screen-stack profile-screen">

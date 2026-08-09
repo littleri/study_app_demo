@@ -14,7 +14,7 @@ export const studyToolDefinitions: readonly StudyToolDefinition[] = [
   {
     id: "source",
     title: "进入学习",
-    description: "阅读教材原页，从上下文开始本节学习"
+    description: "打开本章结构化课程，从目标与原文证据开始学习"
   },
   {
     id: "assignment",

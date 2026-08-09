@@ -1,4 +1,6 @@
-import { demoRepository } from "../services/DemoRepository";
+import { demoRepository, type DemoRepository } from "../services/DemoRepository";
+
+export type BookCourseRepository = DemoRepository;
 
 /**
  * Compatibility boundary for the migrated screens.
@@ -7,4 +9,4 @@ import { demoRepository } from "../services/DemoRepository";
  * in-memory repository backed by committed fixtures, so no browser request
  * can accidentally reach the original backend.
  */
-export const bookcourseApi = demoRepository;
+export const bookcourseApi: BookCourseRepository = demoRepository;

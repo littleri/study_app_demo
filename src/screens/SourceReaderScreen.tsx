@@ -17,7 +17,7 @@ import {
 } from "./shared";
 
 export function SourceReaderScreen() {
-  const { back, go, parsedScanResult, sourcePageTarget, showToast, uploadedFile } = useAppContext();
+  const { back, go, parsedAssets, parsedScanResult, sourcePageTarget, showToast, uploadedFile } = useAppContext();
   const bookId = sourcePageTarget?.bookId ?? uploadedFile?.bookId ?? "";
   const pageCount = parsedScanResult?.page_count ?? null;
   const sourceUnit = parsedScanResult?.source_unit ?? "page";
@@ -26,7 +26,13 @@ export function SourceReaderScreen() {
   const targetEnd = Math.max(targetStart, sourcePageTarget?.pageEnd ?? targetStart);
   const [currentPage, setCurrentPage] = useState(targetStart);
   const [failedImageKey, setFailedImageKey] = useState<string | null>(null);
-  const imageUrl = bookId ? sourcePageImageUrl(bookId, currentPage) : "";
+  const exactPageAsset = parsedAssets?.find((asset) => (
+    asset.source_type === "extracted"
+    && asset.book_id === bookId
+    && asset.page === currentPage
+    && Boolean(asset.source_page_image_url)
+  ));
+  const imageUrl = exactPageAsset?.source_page_image_url ?? (bookId ? sourcePageImageUrl(bookId, currentPage) : "");
   const imageKey = `${bookId}:${currentPage}:${imageUrl}`;
   const imageFailed = Boolean(imageUrl) && failedImageKey === imageKey;
   const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content");

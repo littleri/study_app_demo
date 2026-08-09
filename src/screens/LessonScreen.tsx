@@ -18,8 +18,8 @@ import {
   Pill,
   ProgressBar
 } from "../components/ui";
-import { bookcourseApi } from "../api/bookcourseApi";
 import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { CollapsibleRegion, useLocalMotionItem } from "../motion";
 import {
   isLessonBuildTerminal,
@@ -38,6 +38,7 @@ import {
 } from "./lessonEvidence";
 
 export function LessonScreen() {
+  const bookcourseRepository = useBookCourseRepository();
   const { activeChapterId, generatedFlashcards, generatedLessons, generatedQuizzes, go, lessonBuildJobStatus, openSourcePage, openSheet, parsedAssets, parsedChapters, parsedChunks, setGeneratedFlashcards, setGeneratedLessons, setGeneratedQuizzes, setLessonBuildJobId, setLessonBuildJobStatus, setParsedAssets, showToast, uploadedFile } = useAppContext();
   const [generatingFigure, setGeneratingFigure] = useState(false);
   const [buildingLesson, setBuildingLesson] = useState(false);
@@ -129,22 +130,22 @@ export function LessonScreen() {
     }
     setBuildingLesson(true);
     try {
-      const job = await bookcourseApi.buildLessons(uploadedFile.bookId, { chapter_ids: [liveChapter.chapter_id], force: true });
+      const job = await bookcourseRepository.buildLessons(uploadedFile.bookId, { chapter_ids: [liveChapter.chapter_id], force: true });
       setLessonBuildJobId(job.job_id);
       setLessonBuildJobStatus(job);
       let finalJob = job;
       for (let attempt = 0; attempt < 50 && !isLessonBuildTerminal(finalJob.status); attempt += 1) {
         await new Promise((resolve) => window.setTimeout(resolve, 1000));
-        finalJob = await bookcourseApi.getLessonJob(job.job_id);
+        finalJob = await bookcourseRepository.getLessonJob(job.job_id);
         setLessonBuildJobStatus(finalJob);
       }
       if (finalJob.status === "failed") throw new Error(finalJob.error ?? "本章课程生成失败");
       const generatedChapterIds = successfulLessonChapterIds(finalJob);
       if (generatedChapterIds.length === 0) throw new Error("本次没有章节成功生成课程");
-      const nextLessons = await bookcourseApi.getLessons(uploadedFile.bookId);
+      const nextLessons = await bookcourseRepository.getLessons(uploadedFile.bookId);
       const [cards, quizzes] = await Promise.all([
-        bookcourseApi.buildFlashcards(uploadedFile.bookId, { chapter_ids: generatedChapterIds }),
-        bookcourseApi.buildQuizzes(uploadedFile.bookId, { chapter_ids: generatedChapterIds })
+        bookcourseRepository.buildFlashcards(uploadedFile.bookId, { chapter_ids: generatedChapterIds }),
+        bookcourseRepository.buildQuizzes(uploadedFile.bookId, { chapter_ids: generatedChapterIds })
       ]);
       const affectedChapterIds = new Set(finalJob.chapter_results.map((item) => item.chapter_id));
       setGeneratedLessons(nextLessons);
@@ -166,7 +167,7 @@ export function LessonScreen() {
     }
     setGeneratingFigure(true);
     try {
-      const result = await bookcourseApi.generateAsset({
+      const result = await bookcourseRepository.generateAsset({
         book_id: uploadedFile.bookId,
         lesson_id: lesson?.lesson_id ?? `lesson_${liveChapter.chapter_id}`,
         chapter_id: liveChapter.chapter_id,

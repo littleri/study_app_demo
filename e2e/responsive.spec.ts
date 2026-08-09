@@ -19,6 +19,13 @@ function expectedNavigationMode(viewport: CssViewport): NavigationMode {
   return viewport.width >= 768 && viewport.height >= 600 ? "rail" : "bottom";
 }
 
+async function clickHomeUploadAction(page: Page, label: string) {
+  const uploadAction = page.locator('[data-home-global-action="upload"]');
+  await expect(uploadAction, `${label}: stable home upload action is visible`).toBeVisible();
+  await expect(uploadAction, `${label}: upload action exposes the current value`).toHaveAccessibleName("上传新书，添加另一份教材");
+  await uploadAction.click();
+}
+
 async function expectNavigationMode(page: Page, viewport: CssViewport, label: string) {
   const navigation = page.getByRole("navigation", { name: "主导航" });
   await expect(navigation, `${label}: primary navigation is visible`).toBeVisible();
@@ -52,33 +59,30 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
   expect(widths.contentScrollWidth, `${label}: content does not overflow horizontally`).toBeLessThanOrEqual(widths.contentClientWidth + 1);
 }
 
-const preparedCourseSession = {
-  uploadedFile: {
-    bookId: "book_stage3",
-    name: "stage3-biology.pdf",
-    sizeBytes: 1024,
-    contentType: "application/pdf",
-    uploadedAt: 1
-  },
-  parseJobId: "job_stage3",
-  parseJobStatus: {
-    job_id: "job_stage3",
-    book_id: "book_stage3",
-    status: "pending",
-    stage: "queued",
-    progress: 1,
-    message: "阶段 3 fixture 正在准备课程",
-    error: null
-  }
-};
+function stageFiveScenario(options?: { imageMode?: StageFiveImageMode }) {
+  if (options?.imageMode === "failure") return "image-failure";
+  if (options?.imageMode === "mixed") return "image-mixed";
+  return "library";
+}
 
-async function loadPreparedCourse(page: Page, bookCourseApi: BookCourseApiFixture) {
-  bookCourseApi.usePreparedCourse();
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
-  }, preparedCourseSession);
-  await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "prepared fixture finishes the real parse flow").toBeVisible();
+function stageSixScenario(options?: StageSixFlowOptions) {
+  if (options?.mistakeMode === "error") return "mistakes-error";
+  if (options?.mistakeMode === "loading") return "mistakes-loading";
+  if (options && Object.hasOwn(options, "studyPlanDays")) return "plan-custom";
+  if (options?.taskMode === "out_of_range") return "plan-out-of-range";
+  if (options?.taskMode === "sparse") return "plan-sparse";
+  return "default";
+}
+
+async function loadProductionCourse(page: Page, scenario = "default", planDays?: unknown) {
+  const query = new URLSearchParams({ scenario, embedded: "device-preview" });
+  if (planDays !== undefined) query.set("planDays", JSON.stringify(planDays));
+  await page.goto(`/e2e/production-repository-harness.html?${query.toString()}`);
+  await expect(page.locator(".home-dashboard"), "production repository harness renders the real Home screen").toBeVisible();
+  if (scenario !== "empty" && scenario !== "course-error" && scenario !== "course-loading") {
+    await expect(page.locator('.home-book-workspace[data-loaded="true"]'), "production repository hydrates the selected course").toBeVisible();
+  }
+  await expect(page.locator(".motion-screen-transition"), "production Home transition settles").toHaveAttribute("data-motion-state", "idle");
 }
 
 async function loadStageFiveCourse(
@@ -86,12 +90,8 @@ async function loadStageFiveCourse(
   bookCourseApi: BookCourseApiFixture,
   options?: { imageMode?: StageFiveImageMode }
 ) {
-  bookCourseApi.useStageFiveFlow(options);
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
-  }, preparedCourseSession);
-  await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "Stage 5 fixture finishes the real parse flow").toBeVisible();
+  void bookCourseApi;
+  await loadProductionCourse(page, stageFiveScenario(options));
 }
 
 async function loadStageSixCourse(
@@ -99,20 +99,48 @@ async function loadStageSixCourse(
   bookCourseApi: BookCourseApiFixture,
   options?: StageSixFlowOptions
 ) {
-  bookCourseApi.useStageSixFlow(options);
-  await page.addInitScript((session) => {
-    window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
-  }, preparedCourseSession);
-  await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }), "Stage 6 fixture finishes the real parse flow").toBeVisible();
+  void bookCourseApi;
+  await loadProductionCourse(page, stageSixScenario(options), options?.studyPlanDays);
 }
 
 async function clickSettledScreenTarget(page: Page, target: Locator, label: string) {
-  await expect(page.locator(".motion-screen-transition"), `${label}: current screen transition is settled before interaction`).toHaveAttribute("data-motion-state", "idle");
+  await expect.poll(async () => page.evaluate(() => {
+    const nonIdleStates = Array.from(document.querySelectorAll<HTMLElement>("[data-motion-state]"))
+      .map((element) => `${element.className}:${element.dataset.motionState}`)
+      .filter((state) => !state.endsWith(":idle"));
+    const unfinishedAnimations = document.getAnimations({ subtree: true })
+      .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+      .filter((animation) => animation.playState !== "finished" && animation.playState !== "idle")
+      .length;
+    return { nonIdleStates, unfinishedAnimations };
+  }), { message: `${label}: all finite motion settles before interaction` }).toEqual({ nonIdleStates: [], unfinishedAnimations: 0 });
+  await expect(target, `${label}: action is unique`).toHaveCount(1);
   await expect(target, `${label}: action is visible`).toBeVisible();
   await expect(target, `${label}: action is enabled`).toBeEnabled();
-  // Trial mode applies Playwright's real visibility, stability, scroll, and
-  // hit-testing checks without issuing the business click yet.
+  await target.evaluate(async (element) => {
+    const action = element as HTMLElement;
+    const scroller = action.closest<HTMLElement>(".screen-content");
+    const previousScrollBehavior = scroller?.style.scrollBehavior ?? "";
+    if (scroller) scroller.style.scrollBehavior = "auto";
+    try {
+      action.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+      const readBounds = () => {
+        const bounds = action.getBoundingClientRect();
+        return [bounds.bottom, bounds.left, bounds.right, bounds.top];
+      };
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      const firstFrame = readBounds();
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      const secondFrame = readBounds();
+      if (firstFrame.some((value, index) => value !== secondFrame[index])) {
+        throw new Error("Responsive action did not settle across two animation frames");
+      }
+    } finally {
+      if (scroller) scroller.style.scrollBehavior = previousScrollBehavior;
+    }
+  });
+  // Trial mode applies Playwright's real hit-testing without issuing the
+  // business click; the normal click below retains the user interaction path.
   await target.click({ trial: true });
   await expect.poll(
     () => target.evaluate((element) => {
@@ -127,24 +155,22 @@ async function clickSettledScreenTarget(page: Page, target: Locator, label: stri
 
 async function openStageSixBook(page: Page, bookCourseApi: BookCourseApiFixture, options?: StageSixFlowOptions) {
   await loadStageSixCourse(page, bookCourseApi, options);
-  await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
-  await expect(page.locator(".library-course-grid"), "Stage 6 library loads the fixture course").toBeVisible();
   await clickSettledScreenTarget(
     page,
-    page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }),
-    "Stage 6 library course entry"
+    page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action'),
+    "Stage 6 current-course entry"
   );
-  await expect(page.locator(".book-course-screen"), "Stage 6 course overview opens from the library").toBeVisible();
+  await expect(page.locator(".book-course-screen"), "Stage 6 course overview opens from Home").toBeVisible();
 }
 
 async function openStageSixLesson(page: Page, bookCourseApi: BookCourseApiFixture, options?: StageSixFlowOptions) {
   await openStageSixBook(page, bookCourseApi, options);
-  await page.locator(".course-action-grid .quick-action").nth(1).click();
+  await clickSettledScreenTarget(page, page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"), "Stage 6 lesson entry");
   await expect(page.locator(".lesson-layout"), "Stage 6 lesson opens from the course overview").toBeVisible();
 }
 
 async function openStageSixPlan(page: Page, label: string) {
-  await clickSettledScreenTarget(page, page.locator(".course-action-grid .quick-action").first(), label);
+  await clickSettledScreenTarget(page, page.locator(".study-plan-summary button"), label);
   await expect(page.locator(".study-plan-screen"), label).toBeVisible();
 }
 
@@ -152,18 +178,18 @@ async function openStageFiveLibrary(page: Page, bookCourseApi: BookCourseApiFixt
   await loadStageFiveCourse(page, bookCourseApi, options);
   await clickSettledScreenTarget(
     page,
-    page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }),
+    page.locator(".home-book-picker-heading button"),
     "Stage 5 home course-library entry"
   );
   await expect(page.locator(".library-course-grid"), "Stage 5 library loads the fixture courses").toBeVisible();
 }
 
 async function openStageFiveCourse(page: Page, bookCourseApi: BookCourseApiFixture, options?: { imageMode?: StageFiveImageMode }) {
-  await openStageFiveLibrary(page, bookCourseApi, options);
+  await loadStageFiveCourse(page, bookCourseApi, options);
   await clickSettledScreenTarget(
     page,
-    page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }),
-    "Stage 5 library course entry"
+    page.locator('.home-book-workspace[data-loaded="true"] .home-primary-action'),
+    "Stage 5 current-course entry"
   );
   await expect(page.locator(".book-course-screen"), "Stage 5 course overview opens from the library").toBeVisible();
 }
@@ -172,7 +198,7 @@ async function openStageFiveLesson(page: Page, bookCourseApi: BookCourseApiFixtu
   await openStageFiveCourse(page, bookCourseApi, options);
   await clickSettledScreenTarget(
     page,
-    page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }),
+    page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
     "Stage 5 course lesson entry"
   );
   await expect(page.locator(".lesson-layout"), "Stage 5 lesson opens from the course overview").toBeVisible();
@@ -184,24 +210,22 @@ async function openStageFiveSourceReader(page: Page, label: string) {
 }
 
 async function openPreparedLesson(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await loadPreparedCourse(page, bookCourseApi);
-  await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
-  await page.getByRole("button", { name: "进入课程", exact: true }).first().click();
-  await page.getByRole("button", { name: /RAG 片段/ }).click();
+  await openStageFiveLesson(page, bookCourseApi);
   await expect(page.getByRole("button", { name: "问 AI", exact: true }), "prepared lesson exposes its real sheet triggers").toBeVisible();
 }
 
 async function openPreparedChapterWorkspace(page: Page, bookCourseApi: BookCourseApiFixture) {
-  await loadPreparedCourse(page, bookCourseApi);
-  await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
-  await page.getByRole("button", { name: "编辑 阶段 3 测试教材", exact: true }).first().click();
-  await page.getByRole("button", { name: "编辑内容", exact: true }).first().click();
-  await expect(page.getByRole("button", { name: "编辑 细胞分裂", exact: true }), "chapter confirmation loads from the local fixture").toBeVisible();
+  await openStageFiveLibrary(page, bookCourseApi);
+  const course = page.locator(".library-course-grid .course-space-card").first();
+  await clickSettledScreenTarget(page, course.locator(".course-card-edit"), "prepared chapter course settings");
+  await clickSettledScreenTarget(page, course.locator(".course-card-menu button").first(), "prepared chapter content entry");
+  await expect(page.locator(".chapter-confirm-screen"), "chapter confirmation loads from the production repository").toBeVisible();
+  await expect(page.locator(".toc-edit-button").first(), "chapter confirmation exposes its editor action").toBeVisible();
 }
 
 async function openPreparedChapterEditor(page: Page, bookCourseApi: BookCourseApiFixture) {
   await openPreparedChapterWorkspace(page, bookCourseApi);
-  const editTrigger = page.getByRole("button", { name: "编辑 细胞分裂", exact: true });
+  const editTrigger = page.locator(".toc-edit-button").first();
   await editTrigger.scrollIntoViewIfNeeded();
   await editTrigger.click();
 }
@@ -335,16 +359,16 @@ async function expectAiComposeInsideVisualViewport(page: Page, label: string) {
 }
 
 async function expectElementsInsideVisualViewport(page: Page, selectors: string[], label: string) {
-  await expect.poll(async () => page.evaluate((targetSelectors) => {
-    const viewportTop = window.visualViewport?.offsetTop ?? 0;
-    const viewportBottom = viewportTop + (window.visualViewport?.height ?? window.innerHeight);
-    return targetSelectors.every((selector) => {
-      const target = document.querySelector<HTMLElement>(selector);
+  for (const selector of selectors) {
+    await expect.poll(async () => page.evaluate((targetSelector) => {
+      const viewportTop = window.visualViewport?.offsetTop ?? 0;
+      const viewportBottom = viewportTop + (window.visualViewport?.height ?? window.innerHeight);
+      const target = document.querySelector<HTMLElement>(targetSelector);
       if (!target) return false;
       const bounds = target.getBoundingClientRect();
       return bounds.top >= viewportTop - 1 && bounds.bottom <= viewportBottom + 1;
-    });
-  }, selectors), `${label}: every target stays inside the visual viewport`).toBeTruthy();
+    }, selector), `${label}: ${selector} stays inside the visual viewport`).toBeTruthy();
+  }
 }
 
 async function getRailBounds(page: Page) {
@@ -402,10 +426,7 @@ async function expectAiDialogButtonTargets(page: Page, label: string) {
 
 const stageFourLongFilename = `${"responsive-source-".repeat(10)}upload.pdf`;
 const stageFourDraftTitle = "iPad local chapter draft survives a chapter switch";
-const stageFourDeletedChapterId = "chapter_stage4_8";
-const stageFourDeletedChapterTitle = "Stage 4 chapter 8";
-const stageFourNestedChapterTitle = "Stage 4 chapter 3";
-const stageFiveLongCourseTitle = `${"Long Stage Five biology course title for stable two-line cards ".repeat(3)}with a deliberate ending`;
+const stageFiveLongCourseTitle = `${"用于验证窄屏两行截断与稳定卡片宽度的超长教材标题 ".repeat(3)}结尾`;
 
 function expectedStageFiveLibraryColumns(viewport: CssViewport) {
   if (viewport.width >= 1024 && viewport.height >= 600) return 3;
@@ -413,28 +434,76 @@ function expectedStageFiveLibraryColumns(viewport: CssViewport) {
 }
 
 async function expectStageFiveHomeLayout(page: Page, viewport: CssViewport, label: string) {
+  await expect.poll(
+    () => page.locator(".home-book-option.is-selected .home-book-cover").evaluate((element) => getComputedStyle(element).filter),
+    { message: `${label}: selected-book blur transition settles before geometry audit` }
+  ).toBe("none");
   const geometry = await page.evaluate(() => {
-    const daily = document.querySelector<HTMLElement>(".daily-task-card");
-    const review = document.querySelector<HTMLElement>(".review-card");
-    const quickActions = [...document.querySelectorAll<HTMLElement>(".hifi-quick-grid .quick-action")];
-    if (!daily || !review || quickActions.length !== 4) throw new Error("Stage 5 home elements are missing");
+    const dashboard = document.querySelector<HTMLElement>(".home-dashboard");
+    const carousel = document.querySelector<HTMLElement>(".home-book-carousel");
+    const picker = document.querySelector<HTMLElement>(".home-book-picker");
+    const workspace = document.querySelector<HTMLElement>(".home-book-workspace");
+    const globalActionList = document.querySelector<HTMLElement>(".home-global-action-list");
+    const globalActions = [...document.querySelectorAll<HTMLElement>(".home-global-action")];
+    const books = [...document.querySelectorAll<HTMLElement>(".home-book-option")];
+    const primaryAction = document.querySelector<HTMLElement>(".home-primary-action, .home-status-actions button");
+    if (!dashboard || !carousel || !picker || !workspace || !globalActionList || globalActions.length < 1 || books.length !== 3 || !primaryAction) {
+      throw new Error("Production home elements are missing");
+    }
     return {
-      daily: daily.getBoundingClientRect().toJSON(),
-      quickLefts: quickActions.map((element) => Math.round(element.getBoundingClientRect().left)),
-      review: review.getBoundingClientRect().toJSON(),
+      books: books.map((element) => {
+        const cover = element.querySelector<HTMLElement>(".home-book-cover");
+        const bounds = element.getBoundingClientRect();
+        return {
+          centerY: bounds.top + bounds.height / 2,
+          filter: cover ? getComputedStyle(cover).filter : "missing",
+          offsetWidth: element.offsetWidth,
+          selected: element.getAttribute("aria-selected") === "true"
+        };
+      }),
+      carousel: {
+        clientWidth: carousel.clientWidth,
+        display: getComputedStyle(carousel).display,
+        flexDirection: getComputedStyle(carousel).flexDirection,
+        overflowX: getComputedStyle(carousel).overflowX,
+        scrollWidth: carousel.scrollWidth
+      },
+      dashboard: dashboard.getBoundingClientRect().toJSON(),
+      globalActionList: globalActionList.getBoundingClientRect().toJSON(),
+      globalActions: globalActions.map((element) => element.getBoundingClientRect().toJSON()),
+      picker: picker.getBoundingClientRect().toJSON(),
+      primaryAction: primaryAction.getBoundingClientRect().toJSON(),
+      workspace: workspace.getBoundingClientRect().toJSON(),
       viewportHeight: window.innerHeight
     };
   });
 
-  expect(geometry.daily.top, `${label}: today's primary task starts in the first viewport`).toBeLessThan(geometry.viewportHeight);
-  const quickColumns = new Set(geometry.quickLefts).size;
-  if (expectedNavigationMode(viewport) === "rail") {
-    expect(geometry.review.left, `${label}: iPad puts the current course beside today's task`).toBeGreaterThanOrEqual(geometry.daily.right - 1);
-    expect(quickColumns, `${label}: iPad exposes four quick-entry columns`).toBe(4);
-  } else {
-    expect(geometry.review.top, `${label}: phone keeps the current course after today's task`).toBeGreaterThanOrEqual(geometry.daily.bottom - 1);
-    expect(quickColumns, `${label}: phone keeps quick entries in a 2 by 2 grid`).toBe(2);
+  expect(geometry.picker.top, `${label}: the horizontal book picker starts in the first viewport`).toBeLessThan(geometry.viewportHeight);
+  expect(geometry.primaryAction.height, `${label}: the next-step action remains a touch target`).toBeGreaterThanOrEqual(44);
+  const isShortLandscape = viewport.width > viewport.height && viewport.height < 600;
+  const expectedBookWidth = isShortLandscape ? 92 : Math.min(108, Math.max(100, viewport.width * .25));
+  expect(geometry.books.filter((book) => Math.abs(book.offsetWidth - expectedBookWidth) <= 1).length, `${label}: every book keeps its viewport-specific carousel width`).toBe(3);
+  expect(geometry.books.filter((book) => book.selected && book.filter === "none").length, `${label}: exactly one selected book stays sharp`).toBe(1);
+  expect(geometry.books.filter((book) => !book.selected && book.filter.includes("blur(1.5px)")).length, `${label}: unselected books retain the required blur`).toBe(2);
+  expect(geometry.carousel.display, `${label}: the book picker uses a flex row`).toBe("flex");
+  expect(geometry.carousel.flexDirection, `${label}: books are arranged horizontally`).toBe("row");
+  expect(geometry.carousel.overflowX, `${label}: the book row supports horizontal scrolling`).toBe("auto");
+  expect(geometry.carousel.scrollWidth, `${label}: the horizontal book row has scrollable content`).toBeGreaterThan(geometry.carousel.clientWidth);
+  expect(Math.max(...geometry.books.map((book) => book.centerY)) - Math.min(...geometry.books.map((book) => book.centerY)), `${label}: book centers share one horizontal axis`).toBeLessThanOrEqual(1);
+  if (geometry.globalActions.length === 1) {
+    expect(
+      Math.abs(geometry.globalActionList.width - geometry.globalActions[0].width),
+      `${label}: a lone upload action spans the entire learning-action row`
+    ).toBeLessThanOrEqual(1);
   }
+  if (expectedNavigationMode(viewport) === "rail") {
+    expect(geometry.workspace.left, `${label}: iPad puts the selected-book workspace beside the book picker`).toBeGreaterThanOrEqual(geometry.picker.right - 1);
+    expect(new Set(geometry.globalActions.map((item) => Math.round(item.left))).size, `${label}: iPad keeps available global learning actions in one row`).toBe(geometry.globalActions.length);
+  } else {
+    expect(geometry.workspace.top, `${label}: phone keeps the selected-book workspace after the book picker`).toBeGreaterThanOrEqual(geometry.picker.bottom - 1);
+    expect(new Set(geometry.globalActions.map((item) => Math.round(item.left))).size, `${label}: phone keeps available global learning actions in one row`).toBe(geometry.globalActions.length);
+  }
+  expect(geometry.dashboard.width, `${label}: dashboard remains measurable inside the app shell`).toBeGreaterThan(0);
   await expectNoHorizontalOverflow(page, `${label}: Stage 5 home`);
 }
 
@@ -528,12 +597,13 @@ async function expectBookCourseTransitionGeometry(page: Page, label: string) {
     const contentRight = screenBounds.right - Number.parseFloat(screenStyle.paddingRight);
     return {
       contentCenter: (contentLeft + contentRight) / 2,
+      contentWidth: contentRight - contentLeft,
       root: { center: rootBounds.left + (rootBounds.width / 2), width: rootBounds.width },
       wrapper: { center: wrapperBounds.left + (wrapperBounds.width / 2), width: wrapperBounds.width }
     };
   });
 
-  expect(geometry.root.width, `${label}: BookCourse keeps its explicit 960px page-root width`).toBe(960);
+  expect(geometry.root.width, `${label}: Study keeps its 920px reading root without exceeding available content`).toBeCloseTo(Math.min(920, geometry.contentWidth), 5);
   expect(geometry.root.center, `${label}: BookCourse stays centered in screen-content`).toBeCloseTo(geometry.contentCenter, 5);
   expect(geometry.root.center, `${label}: BookCourse stays centered inside the transition wrapper`).toBeCloseTo(geometry.wrapper.center, 5);
 }
@@ -570,13 +640,6 @@ async function expectCenteredFlowTransitionGeometry(page: Page, label: string) {
   expect(geometry.root.height, `${label}: centered-flow resolves its preserved min-height instead of collapsing to content height`).toBeCloseTo(geometry.wrapper.height - 20, 5);
   expect(geometry.screen.scrollHeight, `${label}: centered-flow does not add artificial main-scroll height`).toBe(geometry.screen.clientHeight);
   expect(geometry.screen.scrollTop, `${label}: centered-flow leaves the main scroll position unchanged`).toBe(0);
-}
-
-function readStageFourConfirmationPayload(body: unknown): Array<{ chapter_id: string; source_title: string }> {
-  if (!body || typeof body !== "object" || !Array.isArray((body as { chapters?: unknown }).chapters)) {
-    throw new Error("Stage 4 confirmation request must contain a { chapters } payload");
-  }
-  return (body as { chapters: Array<{ chapter_id: string; source_title: string }> }).chapters;
 }
 
 async function expectStageFourFlowLayout(
@@ -628,13 +691,9 @@ async function expectStageFourChapterWorkspace(page: Page, viewport: CssViewport
   expect(geometry.detail.left, `${label}: iPad editor is to the right of the chapter directory`).toBeGreaterThanOrEqual(geometry.directory.right - 1);
 }
 
-async function openStageFourUpload(page: Page, bookCourseApi: BookCourseApiFixture, options?: { mode?: "success" | "failed"; progress?: number }) {
-  bookCourseApi.useStageFourFlow(options);
-  await page.addInitScript(() => {
-    window.localStorage.removeItem("bookcourse-active-parse-session");
-  });
+async function openProductionUpload(page: Page) {
   await page.goto("/?embedded=device-preview");
-  await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
+  await clickHomeUploadAction(page, "production upload flow");
   await expect(page.locator(".upload-flow-screen")).toBeVisible();
 }
 
@@ -644,7 +703,9 @@ async function uploadStageFourFile(page: Page) {
     mimeType: "application/pdf",
     buffer: Buffer.from("stage four responsive fixture")
   });
-  await expect(page.locator(".parse-ready-screen")).toBeVisible();
+  await expect(page.locator(".upload-selection-summary")).toBeVisible();
+  await page.getByRole("button", { name: "上传并继续", exact: true }).click();
+  await expect(page.locator(".parse-ready-screen")).toBeVisible({ timeout: 15_000 });
 }
 
 async function expectStageSixTwoColumnLayout(
@@ -683,9 +744,9 @@ async function expectStageSixTwoColumnLayout(
   }
 }
 
-async function expectStageSixPlanLayout(page: Page, viewport: CssViewport, label: string) {
+async function expectStageSixPlanLayout(page: Page, viewport: CssViewport, label: string, expectedDayCount = 7) {
   const calendarButtons = page.locator(".study-plan-calendar .plan-date-row button");
-  await expect(calendarButtons, `${label}: seven plan days are rendered`).toHaveCount(7);
+  await expect(calendarButtons, `${label}: the exact repository plan-day contract is rendered`).toHaveCount(expectedDayCount);
   const calendar = page.locator(".study-plan-calendar");
   const tasks = page.locator(".study-plan-tasks");
   await expect(calendar, `${label}: date calendar is visible`).toBeVisible();
@@ -875,7 +936,7 @@ test.describe("responsive smoke", () => {
       expect(Math.round(shellBounds.left), "1210px touch viewport is flush with the viewport edge").toBe(0);
     }
 
-    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
+    await clickHomeUploadAction(page, `${project.name}: paired viewport upload`);
     await expect(uploadHeading, `${project.name}: app remains interactive after resize`).toBeVisible();
 
     await page.setViewportSize(project.initialViewport);
@@ -890,9 +951,9 @@ test.describe("responsive smoke", () => {
     await expect(homeHeading, `${project.name}: home loads directly at the paired viewport`).toBeVisible();
 
     expect(
-      bookCourseApi.requests.some((request) => request.method === "GET" && request.path === "/api/books"),
-      `${project.name}: the local courses fixture was used`
-    ).toBeTruthy();
+      bookCourseApi.requests,
+      `${project.name}: the in-memory demo repository does not issue browser API requests`
+    ).toEqual([]);
     expect(bookCourseApi.unhandledRequests, `${project.name}: every API request has a local fixture`).toEqual([]);
     expect(bookCourseApi.externalRequests, `${project.name}: no external network requests are allowed`).toEqual([]);
     expect(bookCourseApi.consoleErrors, `${project.name}: no console errors are emitted`).toEqual([]);
@@ -991,7 +1052,7 @@ test.describe("responsive smoke", () => {
     expect(railSafeArea.contentPaddingRight, "tablet content avoids the right safe area").toBeGreaterThanOrEqual(13);
 
     await page.getByRole("button", { name: "首页", exact: true }).click();
-    await page.getByRole("button", { name: "上传新书，生成 AI 课程", exact: true }).click();
+    await clickHomeUploadAction(page, `${project.name}: safe-area upload`);
     await expect(page.getByRole("navigation", { name: "主导航" }), "hideNav removes primary navigation").toHaveCount(0);
     await page.getByRole("button", { name: "返回", exact: true }).click();
     await expectNavigationMode(page, { width: 834, height: 1194 }, `${project.name}: navigation returns after hideNav`);
@@ -1107,9 +1168,12 @@ test.describe("responsive smoke", () => {
     expect(bookCourseApi.externalRequests, "empty parent ID probe has no external API dependency").toEqual([]);
   });
 
-  test("completes the Stage 4 upload-to-course flow with responsive editing", async ({ page, bookCourseApi }, testInfo) => {
+  test("completes the production repository upload-to-course flow with responsive editing", async ({ page }, testInfo) => {
+    test.setTimeout(45_000);
     const project = getResponsiveProject(testInfo.project.name);
-    await openStageFourUpload(page, bookCourseApi);
+    const observedRequests: string[] = [];
+    page.on("request", (request) => observedRequests.push(request.url()));
+    await openProductionUpload(page);
     await expectStageFourFlowLayout(
       page,
       project.initialViewport,
@@ -1132,7 +1196,7 @@ test.describe("responsive smoke", () => {
 
     await page.locator(".parse-flow-actions .button").first().click();
     await expect(page.locator(".processing-flow-screen")).toBeVisible();
-    await expect(page.locator(".processing-card strong")).toHaveText("0%");
+    await expect(page.locator(".processing-card strong")).toHaveText("18%");
     await expectStageFourFlowLayout(
       page,
       project.initialViewport,
@@ -1140,7 +1204,7 @@ test.describe("responsive smoke", () => {
       ".processing-flow-support .stage-list",
       `${project.name}: processing`
     );
-    await expectNoHorizontalOverflow(page, `${project.name}: zero percent processing state`);
+    await expectNoHorizontalOverflow(page, `${project.name}: first production processing state`);
 
     await expect(page.locator(".chapter-confirm-screen"), `${project.name}: completed parsing opens chapter confirmation`).toBeVisible({ timeout: 10_000 });
     await expectStageFourChapterWorkspace(page, project.initialViewport, `${project.name}: chapter confirmation`);
@@ -1187,11 +1251,19 @@ test.describe("responsive smoke", () => {
     expect(stickyGeometry.last.top, `${project.name}: last chapter remains inside the viewport at the end of its scroll range`).toBeGreaterThanOrEqual(0);
     expect(stickyGeometry.last.bottom, `${project.name}: sticky confirmation action does not cover the last chapter at the end of its scroll range`).toBeLessThanOrEqual(stickyGeometry.action.top + 1);
 
+    const chapterTitles = page.locator(".chapter-confirm-directory .toc-entry-title");
+    const topLevelChapterTitles = page.locator(".chapter-confirm-directory .toc-directory > .toc-node > .toc-entry > .toc-entry-title");
+    const nestedChapterTitleText = (await nestedChapterTitle.locator("strong").textContent())?.trim() ?? "";
+    const primaryChapterTitleText = (await chapterTitles.first().locator("strong").textContent())?.trim() ?? "";
+    const deletedChapterTitleText = (await topLevelChapterTitles.last().locator("strong").textContent())?.trim() ?? "";
+    expect(nestedChapterTitleText, `${project.name}: nested chapter has a semantic title`).not.toBe("");
+    expect(primaryChapterTitleText, `${project.name}: primary chapter has a semantic title`).not.toBe("");
+    expect(deletedChapterTitleText, `${project.name}: deletion target has a semantic title`).not.toBe("");
+
     if (expectedNavigationMode(project.initialViewport) === "rail") {
-      const chapterTitles = page.locator(".chapter-confirm-directory .toc-entry-title");
       await nestedChapterTitle.click();
       await expect(nestedChapterTitle, `${project.name}: iPad chapter title selects the detail target`).toHaveAttribute("aria-current", "true");
-      await expect(page.locator(".chapter-detail-heading h3"), `${project.name}: iPad detail panel follows title selection`).toHaveText(stageFourNestedChapterTitle);
+      await expect(page.locator(".chapter-detail-heading h3"), `${project.name}: iPad detail panel follows title selection`).toHaveText(nestedChapterTitleText);
       await chapterTitles.first().click();
       const sourceTitleInput = page.locator(".chapter-detail-form input").first();
       await sourceTitleInput.fill(stageFourDraftTitle);
@@ -1200,7 +1272,8 @@ test.describe("responsive smoke", () => {
       await expect(sourceTitleInput, `${project.name}: iPad preserves the local chapter draft after switching`).toHaveValue(stageFourDraftTitle);
       await page.locator(".chapter-detail-form button[type='submit']").click();
 
-      const deleteChapterTitle = page.getByRole("button", { name: stageFourDeletedChapterTitle, exact: true });
+      const deleteChapterTitle = topLevelChapterTitles.last();
+      await expect(deleteChapterTitle.locator("strong")).toHaveText(deletedChapterTitleText);
       await deleteChapterTitle.click();
       await expect(deleteChapterTitle, `${project.name}: iPad title selection remains separate from the edit form action`).toHaveAttribute("aria-current", "true");
       await page.locator(".chapter-detail-form > .button-danger").click();
@@ -1209,22 +1282,25 @@ test.describe("responsive smoke", () => {
       const editorSheet = page.locator(".sheet[data-sheet-type='editChapter']");
       await nestedChapterTitle.click();
       await expect(editorSheet, `${project.name}: phone chapter title selects a chapter and opens its editor`).toBeVisible();
-      await expect(editorSheet.locator("input").first(), `${project.name}: phone title selection opens the selected chapter`).toHaveValue(stageFourNestedChapterTitle);
+      await expect(editorSheet.locator("input").first(), `${project.name}: phone title selection opens the selected chapter`).toHaveValue(nestedChapterTitleText);
       await page.keyboard.press("Escape");
       await expect(editorSheet, `${project.name}: phone title selection can return to the directory`).toHaveCount(0);
 
-      const primaryEditButton = page.getByRole("button", { name: /编辑 Long chapter title for responsive wrapping/, exact: true });
+      const primaryEditButton = page.getByRole("button", { name: `编辑 ${primaryChapterTitleText}`, exact: true });
       await primaryEditButton.click();
       await expect(editorSheet, `${project.name}: phone keeps the chapter editor in a bottom sheet`).toBeVisible();
       await editorSheet.locator("input").first().fill(stageFourDraftTitle);
       await editorSheet.locator("button[type='submit']").click();
+      await expect(editorSheet, `${project.name}: saved phone editor exits before the next directory action`).toHaveCount(0);
 
-      const deleteEditButton = page.getByRole("button", { name: `编辑 ${stageFourDeletedChapterTitle}`, exact: true });
+      const deleteEditButton = page.locator(".chapter-confirm-directory .toc-directory > .toc-node > .toc-entry > .toc-edit-button").last();
+      await expect(deleteEditButton).toHaveAccessibleName(`编辑 ${deletedChapterTitleText}`);
       await deleteEditButton.click();
       await editorSheet.locator(".button-danger").click();
       await editorSheet.locator(".chapter-delete-confirm .button-danger").click();
     }
 
+    const remainingChapterCount = await page.locator(".chapter-confirm-directory .toc-entry-title").count();
     await page.locator(".chapter-confirm-actions .button").click();
     await expect(page.locator(".course-ready-screen")).toBeVisible();
     await expect(page.locator(".course-ready-screen h1")).toHaveText("生成成功");
@@ -1234,76 +1310,29 @@ test.describe("responsive smoke", () => {
         await expectCenteredFlowTransitionGeometry(page, `${project.name} ${viewport.width}x${viewport.height}: CourseReady`);
       }
     }
-    await expect(page.locator(".course-ready-support .metric-card").first(), `${project.name}: course ready state reflects the confirmed chapter count`).toContainText("7 个目录项完成编排");
+    await expect(page.locator(".course-ready-support .metric-card").first(), `${project.name}: course ready state reflects the confirmed chapter count`).toContainText(`${remainingChapterCount} 个目录项完成编排`);
     await expectNoHorizontalOverflow(page, `${project.name}: course ready state`);
 
-    expect(bookCourseApi.requests.filter((request) => request.method === "POST" && request.path === "/api/uploads/init"), `${project.name}: upload initialization count is unchanged`).toHaveLength(1);
-    expect(bookCourseApi.requests.filter((request) => request.method === "POST" && request.path === "/api/books/book_stage4/files"), `${project.name}: file upload count is unchanged`).toHaveLength(1);
-    expect(bookCourseApi.requests.filter((request) => request.method === "POST" && request.path === "/api/books/book_stage4/parse"), `${project.name}: parse start count is unchanged`).toHaveLength(1);
-    expect(bookCourseApi.requests.filter((request) => request.method === "POST" && request.path === "/api/books/book_stage4/chapters/confirm"), `${project.name}: chapter confirmation count is unchanged`).toHaveLength(1);
-    expect(bookCourseApi.requests.filter((request) => request.method === "POST" && request.path === "/api/books/book_stage4/lessons/build"), `${project.name}: lesson generation count is unchanged`).toHaveLength(1);
-
-    const confirmationRequest = bookCourseApi.requests.find((request) => (
-      request.method === "POST" && request.path === "/api/books/book_stage4/chapters/confirm"
-    ));
-    if (!confirmationRequest) throw new Error(`${project.name}: Stage 4 confirmation request is missing`);
-    const confirmationPayload = readStageFourConfirmationPayload(confirmationRequest.body);
-    const confirmationResponse = bookCourseApi.lastStageFourConfirmationResponse;
-    expect(confirmationPayload, `${project.name}: confirmation request sends seven remaining chapters`).toHaveLength(7);
-    if (!confirmationResponse) throw new Error(`${project.name}: confirmation endpoint response is missing`);
-    expect(confirmationResponse, `${project.name}: confirmation endpoint returns seven confirmed chapters`).toHaveLength(7);
-    expect(confirmationPayload.find((chapter) => chapter.chapter_id === "chapter_stage4_primary")?.source_title, `${project.name}: edited title reaches the confirmation request`).toBe(stageFourDraftTitle);
-    expect(confirmationResponse.find((chapter) => chapter.chapter_id === "chapter_stage4_primary")?.source_title, `${project.name}: edited title reaches the confirmation response`).toBe(stageFourDraftTitle);
-    expect(confirmationPayload.some((chapter) => chapter.chapter_id === stageFourDeletedChapterId), `${project.name}: deleted chapter is absent from the confirmation request`).toBeFalsy();
-    expect(confirmationResponse.some((chapter) => chapter.chapter_id === stageFourDeletedChapterId), `${project.name}: deleted chapter is absent from the confirmation response`).toBeFalsy();
-    expect(confirmationResponse.every((chapter) => chapter.status === "已确认"), `${project.name}: confirmation response normalizes every chapter status`).toBeTruthy();
-
-    const persistedConfirmation = await page.evaluate(async () => {
-      const response = await fetch("/api/books/book_stage4/chapters");
-      return {
-        status: response.status,
-        chapters: (await response.json()) as Array<{ chapter_id: string; source_title: string; status: string }>
-      };
+    const appOrigin = new URL(page.url()).origin;
+    const forbiddenRequests = observedRequests.filter((requestUrl) => {
+      const url = new URL(requestUrl);
+      return url.origin !== appOrigin || url.pathname.startsWith("/api/");
     });
-    expect(persistedConfirmation.status, `${project.name}: confirmed chapters remain available from GET /chapters`).toBe(200);
-    expect(persistedConfirmation.chapters, `${project.name}: GET /chapters retains seven confirmed chapters`).toHaveLength(7);
-    expect(persistedConfirmation.chapters.find((chapter) => chapter.chapter_id === "chapter_stage4_primary")?.source_title, `${project.name}: GET /chapters retains the edited title`).toBe(stageFourDraftTitle);
-    expect(persistedConfirmation.chapters.some((chapter) => chapter.chapter_id === stageFourDeletedChapterId), `${project.name}: GET /chapters keeps the deletion`).toBeFalsy();
-    expect(persistedConfirmation.chapters.every((chapter) => chapter.status === "已确认"), `${project.name}: GET /chapters keeps every confirmed status normalized`).toBeTruthy();
-    expect(bookCourseApi.unhandledRequests, `${project.name}: Stage 4 flow has complete local API coverage`).toEqual([]);
-    expect(bookCourseApi.externalRequests, `${project.name}: Stage 4 flow has no external API dependency`).toEqual([]);
-  });
-
-  test("renders Stage 4 long failures, retry navigation, and 100 percent progress without overflow", async ({ page, bookCourseApi }, testInfo) => {
-    const project = getResponsiveProject(testInfo.project.name);
-    await openStageFourUpload(page, bookCourseApi, { mode: "failed" });
-    await uploadStageFourFile(page);
-    const failedProgressButton = page.locator(".parse-flow-actions .button").first();
-    await expect(failedProgressButton).toContainText("查看后台进度");
-    await expect(page.locator(".parse-ready-screen .insight-card")).toContainText("Retry after");
-    await failedProgressButton.click();
-    await expect(page.locator(".processing-status-card")).toContainText("Retry after");
-    await expect(page.locator(".processing-flow-actions .button")).toBeVisible();
-    await expectNoHorizontalOverflow(page, `${project.name}: long failed parse state`);
-    await page.locator(".processing-flow-actions .button").click();
-    await expect(page.locator(".parse-ready-screen"), `${project.name}: retry returns to parse preparation without altering the request flow`).toBeVisible();
-
-    await openStageFourUpload(page, bookCourseApi, { progress: 100 });
-    await uploadStageFourFile(page);
-    const fullProgressButton = page.locator(".parse-flow-actions .button").first();
-    await expect(fullProgressButton).toContainText("查看后台进度");
-    await fullProgressButton.click();
-    await expect(page.locator(".processing-card strong"), `${project.name}: full progress is visible before the completed job response`).toHaveText("100%");
-    await expectNoHorizontalOverflow(page, `${project.name}: one hundred percent processing state`);
-    expect(bookCourseApi.unhandledRequests, `${project.name}: failed and full-progress states are fixture complete`).toEqual([]);
+    expect(forbiddenRequests, `${project.name}: production repository flow has no HTTP API dependency`).toEqual([]);
   });
 
   test("lays out the Stage 5 home and library grid while loading, truncating, and deleting real courses", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
+    await loadProductionCourse(page, "course-loading");
+    await expect(page.locator(".home-book-carousel-skeleton"), `${project.name}: production Home exposes its course-loading skeleton`).toBeVisible();
+    await expect(page.locator(".home-book-carousel-skeleton"), `${project.name}: course-loading skeleton remains busy`).toHaveAttribute("aria-busy", "true");
+    await expect(page.locator(".home-book-workspace.is-loading"), `${project.name}: selected-book workspace preserves loading geometry`).toBeVisible();
+    await expectNoHorizontalOverflow(page, `${project.name}: production Home loading state`);
+
     await loadStageFiveCourse(page, bookCourseApi);
     await expectStageFiveHomeLayout(page, project.initialViewport, `${project.name}: Stage 5 home`);
 
-    await page.locator(".daily-task-copy").getByRole("button", { name: "继续学习", exact: true }).click();
+    await clickSettledScreenTarget(page, page.locator(".home-book-picker-heading button"), `${project.name}: open production library`);
     await expectStageFiveLibraryLayout(page, project.initialViewport, `${project.name}: Stage 5 library`);
 
     const longCourseCard = page.locator(".library-course-grid .course-space-card").filter({ hasText: stageFiveLongCourseTitle });
@@ -1335,18 +1364,29 @@ test.describe("responsive smoke", () => {
     }
 
     const overview = await page.evaluate(() => {
-      const hero = document.querySelector<HTMLElement>(".book-course-overview .course-hero");
-      const actions = document.querySelector<HTMLElement>(".book-course-overview .course-action-grid");
-      if (!hero || !actions) throw new Error("Stage 5 course overview elements are missing");
-      return { actions: actions.getBoundingClientRect().toJSON(), hero: hero.getBoundingClientRect().toJSON() };
+      const bookBar = document.querySelector<HTMLElement>(".study-book-bar");
+      const plan = document.querySelector<HTMLElement>(".study-plan-summary");
+      const directory = document.querySelector<HTMLElement>(".study-directory");
+      if (!bookBar || !plan || !directory) throw new Error("Production Study overview elements are missing");
+      return {
+        bookBarPosition: getComputedStyle(bookBar).position,
+        directory: directory.getBoundingClientRect().toJSON(),
+        plan: plan.getBoundingClientRect().toJSON(),
+        planPosition: getComputedStyle(plan).position
+      };
     });
     if (expectedNavigationMode(project.initialViewport) === "rail") {
-      expect(overview.actions.left, `${project.name}: iPad keeps course actions beside the overview`).toBeGreaterThanOrEqual(overview.hero.right - 1);
+      expect(overview.directory.left, `${project.name}: iPad keeps the original-book directory beside today's plan`).toBeGreaterThanOrEqual(overview.plan.right - 1);
+      expect(overview.planPosition, `${project.name}: iPad keeps today's plan available while the directory scrolls`).toBe("sticky");
     } else {
-      expect(overview.actions.top, `${project.name}: phone keeps course actions after the overview`).toBeGreaterThanOrEqual(overview.hero.bottom - 1);
+      expect(overview.directory.top, `${project.name}: phone keeps the original-book directory after today's plan`).toBeGreaterThanOrEqual(overview.plan.bottom - 1);
+      expect(overview.planPosition, `${project.name}: phone keeps today's plan in the normal reading flow`).not.toBe("sticky");
     }
+    expect(overview.bookBarPosition, `${project.name}: current-book switcher remains sticky`).toBe("sticky");
+    await expect(page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"), `${project.name}: expanded section exposes its primary learning entry`).toBeVisible();
+    await expect(page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-tool-card"), `${project.name}: expanded section exposes assignment, flashcard, and future tools`).toHaveCount(3);
 
-    await clickSettledScreenTarget(page, page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }), `${project.name}: course lesson entry`);
+    await clickSettledScreenTarget(page, page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"), `${project.name}: course lesson entry`);
     await expectStageFiveLessonLayout(page, project.initialViewport, `${project.name}: Stage 5 lesson`);
     await expect(page.locator(".citation-card"), `${project.name}: lesson presents the source illustration`).toBeVisible();
     await expect(page.locator(".lesson-learning-tools > .button").first(), `${project.name}: lesson exposes a citation tool`).toBeVisible();
@@ -1381,42 +1421,43 @@ test.describe("responsive smoke", () => {
   test("recovers Stage 5 source-reader media from a failed cited page to the next successful page", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
     await openStageFiveLesson(page, bookCourseApi, { imageMode: "mixed" });
-    await openStageFiveSourceReader(page, `${project.name}: mixed fixture opens the source reader`);
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".citation-card .inline-link"),
+      `${project.name}: mixed repository citation opens its exact source page`
+    );
+    await expect(page.locator(".source-reader-screen"), `${project.name}: mixed repository opens the production source reader`).toBeVisible();
 
-    const pageOnePath = "/api/books/book_stage3/pages/1/image";
-    const pageTwoPath = "/api/books/book_stage3/pages/2/image";
-    const requestCount = (path: string) => bookCourseApi.requests.filter((request) => request.method === "GET" && request.path === path).length;
     const pageLabel = page.locator(".source-reader-toolbar strong");
     const fallback = page.locator(".source-page-fallback");
-    await expect(pageLabel, `${project.name}: mixed fixture starts from the failed cited page`).toContainText("1");
+    await expect(pageLabel, `${project.name}: mixed repository starts from the failed cited page`).toContainText("11");
     await expect(fallback, `${project.name}: failed first source page renders its stable fallback`).toBeVisible();
+    await expect(fallback, `${project.name}: failed page exposes the exact repository page-image source`).toHaveAttribute("data-motion-image-source", "/assets/textbook/__missing-production-1.webp");
     const fallbackBounds = await fallback.evaluate((element) => element.getBoundingClientRect().toJSON());
     expect(fallbackBounds.width / fallbackBounds.height, `${project.name}: failed first page preserves the document ratio`).toBeCloseTo(0.75, 1);
-    await expect.poll(() => requestCount(pageOnePath), `${project.name}: failed first source page requests its local page URL`).toBeGreaterThan(0);
 
-    const pageTwoRequestsBeforeNext = requestCount(pageTwoPath);
     await clickSettledScreenTarget(page, page.locator(".source-reader-toolbar button").last(), `${project.name}: mixed source reader next-page action`);
-    await expect(pageLabel, `${project.name}: next page updates the source-reader page label`).toContainText("2");
-    await expect.poll(() => requestCount(pageTwoPath), `${project.name}: next page requests a fresh local page-two URL`).toBeGreaterThan(pageTwoRequestsBeforeNext);
+    await expect(pageLabel, `${project.name}: next page updates the source-reader page label`).toContainText("12");
     const pageImage = page.locator(".source-page-media img");
     await expect(pageImage, `${project.name}: successful second source page replaces the first-page fallback`).toBeVisible();
-    await expect(pageImage, `${project.name}: successful second page uses its own source URL`).toHaveAttribute("src", /\/api\/books\/book_stage3\/pages\/2\/image$/);
+    await expect(pageImage, `${project.name}: successful second page uses its own repository source URL`).toHaveAttribute("src", "/assets/textbook/biology-lesson-meiosis-2.webp");
     await expect.poll(() => pageImage.evaluate((image) => image.naturalWidth), `${project.name}: successful second source page decodes its image`).toBeGreaterThan(0);
     await expect(fallback, `${project.name}: failed first-page state does not leak into page two`).toHaveCount(0);
 
     await page.setViewportSize(project.pairedViewport);
     await expectStageFiveSourceReaderLayout(page, project.pairedViewport, `${project.name}: mixed source reader paired viewport`);
-    await expect(pageLabel, `${project.name}: paired viewport preserves the current successful page`).toContainText("2");
+    await expect(pageLabel, `${project.name}: paired viewport preserves the current successful page`).toContainText("12");
     await expect(pageImage, `${project.name}: paired viewport retains the successful page image`).toBeVisible();
 
     await clickSettledScreenTarget(page, page.locator(".source-reader-actions .button").nth(1), `${project.name}: mixed source reader lesson return`);
     await expect(page.locator(".lesson-layout"), `${project.name}: source-reader return path remains connected after mixed page recovery`).toBeVisible();
-    expect(bookCourseApi.unhandledRequests, `${project.name}: mixed source pages remain fixture-complete`).toEqual([]);
+    expect(bookCourseApi.unhandledRequests, `${project.name}: mixed source pages have no legacy HTTP fixture dependency`).toEqual([]);
     expect(bookCourseApi.externalRequests, `${project.name}: mixed source pages use no external network`).toEqual([]);
   });
 
   test("keeps Stage 5 image fallback geometry stable when covers and source images fail", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
+    await page.route("**/assets/textbook/biology-chapter-2-open.webp", (route) => route.abort("failed"));
     await openStageFiveLibrary(page, bookCourseApi, { imageMode: "failure" });
     const courseFallback = page.locator(".course-cover-fallback").first();
     await expect(courseFallback, `${project.name}: failed course cover uses a stable fallback`).toBeVisible();
@@ -1428,13 +1469,22 @@ test.describe("responsive smoke", () => {
       page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }),
       `${project.name}: failed-cover course entry`
     );
-    await clickSettledScreenTarget(page, page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }), `${project.name}: failed-cover lesson entry`);
+    await expect(page.locator(".study-screen"), `${project.name}: failed-cover course still opens its production Study page`).toBeVisible();
+    const chapterToggles = page.locator(".study-chapter-toggle");
+    await expect(chapterToggles, `${project.name}: production Study exposes the repository chapter tree`).toHaveCount(7);
+    await clickSettledScreenTarget(page, chapterToggles.nth(1), `${project.name}: open the chapter that owns extracted assets`);
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
+      `${project.name}: failed-cover lesson entry`
+    );
     const citationFallback = page.locator(".citation-media-fallback");
     await expect(citationFallback, `${project.name}: failed lesson illustration keeps its fallback`).toBeVisible();
     const citationFallbackBounds = await citationFallback.evaluate((element) => element.getBoundingClientRect().toJSON());
     expect(citationFallbackBounds.width / citationFallbackBounds.height, `${project.name}: illustration fallback keeps its aspect ratio`).toBeCloseTo(0.75, 1);
 
-    await openStageFiveSourceReader(page, `${project.name}: failed-cover source reader entry`);
+    await clickSettledScreenTarget(page, page.locator(".citation-card .inline-link"), `${project.name}: failed-cover exact source-page entry`);
+    await expect(page.locator(".source-reader-screen"), `${project.name}: failed-cover source reader entry`).toBeVisible();
     const sourceFallback = page.locator(".source-page-fallback");
     await expect(sourceFallback, `${project.name}: failed source page keeps its canvas fallback`).toBeVisible();
     const sourceFallbackBounds = await sourceFallback.evaluate((element) => element.getBoundingClientRect().toJSON());
@@ -1491,7 +1541,7 @@ test.describe("responsive smoke", () => {
 
   test("lays out Stage 6 study plans and flashcards while preserving day selection, task updates, and card flips", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
-    await openStageSixBook(page, bookCourseApi);
+    await openStageSixBook(page, bookCourseApi, { taskMode: "sparse" });
 
     await openStageSixPlan(page, `${project.name}: Stage 6 study plan opens from the real course action`);
     await expectStageSixPlanLayout(page, project.initialViewport, `${project.name}: Stage 6 initial study plan`);
@@ -1506,9 +1556,9 @@ test.describe("responsive smoke", () => {
     await task.click();
     await expect(task, `${project.name}: plan task retains its completed state after the existing PATCH action`).toHaveClass(/done/);
     await expect.poll(
-      () => bookCourseApi.requests.some((request) => request.method === "PATCH" && request.path === "/api/study-tasks/task_stage6_1"),
-      `${project.name}: plan update uses the local task PATCH fixture`
-    ).toBeTruthy();
+      () => page.evaluate(() => window.__productionRepositoryHarness?.getCallCount("patchStudyTask:task_01") ?? 0),
+      `${project.name}: plan update crosses the production repository boundary`
+    ).toBeGreaterThan(0);
 
     await page.setViewportSize(project.pairedViewport);
     await expectStageSixPlanLayout(page, project.pairedViewport, `${project.name}: Stage 6 paired study plan`);
@@ -1524,7 +1574,12 @@ test.describe("responsive smoke", () => {
     await expect(returnedCourse, `${project.name}: plan back path returns to the course`).toBeVisible();
     await clickSettledScreenTarget(
       page,
-      returnedCourse.locator(".course-action-grid .quick-action").nth(1),
+      returnedCourse.locator(".study-chapter-toggle").nth(1),
+      `${project.name}: returned Study opens the chapter that owns generated flashcards`
+    );
+    await clickSettledScreenTarget(
+      page,
+      returnedCourse.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
       `${project.name}: returned course lesson action remains current, uncovered, and actionable`
     );
     await expect(page.locator(".lesson-layout"), `${project.name}: lesson remains reachable after plan update`).toBeVisible();
@@ -1574,15 +1629,15 @@ test.describe("responsive smoke", () => {
       await expectNoHorizontalOverflow(page, `${project.name}: ${scenario.label} plan remains bounded without horizontal overflow`);
     }
 
-    await openStageSixBook(page, bookCourseApi);
+    await openStageSixBook(page, bookCourseApi, { taskMode: "sparse" });
     await openStageSixPlan(page, `${project.name}: normal plan opens after malformed-plan cases`);
     const normalTask = page.locator(".study-plan-tasks .timeline-item").first();
     await normalTask.click();
     await expect(normalTask, `${project.name}: normal sparse-plan task PATCH remains connected after malformed-plan cases`).toHaveClass(/done/);
     await expect.poll(
-      () => bookCourseApi.requests.some((request) => request.method === "PATCH" && request.path === "/api/study-tasks/task_stage6_1"),
-      `${project.name}: normal task update still uses the local PATCH fixture`
-    ).toBeTruthy();
+      () => page.evaluate(() => window.__productionRepositoryHarness?.getCallCount("patchStudyTask:task_01") ?? 0),
+      `${project.name}: normal task update still crosses the production repository boundary`
+    ).toBeGreaterThan(0);
 
     expect(bookCourseApi.unhandledRequests, `${project.name}: malformed plan cases remain fully covered by local fixtures`).toEqual([]);
     expect(bookCourseApi.externalRequests, `${project.name}: malformed plan cases make no external requests`).toEqual([]);
@@ -1601,7 +1656,7 @@ test.describe("responsive smoke", () => {
     const assignmentCitationLink = await expectStageSixVisibleInlineLinkAudit(page, ".assignment-screen", `${project.name}: Stage 6 assignment citation`);
     await assignmentCitationLink.press("Enter");
     await expect(page.locator(".source-reader-screen"), `${project.name}: assignment citation keeps its source-reader destination`).toBeVisible();
-    await page.locator(".source-reader-actions .button").nth(1).click();
+    await clickSettledScreenTarget(page, page.locator(".source-reader-actions .button").nth(1), `${project.name}: assignment citation back action`);
     await expect(page.locator(".assignment-screen"), `${project.name}: assignment citation back path returns to the answer`).toBeVisible();
 
     const textarea = page.locator(".assignment-card textarea");
@@ -1634,12 +1689,15 @@ test.describe("responsive smoke", () => {
     const diagnosisCitationLink = await expectStageSixVisibleInlineLinkAudit(page, ".diagnosis-screen", `${project.name}: Stage 6 diagnosis citation`);
     await diagnosisCitationLink.press("Enter");
     await expect(page.locator(".source-reader-screen"), `${project.name}: diagnosis citation keeps its source-reader destination`).toBeVisible();
-    await page.locator(".source-reader-actions .button").nth(1).click();
+    await clickSettledScreenTarget(page, page.locator(".source-reader-actions .button").nth(1), `${project.name}: diagnosis citation back action`);
     await expect(page.locator(".diagnosis-screen"), `${project.name}: diagnosis citation back path returns to the result`).toBeVisible();
     await expect.poll(
-      () => bookCourseApi.requests.filter((request) => request.method === "POST" && request.path.includes("/api/assignments/assignment_chapter_stage3/")).length,
-      `${project.name}: submit and diagnose use the local fixture chain`
-    ).toBe(2);
+      () => page.evaluate(() => ({
+        diagnose: window.__productionRepositoryHarness?.getCallCount("diagnoseAssignment:assignment_c2s1") ?? 0,
+        submit: window.__productionRepositoryHarness?.getCallCount("submitAssignment:assignment_c2s1") ?? 0
+      })),
+      `${project.name}: submit and diagnose cross the production repository boundary once each`
+    ).toEqual({ diagnose: 1, submit: 1 });
 
     await page.setViewportSize(project.pairedViewport);
     await expectStageSixDiagnosisLayout(page, project.pairedViewport, `${project.name}: Stage 6 paired diagnosis`);
@@ -1660,50 +1718,82 @@ test.describe("responsive smoke", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await openStageSixBook(page, bookCourseApi);
 
-    await page.locator(".course-action-grid .quick-action").nth(3).click();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".primary-nav .nav-item").nth(3),
+      `${project.name}: production primary navigation opens Profile`
+    );
+    await expect(page.locator(".profile-screen"), `${project.name}: profile remains reachable through primary navigation`).toBeVisible();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".profile-settings-list .settings-row").nth(2),
+      `${project.name}: profile export record opens the production Notes surface`
+    );
     await expect(page.locator(".notes-screen"), `${project.name}: notes opens from the course tool`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".notes-list", ".notes-detail-panel", `${project.name}: Stage 6 notes`, { phoneFirstBefore: false });
-    await expect(page.locator(".notes-list .note-card"), `${project.name}: notes retain the real chunk-derived list`).toHaveCount(2);
+    await expect(page.locator(".notes-list .note-card"), `${project.name}: notes retain every production chunk-derived entry`).toHaveCount(6);
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 notes`);
 
-    await page.locator(".notes-actions .button").nth(1).click();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".notes-actions .button").nth(1),
+      `${project.name}: Notes export action`
+    );
     await expect(page.locator(".export-preview-screen"), `${project.name}: export remains available from notes`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".export-module-list", ".export-intro-card", `${project.name}: Stage 6 export`, { phoneFirstBefore: false });
     const exportChecks = page.locator(".export-module-list input[type=checkbox]");
     await expect(exportChecks, `${project.name}: export modules retain their existing selectable controls`).toHaveCount(7);
-    await page.locator(".export-actions .button").click();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".export-actions .button"),
+      `${project.name}: export confirmation action`
+    );
     await expect(page.getByRole("status"), `${project.name}: export preserves its mock confirmation toast`).toBeVisible();
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 export`);
 
-    await page.locator(".header-bar .icon-button").click();
-    await page.locator(".header-bar .icon-button").click();
-    await expect(page.locator(".book-course-screen"), `${project.name}: export and notes back paths return to the course`).toBeVisible();
-    await page.locator(".course-action-grid .quick-action").nth(1).click();
-    await page.locator(".lesson-bottom-actions .button").nth(1).click();
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: export back to Notes`);
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: Notes back to Profile`);
+    await expect(page.locator(".profile-screen"), `${project.name}: export and notes back paths return to Profile`).toBeVisible();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".primary-nav .nav-item").nth(2),
+      `${project.name}: production primary navigation returns to Study`
+    );
+    await expect(page.locator(".book-course-screen"), `${project.name}: Study remains reachable after Notes and export`).toBeVisible();
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".study-chapter.is-expanded .study-section.is-expanded .study-enter-button"),
+      `${project.name}: Study lesson entry remains actionable after Notes and export`
+    );
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".lesson-bottom-actions .button").nth(1),
+      `${project.name}: lesson completion opens its report`
+    );
     await expect(page.locator(".report-screen"), `${project.name}: lesson completion opens its report`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".report-summary-column", ".report-guidance-column", `${project.name}: Stage 6 report`);
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 report`);
     const reportDetailLink = await expectStageSixVisibleInlineLinkAudit(page, ".report-screen", `${project.name}: Stage 6 report detail`);
     await reportDetailLink.press("Enter");
     await expect(page.locator(".notes-screen"), `${project.name}: report detail link keeps its notes destination`).toBeVisible();
-    await page.locator(".header-bar .icon-button").click();
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: report detail back to report`);
     await expect(page.locator(".report-screen"), `${project.name}: report detail back path returns to the report`).toBeVisible();
 
-    await page.locator(".header-bar .icon-button").click();
-    await page.locator(".header-bar .icon-button").click();
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: report back to lesson`);
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: lesson back to Study`);
     await expect(page.locator(".book-course-screen"), `${project.name}: report back path returns to the course`).toBeVisible();
-    await page.locator(".primary-nav .nav-item").nth(3).click();
+    await clickSettledScreenTarget(page, page.locator(".primary-nav .nav-item").nth(3), `${project.name}: Study navigation opens Profile`);
     await expect(page.locator(".profile-screen"), `${project.name}: profile remains reachable through primary navigation`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".profile-summary-column", ".profile-settings-list", `${project.name}: Stage 6 profile`);
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 profile`);
 
-    await page.locator(".primary-nav .nav-item").nth(1).click();
+    await clickSettledScreenTarget(page, page.locator(".primary-nav .nav-item").nth(1), `${project.name}: Profile navigation opens Community`);
     await expect(page.locator(".community-screen"), `${project.name}: community remains reachable through primary navigation`).toBeVisible();
     await expectStageSixCommunityGrid(page, project.initialViewport, `${project.name}: Stage 6 community`);
-    await page.locator(".community-book-card").first().click();
+    await clickSettledScreenTarget(page, page.locator(".community-book-card").first(), `${project.name}: first community book card`);
     await expect(page.locator(".community-detail-screen"), `${project.name}: community book opens from its card`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".community-detail-card", ".community-detail-workspace .section", `${project.name}: Stage 6 community detail`);
-    await page.locator(".community-detail-actions .button").first().click();
+    await clickSettledScreenTarget(page, page.locator(".community-detail-actions .button").first(), `${project.name}: community import action`);
     await expect(page.locator(".community-import-screen"), `${project.name}: community import retains its mock success path`).toBeVisible();
     await expectStageSixTwoColumnLayout(page, project.initialViewport, ".community-import-success", ".import-progress-card", `${project.name}: Stage 6 community import`);
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 community detail and import`);
@@ -1718,21 +1808,33 @@ test.describe("responsive smoke", () => {
 
   test("checks Stage 6 empty, loading, and error states with local fixtures", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
-    await page.goto("/?embedded=device-preview");
-    await page.locator(".primary-nav .nav-item").nth(3).click();
-    await page.locator(".profile-settings-list .settings-row").nth(2).click();
+    await loadProductionCourse(page, "empty");
+    await clickSettledScreenTarget(page, page.locator(".primary-nav .nav-item").nth(3), `${project.name}: empty repository opens Profile`);
+    await clickSettledScreenTarget(
+      page,
+      page.locator(".profile-settings-list .settings-row").nth(2),
+      `${project.name}: empty repository opens Notes`
+    );
     await expect(page.locator(".notes-screen .parse-empty-card"), `${project.name}: notes keeps its no-course empty state`).toBeVisible();
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 empty state`);
 
-    await openStageSixBook(page, bookCourseApi, { mistakeMode: "loading" });
-    await page.locator(".course-action-grid .quick-action").nth(2).click();
+    await loadStageSixCourse(page, bookCourseApi, { mistakeMode: "loading" });
+    await clickSettledScreenTarget(
+      page,
+      page.locator('[data-home-global-action="mistakes"]'),
+      `${project.name}: Home opens the loading MistakeBook scenario`
+    );
     await expect(page.locator(".mistake-state-card h3"), `${project.name}: mistake loading state remains visible while its fixture is pending`).toContainText("正在读取");
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 loading state`);
-    bookCourseApi.releaseStageSixMistakes();
+    await page.evaluate(() => window.__productionRepositoryHarness?.releaseMistakes());
     await expect(page.locator(".mistake-detail-card"), `${project.name}: released mistake fixture renders its detail state`).toBeVisible();
 
-    await openStageSixBook(page, bookCourseApi, { mistakeMode: "error" });
-    await page.locator(".course-action-grid .quick-action").nth(2).click();
+    await loadStageSixCourse(page, bookCourseApi, { mistakeMode: "error" });
+    await clickSettledScreenTarget(
+      page,
+      page.locator('[data-home-global-action="mistakes"]'),
+      `${project.name}: Home opens the failing MistakeBook scenario`
+    );
     await expect(page.locator(".mistake-state-card h3"), `${project.name}: mistake error state renders its existing error heading`).toContainText("加载失败");
     await expectNoHorizontalOverflow(page, `${project.name}: Stage 6 error state`);
 
@@ -1745,7 +1847,7 @@ test.describe("responsive smoke", () => {
   test("keeps Stage 6 calendar and community layouts stable at breakpoint boundaries and short landscape", async ({ page, bookCourseApi }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
     await openStageSixBook(page, bookCourseApi);
-    await page.locator(".course-action-grid .quick-action").first().click();
+    await openStageSixPlan(page, `${project.name}: production Study plan detail entry`);
     for (const viewport of [
       { width: 767, height: 800 },
       { width: 768, height: 800 },
@@ -1753,12 +1855,12 @@ test.describe("responsive smoke", () => {
       { width: 1024, height: 800 }
     ]) {
       await page.setViewportSize(viewport);
-      await expectStageSixPlanLayout(page, viewport, `${project.name}: Stage 6 ${viewport.width}x${viewport.height} plan boundary`);
+      await expectStageSixPlanLayout(page, viewport, `${project.name}: Stage 6 ${viewport.width}x${viewport.height} plan boundary`, 14);
     }
 
-    await page.locator(".header-bar .icon-button").click();
+    await clickSettledScreenTarget(page, page.locator(".header-bar .icon-button"), `${project.name}: plan boundary back action`);
     await expect(page.locator(".book-course-screen"), `${project.name}: boundary test returns to the course`).toBeVisible();
-    await page.locator(".primary-nav .nav-item").nth(1).click();
+    await clickSettledScreenTarget(page, page.locator(".primary-nav .nav-item").nth(1), `${project.name}: Study navigation opens Community`);
     await expect(page.locator(".community-screen"), `${project.name}: boundary test opens community`).toBeVisible();
     for (const viewport of [
       { width: 767, height: 800 },
@@ -1879,6 +1981,17 @@ test.describe("responsive smoke", () => {
       await expect(page.locator(".chapter-confirm-detail")).toBeVisible();
       await expect(page.locator(".chapter-detail-form")).toBeVisible();
       await expect(page.locator(".sheet[data-sheet-type='editChapter']")).toHaveCount(0);
+      const masterDetail = await page.evaluate(() => {
+        const directory = document.querySelector<HTMLElement>(".chapter-confirm-directory");
+        const detail = document.querySelector<HTMLElement>(".chapter-confirm-detail");
+        if (!directory || !detail) throw new Error("Chapter master-detail surfaces are missing");
+        return {
+          detail: detail.getBoundingClientRect().toJSON(),
+          directory: directory.getBoundingClientRect().toJSON()
+        };
+      });
+      expect(masterDetail.detail.left, `${project.name}: iPad chapter detail is positioned to the right of its directory`).toBeGreaterThanOrEqual(masterDetail.directory.right - 1);
+      expect(masterDetail.detail.top, `${project.name}: iPad chapter master and detail columns share their top edge`).toBeCloseTo(masterDetail.directory.top, 1);
       await expectNoHorizontalOverflow(page, `${project.name}: iPad chapter editor`);
       return;
     }
@@ -1978,12 +2091,12 @@ test.describe("responsive smoke", () => {
     await expectElementsInsideVisualViewport(page, [
       ".sheet[data-sheet-type='chat']",
       ".chat-sheet input",
-      ".chat-sheet > .button"
+      ".chat-sheet-composer > .button"
     ], "iPad shrunk chat sheet, input, and send button");
 
     const chatDialog = page.locator(".sheet[data-sheet-type='chat']");
     await chatDialog.locator(".chat-input input").fill("同源染色体会在哪里分离？");
-    await chatDialog.locator(".chat-sheet > .button").click();
+    await chatDialog.locator(".chat-sheet-composer > .button").click();
     await chatDialog.locator(".citation-card .inline-link").click();
     await expectSheetPresentation(page, "source", layoutViewport, "iPad shrunk source");
     await expectElementsInsideVisualViewport(page, [".sheet[data-sheet-type='source']"], "iPad shrunk source sheet");
@@ -1995,7 +2108,8 @@ test.describe("responsive smoke", () => {
     await page.keyboard.press("Escape");
 
     await openPreparedChapterWorkspace(page, bookCourseApi);
-    const editorRailBounds = await getRailBounds(page);
+    const editorNavigation = page.locator(".primary-nav");
+    await expect(editorNavigation, "iPad ChapterConfirm intentionally hides primary navigation").toHaveCount(0);
     await setVisualViewport(page, shrunkViewport);
     await expectOverlayViewportVariables(page, shrunkViewport, "iPad editor shrunk viewport");
     await expect(page.locator(".chapter-confirm-detail")).toBeVisible();
@@ -2010,23 +2124,23 @@ test.describe("responsive smoke", () => {
     const chapterSave = page.locator(".chapter-detail-form button[type='submit']");
     await chapterSave.scrollIntoViewIfNeeded();
     await expectElementsInsideVisualViewport(page, [".chapter-detail-form button[type='submit']"], "iPad shrunk chapter save action");
-    await expectRailUnchanged(page, editorRailBounds, "iPad shrunk edit chapter");
+    await expect(editorNavigation, "iPad shrunk edit chapter remains a focused flow without primary navigation").toHaveCount(0);
 
     await setVisualViewport(page, restoredViewport);
     await expectOverlayViewportVariables(page, restoredViewport, "iPad restored edit viewport");
     await expectElementsInsideVisualViewport(page, [".chapter-confirm-detail"], "iPad restored chapter master-detail editor");
-    await expectRailUnchanged(page, editorRailBounds, "iPad restored edit chapter");
+    await expect(editorNavigation, "iPad restored edit chapter remains a focused flow without primary navigation").toHaveCount(0);
 
     await setVisualViewport(page, shrunkViewport);
     await page.locator(".chapter-detail-form button[type='submit']").click();
     await expect(page.locator(".toast")).toBeVisible();
     await expectElementsInsideVisualViewport(page, [".toast"], "iPad shrunk toast");
-    await expectRailUnchanged(page, editorRailBounds, "iPad shrunk toast");
+    await expect(editorNavigation, "iPad shrunk toast does not reintroduce primary navigation").toHaveCount(0);
 
     await setVisualViewport(page, restoredViewport);
     await expectOverlayViewportVariables(page, restoredViewport, "iPad restored toast viewport");
     await expectElementsInsideVisualViewport(page, [".toast"], "iPad restored toast");
-    await expectRailUnchanged(page, editorRailBounds, "iPad restored toast");
+    await expect(editorNavigation, "iPad restored toast does not reintroduce primary navigation").toHaveCount(0);
   });
 
   test("gives every AI dialog action a 44px hit target across responsive viewports", async ({ page }, testInfo) => {

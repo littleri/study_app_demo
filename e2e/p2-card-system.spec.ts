@@ -1,3 +1,4 @@
+import type { Locator } from "playwright/test";
 import { expect, test, type Page } from "./fixtures";
 import type { BookCourseApiFixture } from "./fixtures/bookcourse-api";
 
@@ -35,26 +36,149 @@ function contrastRatio(first: Rgb, second: Rgb) {
   return (light + 0.05) / (dark + 0.05);
 }
 
+async function clickAfterMotionAndScrollSettle(page: Page, target: Locator, label: string) {
+  await expect(
+    page.locator(".motion-screen-transition"),
+    `${label}: current screen transition is settled before interaction`
+  ).toHaveAttribute("data-motion-state", "idle");
+  await expect(target, `${label}: action is unique`).toHaveCount(1);
+  await expect(target, `${label}: action is visible`).toBeVisible();
+  await expect(target, `${label}: action is enabled`).toBeEnabled();
+  await expect.poll(async () => target.evaluate((element) => {
+    const action = element as HTMLElement;
+    const motionStateSelector = [
+      "[data-motion-state]",
+      "[data-motion-item-state]",
+      "[data-motion-course-card-state]",
+      "[data-motion-selection-state]",
+      "[data-motion-text-state]",
+      "[data-motion-error-state]"
+    ].join(",");
+    const collapsibles: HTMLElement[] = [];
+    const relatedStateElements = new Set<HTMLElement>();
+    let ancestor: HTMLElement | null = action;
+    while (ancestor) {
+      if (ancestor.matches(".motion-collapsible")) collapsibles.push(ancestor);
+      if (ancestor.matches(motionStateSelector)) relatedStateElements.add(ancestor);
+      ancestor = ancestor.parentElement;
+    }
+    for (const collapsible of collapsibles) {
+      collapsible.querySelectorAll<HTMLElement>(motionStateSelector).forEach((node) => relatedStateElements.add(node));
+    }
+
+    const stateAttributes = [
+      "data-motion-state",
+      "data-motion-item-state",
+      "data-motion-course-card-state",
+      "data-motion-selection-state",
+      "data-motion-text-state",
+      "data-motion-error-state"
+    ];
+    const nonIdleStates = Array.from(relatedStateElements).flatMap((node) => (
+      stateAttributes
+        .map((attribute) => node.getAttribute(attribute))
+        .filter((state): state is string => Boolean(state && state !== "idle"))
+    ));
+    const nonExpandedCollapsibles = collapsibles
+      .map((node) => node.getAttribute("data-motion-collapsible"))
+      .filter((state) => state !== "expanded");
+    const animations = new Set<Animation>();
+    for (const root of collapsibles.length > 0 ? collapsibles : [action]) {
+      root.getAnimations({ subtree: true }).forEach((animation) => animations.add(animation));
+    }
+    const activeFiniteAnimationCount = Array.from(animations)
+      .filter((animation) => animation.effect?.getTiming().iterations !== Infinity)
+      .filter((animation) => animation.playState !== "finished" && animation.playState !== "idle")
+      .length;
+    return { activeFiniteAnimationCount, nonExpandedCollapsibles, nonIdleStates };
+  }), `${label}: related collapsible, layout, and presence motion is idle`).toEqual({
+    activeFiniteAnimationCount: 0,
+    nonExpandedCollapsibles: [],
+    nonIdleStates: []
+  });
+  await expect.poll(async () => target.evaluate(async (element) => {
+    const action = element as HTMLElement;
+    const scroller = action.closest<HTMLElement>(".screen-content");
+    const previousScrollBehavior = scroller?.style.scrollBehavior ?? "";
+    if (scroller) scroller.style.scrollBehavior = "auto";
+    try {
+      action.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+      const readBounds = () => {
+        const bounds = action.getBoundingClientRect();
+        return [bounds.bottom, bounds.left, bounds.right, bounds.top];
+      };
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      const firstFrame = readBounds();
+      await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+      const secondFrame = readBounds();
+      return firstFrame.every((value, index) => value === secondFrame[index]);
+    } finally {
+      if (scroller) scroller.style.scrollBehavior = previousScrollBehavior;
+    }
+  }), `${label}: target settles across two exact animation frames`).toBe(true);
+  await target.click({ trial: true });
+  await target.click();
+}
+
 async function openLibrary(page: Page, bookCourseApi: BookCourseApiFixture) {
   bookCourseApi.useStageFiveFlow();
   await page.addInitScript((session) => {
     window.localStorage.setItem("bookcourse-active-parse-session", JSON.stringify(session));
   }, preparedCourseSession);
   await page.goto("/?embedded=device-preview");
-  await expect(page.locator(".home-primary-action")).toBeVisible();
-  await page.locator(".home-primary-action").click();
+  await clickAfterMotionAndScrollSettle(
+    page,
+    page.getByRole("button", { name: "全部教材", exact: true }),
+    "open Library from Home"
+  );
   await expect(page.locator(".library-course-grid")).toBeVisible();
 }
 
 async function openCourse(page: Page, bookCourseApi: BookCourseApiFixture) {
   await openLibrary(page, bookCourseApi);
-  await page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }).click();
+  await clickAfterMotionAndScrollSettle(
+    page,
+    page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true }),
+    "open first Library course"
+  );
   await expect(page.locator(".book-course-screen")).toBeVisible();
+}
+
+async function openMeiosisSection(page: Page) {
+  const secondChapter = page.locator(
+    '.study-chapter-toggle[aria-label^="第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度"]'
+  );
+  await expect(secondChapter, "meiosis chapter is unique").toHaveCount(1);
+  if (await secondChapter.getAttribute("aria-expanded") !== "true") {
+    await clickAfterMotionAndScrollSettle(page, secondChapter, "expand meiosis chapter");
+  }
+  await expect(secondChapter, "meiosis chapter remains expanded").toHaveAttribute("aria-expanded", "true");
+
+  const sectionToggle = page.locator(
+    '.study-chapter.is-expanded .study-section-toggle[aria-label^="第 1 节 减数分裂和受精作用 教材第 16-26 页"]'
+  );
+  await expect(sectionToggle, "meiosis section is unique inside the expanded chapter").toHaveCount(1);
+  if (await sectionToggle.getAttribute("aria-expanded") !== "true") {
+    await clickAfterMotionAndScrollSettle(page, sectionToggle, "expand meiosis section");
+  }
+  await expect(sectionToggle, "meiosis section remains expanded").toHaveAttribute("aria-expanded", "true");
+  return sectionToggle.locator("..");
 }
 
 async function openLesson(page: Page, bookCourseApi: BookCourseApiFixture) {
   await openCourse(page, bookCourseApi);
-  await page.locator(".course-action-grid").getByRole("button", { name: /RAG 片段/ }).click();
+  const section = await openMeiosisSection(page);
+  await clickAfterMotionAndScrollSettle(
+    page,
+    section.getByRole("button", { name: "闪卡复习 用短时回忆巩固本节概念", exact: true }),
+    "open section flashcards"
+  );
+  await expect(page.locator(".flashcard-screen")).toBeVisible();
+  await clickAfterMotionAndScrollSettle(
+    page,
+    page.getByRole("button", { name: "回到章节", exact: true }),
+    "return from flashcards to lesson"
+  );
   await expect(page.locator(".lesson-screen")).toBeVisible();
 }
 
@@ -125,8 +249,11 @@ test.describe("P2 card-system acceptance", () => {
     const homeViolations = await readTouchViolations(page);
     expect(homeViolations, "home non-inline targets are all at least 44 x 44 CSS px").toEqual([]);
 
-    const homePrimary = await page.locator(".home-primary-action").evaluate((element) => element.getBoundingClientRect().height);
-    expect(homePrimary, "home primary CTA is at least 48px high").toBeGreaterThanOrEqual(48);
+    const homePrimary = page.locator(".home-primary-action:visible");
+    await expect(homePrimary).toHaveCSS("min-height", "48px");
+    await expect
+      .poll(() => homePrimary.evaluate((element) => element.getBoundingClientRect().height))
+      .toBeGreaterThanOrEqual(48);
 
     await openLesson(page, bookCourseApi);
     const lessonViolations = await readTouchViolations(page);
@@ -139,7 +266,7 @@ test.describe("P2 card-system acceptance", () => {
     await expect(page.locator(".lesson-screen .button-primary"), "the lesson exposes exactly one solid primary action").toHaveCount(1);
   });
 
-  test("gives Library one primary course entry and groups course tools into one 2x2 surface", async ({ page, bookCourseApi }) => {
+  test("gives Library one primary course entry and groups the current chapter tools", async ({ page, bookCourseApi }) => {
     await openLibrary(page, bookCourseApi);
     const courseEntry = page.locator(".library-course-grid .course-space-card").first().getByRole("button", { name: "进入课程", exact: true });
     const libraryUpload = page.getByRole("button", { name: "上传新教材", exact: true }).last();
@@ -161,50 +288,41 @@ test.describe("P2 card-system acceptance", () => {
       color: "rgb(32, 38, 58)"
     });
 
-    await courseEntry.click();
+    await clickAfterMotionAndScrollSettle(
+      page,
+      courseEntry,
+      "open the primary Library course entry for its chapter tools"
+    );
     await expect(page.locator(".book-course-screen")).toBeVisible();
-    const group = page.locator(".course-action-grid");
-    await expect(group).toHaveAttribute("role", "group");
-    await expect(group).toHaveAttribute("aria-label", "课程工具");
+    const section = await openMeiosisSection(page);
+    const group = section.locator(".study-tool-grid");
+    await expect(group).toHaveAttribute("aria-label", "本节辅助工具");
     const groupedSurface = await group.evaluate((element) => {
       const groupStyle = getComputedStyle(element);
-      const cells = Array.from(element.querySelectorAll<HTMLElement>(".quick-action")).map((cell) => {
+      const cells = Array.from(element.querySelectorAll<HTMLElement>(".study-tool-card")).map((cell) => {
         const style = getComputedStyle(cell);
+        const bounds = cell.getBoundingClientRect();
         return {
           backdropFilter: style.backdropFilter,
-          borderBottomWidth: style.borderBottomWidth,
-          borderLeftWidth: style.borderLeftWidth,
+          height: bounds.height,
           borderRadius: Number.parseFloat(style.borderTopLeftRadius),
-          borderRightWidth: style.borderRightWidth,
-          borderTopWidth: style.borderTopWidth,
-          boxShadow: style.boxShadow
+          tool: cell.dataset.tool,
+          width: bounds.width
         };
       });
       return {
-        backdropFilter: groupStyle.backdropFilter,
-        borderRadius: Number.parseFloat(groupStyle.borderTopLeftRadius),
-        boxShadow: groupStyle.boxShadow,
         columnGap: groupStyle.columnGap,
         rowGap: groupStyle.rowGap,
         cells
       };
     });
-    expect(groupedSurface, "course utilities form one ordinary 12–16px reading surface").toMatchObject({
-      backdropFilter: "none",
-      boxShadow: "none",
-      columnGap: "0px",
-      rowGap: "0px"
+    expect(groupedSurface, "chapter utilities keep the new two-column tool layout").toMatchObject({
+      columnGap: "12px",
+      rowGap: "12px"
     });
-    expect(groupedSurface.borderRadius).toBeGreaterThanOrEqual(12);
-    expect(groupedSurface.borderRadius).toBeLessThanOrEqual(16);
-    expect(groupedSurface.cells).toHaveLength(4);
-    expect(groupedSurface.cells.every((cell) => cell.borderRadius === 0 && cell.boxShadow === "none" && cell.backdropFilter === "none"), "tool cells are rows inside the group, not independent cards").toBe(true);
-    expect(groupedSurface.cells.map((cell) => [cell.borderTopWidth, cell.borderRightWidth, cell.borderBottomWidth, cell.borderLeftWidth]), "only the three internal dividers are drawn").toEqual([
-      ["0px", "1px", "1px", "0px"],
-      ["0px", "0px", "1px", "0px"],
-      ["0px", "1px", "0px", "0px"],
-      ["0px", "0px", "0px", "0px"]
-    ]);
+    expect(groupedSurface.cells.map((cell) => cell.tool)).toEqual(["assignment", "flashcards", "future"]);
+    expect(groupedSurface.cells.every((cell) => cell.borderRadius >= 12 && cell.borderRadius <= 16 && cell.backdropFilter === "none"), "tool cards remain compact opaque surfaces").toBe(true);
+    expect(groupedSurface.cells.every((cell) => cell.width >= 44 && cell.height >= 44), "chapter tool targets remain touch-safe").toBe(true);
   });
 
   test("keeps the white fully rounded Liquid Glass primary navigation", async ({ page }) => {
@@ -289,7 +407,11 @@ test.describe("P2 card-system acceptance", () => {
     }).filter((pair) => pair.ratio < 4.5);
     expect(contrastViolations, "rendered ordinary text, labels and primary button text meet WCAG AA").toEqual([]);
 
-    await page.locator(".lesson-action-grid .button").first().click();
+    await clickAfterMotionAndScrollSettle(
+      page,
+      page.locator(".lesson-action-grid .button").first(),
+      "open lesson chat for the card-system form audit"
+    );
     const chatSheet = page.locator(".sheet[data-sheet-type='chat']");
     await expect(chatSheet).toBeVisible();
     const chatInput = chatSheet.locator("input");

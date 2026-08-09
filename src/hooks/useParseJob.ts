@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { bookcourseApi } from "../api/bookcourseApi";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { JobStatusResponse } from "../types/api";
 
 export function useParseJob(jobId: string | null) {
+  const bookcourseRepository = useBookCourseRepository();
   const [job, setJob] = useState<JobStatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ export function useParseJob(jobId: string | null) {
     async function poll() {
       try {
         setLoading(true);
-        const result = await bookcourseApi.getJob(currentJobId);
+        const result = await bookcourseRepository.getJob(currentJobId);
         if (!active) return;
         setJob(result);
         setError(null);
@@ -40,7 +41,7 @@ export function useParseJob(jobId: string | null) {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [jobId, retryKey]);
+  }, [bookcourseRepository, jobId, retryKey]);
 
   return {
     job,
