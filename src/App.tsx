@@ -10,6 +10,7 @@ import { bookcourseApi } from "./api/bookcourseApi";
 import { runtimeConfig } from "./config/runtime";
 import { AppProvider } from "./context/AppContext";
 import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./context/AppContext";
+import { communityBooks } from "./data/mockBook";
 import { ScreenTransition, useMotionPresence } from "./motion";
 import {
   createInitialNavigation,
@@ -83,8 +84,8 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true },
   courseReady: { title: "生成成功", back: true, hideNav: true },
   library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
-  community: { title: "社区", subtitle: "发现同学共享的 AI 课程" },
-  communityBook: { title: "共享课程", subtitle: "导入后加入你的书库", back: true },
+  community: { title: "社区", subtitle: "发现同学分享的优质课程" },
+  communityBook: { title: "共享课程", back: true, hideNav: true },
   communityImport: { title: "导入成功", subtitle: "已生成可学习内容", back: true },
   study: {},
   book: {},
@@ -151,6 +152,7 @@ export default function App() {
   const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
   const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
   const [courseSelectionLoadingId, setCourseSelectionLoadingId] = useState<string | null>(null);
+  const [selectedCommunityBookId, setSelectedCommunityBookId] = useState(communityBooks[0]?.id ?? "");
   const courseSummariesRef = useRef<CourseSummary[]>([]);
   courseSummariesRef.current = courseSummaries;
   const [parsedScanResult, setParsedScanResult] = useState<ScanResult | null>(null);
@@ -223,6 +225,10 @@ export default function App() {
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
   }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
+
+  const selectCommunityBook = useCallback((bookId: string) => {
+    setSelectedCommunityBookId(bookId);
+  }, []);
 
   const back = useCallback(() => {
     const current = navigationRef.current;
@@ -515,6 +521,8 @@ export default function App() {
       courseSummariesError,
       courseSummariesRefreshing,
       courseSelectionLoadingId,
+      selectedCommunityBookId,
+      selectCommunityBook,
       refreshCourses,
       parsedScanResult,
       setParsedScanResult,
@@ -565,6 +573,8 @@ export default function App() {
       courseSummariesReadyKind,
       courseSummariesRefreshing,
       courseSelectionLoadingId,
+      selectedCommunityBookId,
+      selectCommunityBook,
       generatedFlashcards,
       generatedLessons,
       generatedQuizzes,

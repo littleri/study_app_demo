@@ -33,6 +33,8 @@ export type AppContextValue = AppActions & {
   courseSummariesError: string | null;
   courseSummariesRefreshing: boolean;
   courseSelectionLoadingId: string | null;
+  selectedCommunityBookId: string;
+  selectCommunityBook: (bookId: string) => void;
   refreshCourses: () => Promise<void>;
   parsedScanResult: ScanResult | null;
   setParsedScanResult: (value: ScanResult | null) => void;

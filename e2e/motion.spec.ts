@@ -5317,6 +5317,7 @@ async function openStageFourCCommunity(page: Page) {
   await page.locator(".primary-nav .nav-item").nth(1).click();
   await expect(page.locator(".community-screen"), "Stage 4C Community opens through its existing primary navigation").toBeVisible();
   await settleCurrentScreenTransition(page);
+  await page.getByLabel("搜索课程", { exact: true }).fill("课");
 }
 
 test.describe("Stage 4C remaining local motion", () => {
@@ -5459,9 +5460,9 @@ test.describe("Stage 4C remaining local motion", () => {
     await openStageFourCCommunity(page);
     const cards = page.locator(".community-grid .community-book-card");
     const tileCovers = page.locator(".community-grid .community-cover-image");
-    await expect(cards, `${testInfo.project.name}: Community keeps its existing shared-book cards`).toHaveCount(4);
-    await expect(tileCovers, `${testInfo.project.name}: Community keeps its existing real cover images`).toHaveCount(4);
-    for (let index = 0; index < 4; index += 1) {
+    await expect(cards, `${testInfo.project.name}: Community keeps its existing shared-book cards`).toHaveCount(10);
+    await expect(tileCovers, `${testInfo.project.name}: Community keeps its existing real cover images`).toHaveCount(10);
+    for (let index = 0; index < 10; index += 1) {
       await expectStageFourCImageIdle(tileCovers.nth(index), `${testInfo.project.name}: initial Community cover ${index + 1}`);
     }
     const initialTileBounds = await readStageFourCBox(tileCovers.first());
@@ -5561,7 +5562,8 @@ test.describe("Stage 4C remaining local motion", () => {
     await page.locator(".primary-nav .nav-item").nth(1).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleCurrentScreenTransition(page);
-    await expectDirectStageFourALocalItem(page.locator(".community-hero"), `${testInfo.project.name}: reduced Community hero`);
+    await expect(page.locator(".community-search-panel"), `${testInfo.project.name}: reduced Community search remains visible`).toBeVisible();
+    await expect(page.locator(".community-screen"), `${testInfo.project.name}: reduced Community root remains free of local-content motion`).not.toHaveAttribute("data-motion-item", /.+/);
     const firstCommunityCover = page.locator(".community-grid .community-cover-image").first();
     await expectStageFourCImageIdle(firstCommunityCover, `${testInfo.project.name}: reduced Community tile cover`);
     await page.locator(".community-book-card").first().click();
@@ -5642,12 +5644,9 @@ test.describe("Stage 4C remaining local motion", () => {
       await page.locator(".primary-nav .nav-item").nth(1).click();
       await expect(page.locator(".community-screen"), `${testInfo.project.name}: existing Community primary navigation remains reachable`).toBeVisible();
       await settleCurrentScreenTransition(page);
-      const communityHero = page.locator(".community-hero");
-      await expectPausedStageFourCGenericLocalItem(communityHero, page, `${testInfo.project.name}: Community hero`);
+      await expect(page.locator(".community-search-panel"), `${testInfo.project.name}: Community search replaces the removed hero`).toBeVisible();
       await expect(page.locator(".community-screen"), `${testInfo.project.name}: Community page root stays static`).not.toHaveAttribute("data-motion-item", /.+/);
       await expect(page.locator(".community-grid [data-motion-item]"), `${testInfo.project.name}: Community grid and book cards stay static`).toHaveCount(0);
-      await settleStageFourALocalItem(communityHero);
-      await waitForStageFourCLocalIdle(communityHero, `${testInfo.project.name}: settled Community hero`);
       await page.locator(".community-book-card").first().click();
       await expect(page.locator(".community-detail-screen"), `${testInfo.project.name}: existing Community book route remains reachable`).toBeVisible();
       await settleCurrentScreenTransition(page);

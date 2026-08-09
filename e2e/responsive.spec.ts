@@ -773,16 +773,9 @@ async function expectStageSixDiagnosisLayout(page: Page, viewport: CssViewport, 
 
 async function expectStageSixCommunityGrid(page: Page, viewport: CssViewport, label: string) {
   const books = page.locator(".community-grid .community-book-card");
-  await expect(books, `${label}: community books are available`).toHaveCount(4);
+  await expect(books, `${label}: community books are available`).toHaveCount(10);
   const lefts = await books.evaluateAll((elements) => elements.map((element) => Math.round(element.getBoundingClientRect().left)));
-  const expectedColumns = viewport.width >= 1024 && viewport.height >= 600
-    ? 3
-    : viewport.width >= 768 && viewport.height >= 600
-      ? 2
-      : viewport.width >= 700 && viewport.height < 600
-        ? 3
-        : 1;
-  expect(new Set(lefts).size, `${label}: community uses the expected responsive column count`).toBe(expectedColumns);
+  expect(new Set(lefts).size, `${label}: community uses the required two-column grid`).toBe(2);
   await expectNoHorizontalOverflow(page, `${label}: community grid`);
 }
 
@@ -847,6 +840,20 @@ test.describe("responsive smoke", () => {
       "the application API request reaches the fixture"
     ).toBeTruthy();
     expect(bookCourseApi.unhandledRequests, "blocked probes never reach the API fixture").toEqual([]);
+  });
+
+  test("keeps community discovery on a two-column grid across paired viewports", async ({ page }, testInfo) => {
+    const project = getResponsiveProject(testInfo.project.name);
+
+    await page.goto("/?embedded=device-preview");
+    await page.getByRole("button", { name: "社区", exact: true }).click();
+    await expect(page.getByRole("region", { name: "社区课程", exact: true }), `${project.name}: community opens`).toBeVisible();
+    await page.getByLabel("搜索课程", { exact: true }).fill("课");
+    await expectStageSixCommunityGrid(page, project.initialViewport, `${project.name}: initial community viewport`);
+
+    await page.setViewportSize(project.pairedViewport);
+    await expect(page.getByRole("region", { name: "社区课程", exact: true }), `${project.name}: community remains open after resize`).toBeVisible();
+    await expectStageSixCommunityGrid(page, project.pairedViewport, `${project.name}: paired community viewport`);
   });
 
   test("loads paired viewports and remains interactive after resize", async ({ page, bookCourseApi }, testInfo) => {
@@ -1699,6 +1706,7 @@ test.describe("responsive smoke", () => {
 
     await page.locator(".primary-nav .nav-item").nth(1).click();
     await expect(page.locator(".community-screen"), `${project.name}: community remains reachable through primary navigation`).toBeVisible();
+    await page.getByLabel("搜索课程", { exact: true }).fill("课");
     await expectStageSixCommunityGrid(page, project.initialViewport, `${project.name}: Stage 6 community`);
     await page.locator(".community-book-card").first().click();
     await expect(page.locator(".community-detail-screen"), `${project.name}: community book opens from its card`).toBeVisible();
@@ -1760,6 +1768,7 @@ test.describe("responsive smoke", () => {
     await expect(page.locator(".book-course-screen"), `${project.name}: boundary test returns to the course`).toBeVisible();
     await page.locator(".primary-nav .nav-item").nth(1).click();
     await expect(page.locator(".community-screen"), `${project.name}: boundary test opens community`).toBeVisible();
+    await page.getByLabel("搜索课程", { exact: true }).fill("课");
     for (const viewport of [
       { width: 767, height: 800 },
       { width: 768, height: 800 },

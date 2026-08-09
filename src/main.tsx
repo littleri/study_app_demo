@@ -13,6 +13,7 @@ import "./styles/study.css";
 import "./styles/motion.css";
 import "./styles/device-preview.css";
 import "./styles/card-system.css";
+import "./styles/community.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isEmbeddedPreview = searchParams.get("embedded") === "device-preview";
