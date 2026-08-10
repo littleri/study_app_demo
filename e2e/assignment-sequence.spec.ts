@@ -102,3 +102,56 @@ test.describe("assignment exercise sequence", () => {
     await expect(page.locator(".diagnosis-screen")).toBeVisible();
   });
 });
+
+test.describe("assignment entry geometry", () => {
+  test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "no-preference", timezoneId: "Asia/Hong_Kong" });
+
+  test("keeps the full-bleed exercise card edges visible during the phone entry transition", async ({ page }) => {
+    const viewport = page.viewportSize();
+    test.skip(!viewport || viewport.width >= 768 || viewport.width > viewport.height, "The full-bleed card is a phone portrait layout.");
+
+    await page.goto("/?embedded=device-preview");
+    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+    await page.addStyleTag({
+      content: ".motion-screen-surface { animation-play-state: paused !important; }"
+    });
+    await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();
+
+    const transition = page.locator('.motion-screen-transition[data-screen="assignment"]');
+    const currentSurface = transition.locator(':scope > [data-motion-surface="current"]');
+    await expect(transition).toHaveAttribute("data-motion-state", "transitioning");
+    await expect(page.locator(".assignment-exercise-card")).toBeVisible();
+
+    const entryGeometry = await page.evaluate(() => {
+      const shell = document.querySelector<HTMLElement>(".app-shell");
+      const transition = document.querySelector<HTMLElement>('.motion-screen-transition[data-screen="assignment"]');
+      const surface = document.querySelector<HTMLElement>('.motion-screen-surface[data-motion-surface="current"]');
+      const card = document.querySelector<HTMLElement>(".assignment-exercise-card");
+      if (!shell || !transition || !surface || !card) throw new Error("Assignment entry geometry is missing.");
+      const shellBounds = shell.getBoundingClientRect();
+      const transitionBounds = transition.getBoundingClientRect();
+      const cardBounds = card.getBoundingClientRect();
+      return {
+        animationName: getComputedStyle(surface).animationName,
+        cardExtendsPastTransition: cardBounds.left < transitionBounds.left && cardBounds.right > transitionBounds.right,
+        leftInset: cardBounds.left - shellBounds.left,
+        rightInset: shellBounds.right - cardBounds.right,
+        transitionOverflow: getComputedStyle(transition).overflow
+      };
+    });
+
+    expect(entryGeometry.animationName).toBe("motion-screen-assignment-in");
+    expect(entryGeometry.cardExtendsPastTransition).toBe(true);
+    expect(Math.abs(entryGeometry.leftInset)).toBeLessThanOrEqual(1);
+    expect(Math.abs(entryGeometry.rightInset)).toBeLessThanOrEqual(1);
+    expect(entryGeometry.transitionOverflow).toBe("visible");
+
+    await currentSurface.evaluate((element) => {
+      element.dispatchEvent(new AnimationEvent("animationend", {
+        animationName: "motion-screen-assignment-in",
+        bubbles: true
+      }));
+    });
+    await expect(transition).toHaveAttribute("data-motion-state", "idle");
+  });
+});

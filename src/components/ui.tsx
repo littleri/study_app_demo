@@ -21,6 +21,7 @@ import { globalMotionFallbackMs, localSlowMotionDurationSeconds, localStateGsapE
 import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
 import { useDeviceLayout } from "../layouts/useDeviceLayout";
+import { useMouseDragScroll } from "../hooks/useMouseDragScroll";
 import { IosStatusBar } from "./IosStatusBar";
 
 gsap.registerPlugin(useGSAP);
@@ -394,6 +395,7 @@ export function AppShell({
   hideNav?: boolean;
 }) {
   const deviceLayout = useDeviceLayout();
+  const mouseDragScroll = useMouseDragScroll();
   const appShellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [appShellElement, setAppShellElement] = useState<HTMLDivElement | null>(null);
@@ -468,7 +470,25 @@ export function AppShell({
 
   return (
     <div className="stage">
-      <div ref={setAppShellNode} className="app-shell" role="application" aria-label="BookCourse AI 应用" data-active-screen={active} data-device-layout={deviceLayout} data-motion-reduced={motionReduced ? "true" : "false"} onClickCapture={onClickCapture}>
+      <div
+        ref={setAppShellNode}
+        className="app-shell"
+        role="application"
+        aria-label="BookCourse AI 应用"
+        data-active-screen={active}
+        data-device-layout={deviceLayout}
+        data-motion-reduced={motionReduced ? "true" : "false"}
+        data-mouse-dragging={mouseDragScroll.dragging ? "true" : "false"}
+        onClickCapture={(event) => {
+          if (mouseDragScroll.consumeClick(event)) return;
+          onClickCapture?.(event);
+        }}
+        onLostPointerCaptureCapture={mouseDragScroll.onLostPointerCaptureCapture}
+        onPointerCancelCapture={mouseDragScroll.onPointerCancelCapture}
+        onPointerDownCapture={mouseDragScroll.onPointerDownCapture}
+        onPointerMoveCapture={mouseDragScroll.onPointerMoveCapture}
+        onPointerUpCapture={mouseDragScroll.onPointerUpCapture}
+      >
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
@@ -965,6 +985,7 @@ function GlobalAIAssistant({
         aria-haspopup="dialog"
         aria-hidden={dialogVisible ? true : undefined}
         data-ai-orb-hidden={dialogVisible ? "true" : "false"}
+        data-mouse-drag-scroll="ignore"
         tabIndex={dialogVisible ? -1 : undefined}
         style={orbStyle}
         onClick={() => {

@@ -614,6 +614,7 @@ export function StudyScreen() {
 
       <section
         className={`study-directory ${directoryDragging ? "is-mouse-dragging" : ""}`}
+        data-mouse-drag-scroll="ignore"
         aria-labelledby="study-directory-title"
         onClickCapture={suppressClickAfterDirectoryDrag}
         onPointerCancel={finishDirectoryMouseDrag}

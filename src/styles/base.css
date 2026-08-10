@@ -225,6 +225,17 @@ textarea:focus-visible {
   height: 0;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .app-shell[data-mouse-dragging="true"] {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  .app-shell[data-mouse-dragging="true"] * {
+    cursor: inherit;
+  }
+}
+
 .screen-content.with-header {
   padding-top: 112px;
 }

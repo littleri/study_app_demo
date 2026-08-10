@@ -243,6 +243,7 @@ export function HomeBookCarousel({
           <div
             ref={scrollerRef}
             className={`home-book-carousel ${books.length === 1 ? "is-single" : ""}`}
+            data-mouse-drag-scroll="self"
             role="listbox"
             aria-label="选择教材"
             aria-orientation="horizontal"

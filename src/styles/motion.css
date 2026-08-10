@@ -218,6 +218,20 @@
   }
 }
 
+/* The phone Assignment surface contains a full-bleed exercise card whose
+   rounded sides extend beyond the padded content column. Keep this route's
+   global motion on the vertical axis so the card owns the same left/right
+   geometry in every painted frame. */
+@keyframes motion-screen-assignment-in {
+  from {
+    transform: translateY(var(--motion-distance-small));
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
 @keyframes motion-screen-tablet-out {
   from {
     opacity: 1;
@@ -283,6 +297,22 @@
   .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction]
     > .motion-screen-surface[data-motion-surface="previous"] {
     animation-name: motion-screen-tablet-out;
+  }
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  /* The global transition wrapper normally clips overflowing screen bodies.
+     On Assignment that clip coincides with the padded content column and cuts
+     off both full-bleed rounded sides until the transition settles. The screen
+     scroller still owns the viewport boundary, so this targeted overflow is
+     contained by the app shell rather than leaking into the page. */
+  .motion-screen-transition[data-motion-state="transitioning"][data-screen="assignment"] {
+    overflow: visible;
+  }
+
+  .motion-screen-transition[data-motion-state="transitioning"][data-screen="assignment"]
+    > .motion-screen-surface[data-motion-surface="current"] {
+    animation-name: motion-screen-assignment-in;
   }
 }
 

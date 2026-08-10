@@ -21,6 +21,7 @@ export type ScreenTransitionProps = {
 export const screenTransitionEnterAnimationNames = [
   "motion-screen-phone-forward-in",
   "motion-screen-phone-back-in",
+  "motion-screen-assignment-in",
   "motion-screen-replace-in",
   "motion-screen-tablet-in",
   "motion-screen-short-forward-in",

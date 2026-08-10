@@ -241,6 +241,7 @@ export function CommunityScreen() {
             <div
               ref={categoryListRef}
               className={`community-category-list${categoryDragging ? " is-dragging" : ""}`}
+              data-mouse-drag-scroll="self"
               role="group"
               aria-label="按学科筛选书籍"
               onClickCapture={preventCategoryClickAfterDrag}
