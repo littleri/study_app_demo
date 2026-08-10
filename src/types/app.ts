@@ -27,10 +27,19 @@ export type Screen =
 
 export type SheetState =
   | { type: "chat" }
-  | { type: "source"; title: string; image: string; page: string }
+  | {
+      type: "source";
+      title: string;
+      image: string;
+      page: string;
+      text?: string;
+      source?: SourcePageTarget;
+    }
   | {
       type: "note";
       concept: string;
+      kind?: "concept" | "selection";
+      quote?: string;
       explanation?: string;
       sourceLabel?: string;
       source?: SourcePageTarget;

@@ -36,7 +36,7 @@ function resolveUploadedCover(fileName: string) {
 
 export function ParseReadyScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { clearLoadedCourse, go, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus, showToast } = useAppContext();
+  const { clearLoadedCourse, go, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus } = useAppContext();
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -60,12 +60,10 @@ export function ParseReadyScreen() {
         error: null
       });
       clearLoadedCourse();
-      showToast("后台解析已开始；你可以安全离开，进度会保留");
       go("processing");
     } catch (err) {
       const message = err instanceof Error ? err.message : "解析任务创建失败";
       setParseError(message);
-      showToast(message, "warning");
     } finally {
       setParsing(false);
     }

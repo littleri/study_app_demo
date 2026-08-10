@@ -234,6 +234,7 @@ async function openSourceReader(page: Page) {
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
   await page.locator(".lesson-source-link").first().click();
+  await page.getByRole("button", { name: "全屏阅读教材", exact: true }).click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -605,22 +606,44 @@ test.describe("current DemoRepository responsive matrix", () => {
     await page.setViewportSize(project.pairedViewport);
     await setVisualViewport(page, { height: project.pairedViewport.height, offsetTop: 0 });
     await openLesson(page);
-    const repeatedLessonSelectors = [
+    const lessonPager = page.locator(".lesson-knowledge-pager");
+    await expect(lessonPager.locator(".lesson-introduction")).toBeVisible();
+    await expect(lessonPager.locator(".lesson-source-link")).toBeVisible();
+    await expect(lessonPager.locator(".lesson-page-controls")).toHaveCount(0);
+    await expect(page.locator(".lesson-concepts, .concept-card-grid")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "完成本节", exact: true })).toHaveCount(0);
+    await lessonPager.focus();
+    await page.keyboard.press("ArrowRight");
+    const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });
+    await expect(lessonProgress).toHaveAttribute("aria-valuenow", "2");
+    await expect(lessonPager.locator(".lesson-source-link")).toBeVisible();
+    const knowledgePageSelectors = [
       ".lesson-source-link",
-      ".concept-card-grid button",
-      ".lesson-inline-figure",
-      ".lesson-floating-complete .button"
+      ".lesson-inline-figure"
     ];
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
       ".lesson-reading-column",
-      ...repeatedLessonSelectors
+      ".lesson-knowledge-pager",
+      ...knowledgePageSelectors
     ], `${project.name} Lesson paired viewport full-element geometry`);
     await expectAllControlsReachableInVisualViewport(
       page,
-      ".lesson-source-link, .concept-card-grid button, .lesson-floating-complete .button",
+      ".lesson-source-link",
       `${project.name} Lesson paired visual viewport controls`
     );
+
+    const lessonPageCount = Number(await lessonProgress.getAttribute("aria-valuemax"));
+    for (let pageIndex = 2; pageIndex < lessonPageCount; pageIndex += 1) {
+      await lessonPager.focus();
+      await page.keyboard.press("ArrowRight");
+    }
+    await expect(lessonProgress).toHaveAttribute("aria-valuenow", String(lessonPageCount));
+    await expect(page.getByRole("button", { name: "完成本节", exact: true })).toBeVisible();
+    const finalLessonSelectors = [
+      ...knowledgePageSelectors,
+      ".lesson-floating-complete .button"
+    ];
 
     const shortLandscape = project.name === "small-phone-short-landscape";
     const offsetTop = Math.min(shortLandscape ? 32 : 24, Math.max(0, project.pairedViewport.height - 1));
@@ -633,11 +656,12 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
       ".lesson-reading-column",
-      ...repeatedLessonSelectors
+      ".lesson-knowledge-pager",
+      ...finalLessonSelectors
     ], `${project.name} Lesson shrunken visual viewport full-element geometry`);
     await expectAllControlsReachableInVisualViewport(
       page,
-      ".lesson-source-link, .concept-card-grid button, .lesson-floating-complete .button",
+      ".lesson-source-link, .lesson-floating-complete .button",
       `${project.name} Lesson shrunken visual viewport controls`
     );
     await expectNoShellOverflow(page, `${project.name} Lesson visual viewport cleanup`);

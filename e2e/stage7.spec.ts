@@ -288,6 +288,10 @@ async function openProductionSourceReader(page: Page, scenario = "default") {
   await openProductionLesson(page, scenario);
   await clickAfterMotionAndScrollSettle(
     page.locator(".lesson-source-link").first(),
+    "open production source sheet"
+  );
+  await clickAfterMotionAndScrollSettle(
+    page.getByRole("button", { name: "全屏阅读教材", exact: true }),
     "open production SourceReader"
   );
   await expect(page.locator(".source-reader-screen")).toBeVisible();
@@ -413,42 +417,7 @@ async function expectParseReadyBottomSurface(page: Page) {
 
 async function expectChapterConfirmationOverlayStack(page: Page) {
   await expect(page.getByRole("navigation", { name: "主导航" }), "Chapter confirmation is a focused task without a misleading active tab").toHaveCount(0);
-  const toast = page.locator(".toast");
-  await expect(toast, "Chapter confirmation completion Toast is mounted exactly once").toHaveCount(1);
-  await expect(toast, "Chapter confirmation completion Toast is visible").toBeVisible();
-  const geometry = await page.evaluate(() => {
-    const action = document.querySelector<HTMLElement>(".chapter-confirm-actions");
-    const toast = document.querySelector<HTMLElement>(".toast");
-    const indicator = document.querySelector<HTMLElement>(".home-indicator span");
-    if (!action || !toast) throw new Error("Chapter confirmation action/toast stack is missing");
-    const indicatorBounds = indicator?.getBoundingClientRect();
-    const visualTop = window.visualViewport?.offsetTop ?? 0;
-    const visualBottom = visualTop + (window.visualViewport?.height ?? window.innerHeight);
-    return {
-      action: action.getBoundingClientRect().toJSON() as Bounds,
-      toast: toast.getBoundingClientRect().toJSON() as Bounds,
-      indicator: indicatorBounds && indicatorBounds.height > 0 ? indicatorBounds.toJSON() as Bounds : null,
-      visualBottom,
-      visualTop
-    };
-  });
-  expect(geometry.toast.width, "Chapter confirmation Toast has a non-zero width").toBeGreaterThan(0);
-  expect(geometry.toast.height, "Chapter confirmation Toast has a non-zero height").toBeGreaterThan(0);
-  expect(
-    geometry.toast.top,
-    `Chapter confirmation Toast begins inside the visual viewport (${JSON.stringify(geometry)})`
-  ).toBeGreaterThanOrEqual(geometry.visualTop - 1);
-  expect(
-    geometry.toast.bottom,
-    `Chapter confirmation Toast ends inside the visual viewport (${JSON.stringify(geometry)})`
-  ).toBeLessThanOrEqual(geometry.visualBottom + 1);
-  expect(
-    overlaps(geometry.action, geometry.toast),
-    `Chapter confirmation: completion toast does not intersect the sticky action (${JSON.stringify(geometry)})`
-  ).toBeFalsy();
-  if (geometry.indicator) {
-    expect(geometry.toast.bottom, "Chapter confirmation: completion toast clears the Home Indicator").toBeLessThanOrEqual(geometry.indicator.top - 1);
-  }
+  await expect(page.locator(".toast"), "Chapter confirmation remains popup-free after parsing completes").toHaveCount(0);
 }
 
 async function expectViewportShellContract(page: Page, viewport: CssViewport, label: string) {

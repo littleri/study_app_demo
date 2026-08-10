@@ -135,6 +135,7 @@ async function openSourceFromStudy(page: Page) {
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
   await page.locator(".lesson-source-link").first().click();
+  await page.getByRole("button", { name: "全屏阅读教材", exact: true }).click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -1632,16 +1633,23 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
   test("keeps Lesson and Profile local entries scoped to their current real screen instances", async ({ page }) => {
     test.setTimeout(50_000);
-    await installInitialPauseStyle(page, ".lesson-article-header, .profile-card");
+    await installInitialPauseStyle(page, ".lesson-introduction-heading, .profile-card");
     await openLesson(page);
 
-    const lessonTitle = page.locator(".lesson-article-header");
+    const lessonTitle = page.locator(".lesson-introduction-heading");
     await expectLocalEntry(lessonTitle, "lesson title entry");
     await dispatchAnimation(lessonTitle, "animationend", "motion-local-item-in");
     await expect(lessonTitle).toHaveAttribute("data-motion-item-state", "idle");
     const lessonNode = await lessonTitle.elementHandle();
     if (!lessonNode) throw new Error("Lesson title local-motion root is missing");
 
+    const lessonPager = page.locator(".lesson-knowledge-pager");
+    const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });
+    const lessonPageCount = Number(await lessonProgress.getAttribute("aria-valuemax"));
+    for (let pageIndex = 1; pageIndex < lessonPageCount; pageIndex += 1) {
+      await lessonPager.focus();
+      await page.keyboard.press("ArrowRight");
+    }
     await page.locator(".lesson-floating-complete .button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
     await expect(page.locator(".report-screen")).toHaveCount(0);

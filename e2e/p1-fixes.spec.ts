@@ -111,6 +111,7 @@ test.describe("P1 learning flow safeguards", () => {
 
     await page.getByRole("button", { name: "上传并继续", exact: true }).click();
     await expect(page.locator(".parse-ready-screen")).toBeVisible();
+    await expect(page.locator(".toast"), "upload confirmation stays inside the page without a popup").toHaveCount(0);
     await expect(page.locator(".parse-info-grid")).toContainText("后台解析");
     await expect(page.locator(".parse-ready-summary h2")).toHaveText("biology-replacement");
     await expect(page.locator(".parse-ready-summary h2")).toHaveAttribute("title", "biology-replacement (publisher).pdf");
@@ -119,6 +120,7 @@ test.describe("P1 learning flow safeguards", () => {
 
     await page.getByRole("button", { name: "开始解析", exact: true }).click();
     await expect(page.locator(".processing-flow-screen")).toBeVisible();
+    await expect(page.locator(".toast"), "parse startup stays inside the page without a popup").toHaveCount(0);
   });
 
   test("collapses deduplicated learner-facing evidence while keeping every source available", async ({ page }) => {
@@ -137,6 +139,6 @@ test.describe("P1 learning flow safeguards", () => {
     await expect(sourceButton).toContainText("教材第 18 页");
     await expectNoHorizontalOverflow(page);
     await sourceButton.click();
-    await expect(page.locator(".source-reader-screen")).toBeVisible();
+    await expect(page.locator(".sheet[data-sheet-type='source']")).toBeVisible();
   });
 });

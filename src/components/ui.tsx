@@ -22,6 +22,8 @@ import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
 import { useDeviceLayout } from "../layouts/useDeviceLayout";
 import { useMouseDragScroll } from "../hooks/useMouseDragScroll";
+import { useAppContext } from "../context/AppContext";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { IosStatusBar } from "./IosStatusBar";
 
 gsap.registerPlugin(useGSAP);
@@ -587,7 +589,51 @@ type OrbPosition = {
   left: number | null;
 };
 
+type AiOrbInteraction = "idle" | "pressed" | "dragging";
+
+const aiOrbIdleImageBySide: Record<OrbPosition["side"], string> = {
+  left: "/assets/brand/cloud-mascot-ai-chat-edge-left-ui.webp",
+  right: "/assets/brand/cloud-mascot-ai-chat-edge-ui.webp"
+};
+
+const aiOrbActiveImageByInteraction: Record<Exclude<AiOrbInteraction, "idle">, string> = {
+  pressed: "/assets/brand/cloud-mascot-ai-chat-edge-pressed-ui.webp",
+  dragging: "/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
+};
+
 type AiDialogView = { key: "ai-assistant" };
+
+export const openGlobalAiAssistantEvent = "bookcourse:open-global-ai-assistant";
+
+type OpenGlobalAiAssistantDetail = {
+  origin?: HTMLButtonElement;
+};
+
+type AiAssistantMessage = {
+  role: "ai" | "user";
+  source?: string;
+  text: string;
+};
+
+type AiAssistantContent = {
+  contextBody: string;
+  contextLabel: string;
+  contextMeta: string;
+  contextTitle: string;
+  modes: string[];
+  suggestions: string[];
+  topics: string[];
+};
+
+const defaultAiAssistantContent: AiAssistantContent = {
+  contextBody: "学习相关的问题，都可以问我。",
+  contextLabel: "当前书籍",
+  contextMeta: "09 / 九月学习",
+  contextTitle: "期末复习效率如何提升？",
+  modes: ["知识点讲解", "作业解析", "错题复盘"],
+  suggestions: ["长时间学习如何避免疲惫", "如何规划复习节奏？"],
+  topics: ["科普", "学习方法"]
+};
 
 function getAiDialogKey(view: AiDialogView) {
   return view.key;
@@ -642,13 +688,15 @@ function getOrbMetrics(shell: HTMLElement, reservedTop = 0): OrbMetrics {
   const safeBottom = readCssNumber(style, "--safe-area-bottom");
   const safeLeft = readCssNumber(style, "--safe-area-left");
   const navHeight = readCssNumber(style, "--primary-nav-height");
-  const orbSize = 54;
-  const inset = 12;
-  const baseTopMin = Math.min(bottom - orbSize, visibleTop + safeTop + inset);
-  const topMax = Math.max(baseTopMin, bottom - safeBottom - navHeight - inset - orbSize);
+  const orb = shell.querySelector<HTMLElement>(".ai-orb");
+  const orbWidth = orb?.offsetWidth || 62;
+  const orbHeight = orb?.offsetHeight || 72;
+  const verticalInset = 12;
+  const baseTopMin = Math.min(bottom - orbHeight, visibleTop + safeTop + verticalInset);
+  const topMax = Math.max(baseTopMin, bottom - safeBottom - navHeight - verticalInset - orbHeight);
   const topMin = Math.min(topMax, Math.max(baseTopMin, reservedTop));
-  const leftMin = safeLeft + inset;
-  const leftMax = Math.max(leftMin, bounds.width - safeRight - inset - orbSize);
+  const leftMin = safeLeft;
+  const leftMax = Math.max(leftMin, bounds.width - safeRight - orbWidth);
 
   return { bottom, leftMax, leftMin, topMax, topMin, visibleHeight, visibleTop };
 }
@@ -666,15 +714,56 @@ function GlobalAIAssistant({
   homeLayout: boolean;
   reducedMotion: boolean;
 }) {
+  const bookcourseRepository = useBookCourseRepository();
+  const {
+    activeChapterId,
+    generatedLessons,
+    parsedChapters,
+    uploadedFile
+  } = useAppContext();
+  const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId)
+    ?? parsedChapters?.[0]
+    ?? null;
+  const activeLesson = activeChapter
+    ? generatedLessons?.find((lesson) => lesson.chapter_id === activeChapter.chapter_id) ?? null
+    : generatedLessons?.[0] ?? null;
+  const assistantContent = useMemo<AiAssistantContent>(() => {
+    if (active !== "lesson") return defaultAiAssistantContent;
+    const title = activeLesson?.title ?? activeChapter?.ai_title ?? activeChapter?.source_title ?? "当前章节";
+    const concepts = activeLesson?.key_concepts.filter(Boolean) ?? [];
+    const primaryConcept = concepts[0] ?? title;
+    const secondaryConcept = concepts[1] ?? null;
+    const pageStart = activeChapter?.printed_page_start ?? activeLesson?.page_start ?? activeChapter?.page_start;
+    const pageEnd = activeChapter?.printed_page_end ?? activeLesson?.page_end ?? activeChapter?.page_end;
+    const pageLabel = pageStart
+      ? `原书 ${pageStart}${pageEnd && pageEnd !== pageStart ? `–${pageEnd}` : ""} 页`
+      : uploadedFile?.name ?? "当前课程";
+    return {
+      contextBody: "依据当前章节原文回答，并标注教材位置。",
+      contextLabel: "当前课程",
+      contextMeta: pageLabel,
+      contextTitle: title,
+      modes: ["本节讲解", "举例理解", "随堂测验"],
+      suggestions: [
+        `用一句话解释“${primaryConcept}”`,
+        secondaryConcept
+          ? `比较“${primaryConcept}”和“${secondaryConcept}”`
+          : `围绕“${title}”给我出一道题`
+      ],
+      topics: concepts.length > 0 ? concepts.slice(0, 2) : ["本节重点", "教材原文"]
+    };
+  }, [active, activeChapter, activeLesson, uploadedFile]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
   const [orbPosition, setOrbPosition] = useState<OrbPosition>({
     side: "right",
     top: 0,
     left: null
   });
-  const [dragging, setDragging] = useState(false);
+  const [orbInteraction, setOrbInteraction] = useState<AiOrbInteraction>("idle");
   const orbRef = useRef<HTMLButtonElement | null>(null);
+  const dialogOriginRef = useRef<HTMLButtonElement | null>(null);
   const suppressOrbClickRef = useRef(false);
   const hasDraggedOrbRef = useRef(false);
   const dialogEpochRef = useRef(0);
@@ -692,7 +781,7 @@ function GlobalAIAssistant({
     currentY: 0,
     moved: false
   });
-  const [messages, setMessages] = useState<{ role: "ai" | "user"; text: string }[]>([]);
+  const [messages, setMessages] = useState<AiAssistantMessage[]>([]);
   const requestedDialog = useMemo<AiDialogView | null>(() => (
     open ? { key: "ai-assistant" } : null
   ), [open]);
@@ -705,6 +794,11 @@ function GlobalAIAssistant({
   });
   const previouslyRenderedDialogRef = useRef(false);
   const dialogVisible = dialogPresence.rendered !== null;
+  const dragging = orbInteraction === "dragging";
+  const orbImageSource = orbInteraction === "idle"
+    ? aiOrbIdleImageBySide[orbPosition.side]
+    : aiOrbActiveImageByInteraction[orbInteraction];
+  const orbSuppressed = active === "lesson";
 
   const requestDialogOpen = useCallback(() => {
     dialogEpochRef.current += 1;
@@ -715,6 +809,35 @@ function GlobalAIAssistant({
   const requestDialogClose = useCallback(() => {
     dialogCloseEpochRef.current = dialogEpochRef.current;
     setOpen(false);
+  }, []);
+
+  useEffect(() => {
+    const shell = containerElement;
+    if (!shell) return;
+    const openFromCustomEntry: EventListener = (event) => {
+      const detail = (event as CustomEvent<OpenGlobalAiAssistantDetail>).detail;
+      dialogOriginRef.current = detail?.origin?.isConnected ? detail.origin : orbRef.current;
+      requestDialogOpen();
+    };
+    shell.addEventListener(openGlobalAiAssistantEvent, openFromCustomEntry);
+    return () => shell.removeEventListener(openGlobalAiAssistantEvent, openFromCustomEntry);
+  }, [containerElement, requestDialogOpen]);
+
+  useEffect(() => {
+    setInput("");
+    setMessages([]);
+    setLoading(false);
+  }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, uploadedFile?.bookId]);
+
+  useEffect(() => {
+    [
+      ...Object.values(aiOrbIdleImageBySide),
+      ...Object.values(aiOrbActiveImageByInteraction)
+    ].forEach((source) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.src = source;
+    });
   }, []);
 
   const clearOrbMotion = useCallback(() => {
@@ -769,7 +892,7 @@ function GlobalAIAssistant({
     clearOrbMotion();
     dragState.current.pointerId = -1;
     dragState.current.moved = false;
-    setDragging(false);
+    setOrbInteraction("idle");
   }, [clearOrbMotion]);
 
   const handleViewportChange = useCallback(() => {
@@ -810,32 +933,74 @@ function GlobalAIAssistant({
 
   useLayoutEffect(() => {
     const wasRendered = previouslyRenderedDialogRef.current;
+    const origin = dialogOriginRef.current;
     if (
       wasRendered &&
       !dialogVisible &&
       !open &&
       dialogCloseEpochRef.current === dialogEpochRef.current &&
-      orbRef.current?.isConnected &&
-      orbRef.current.dataset.aiOrbHidden !== "true"
+      origin?.isConnected &&
+      origin.getClientRects().length > 0 &&
+      origin.dataset.aiOrbHidden !== "true"
     ) {
-      orbRef.current.focus({ preventScroll: true });
+      origin.focus({ preventScroll: true });
     }
     previouslyRenderedDialogRef.current = dialogVisible;
   }, [dialogVisible, open]);
 
-  function submitMessage(event: FormEvent<HTMLFormElement>) {
+  async function submitMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = input.trim();
-    if (!text) return;
-    setMessages((items) => [
-      ...items,
-      { role: "user", text },
-      {
-        role: "ai",
-        text: "我会先结合当前课程上下文定位知识点，再给你一个可以直接复习的短答案，并附上教材页码和错题记录。"
-      }
-    ]);
+    if (!text || loading) return;
+    const history = messages.map((message) => ({
+      content: message.text,
+      role: message.role === "ai" ? "assistant" : "user"
+    }));
+    setMessages((items) => [...items, { role: "user", text }]);
     setInput("");
+    if (active !== "lesson" || !uploadedFile) {
+      setMessages((items) => [
+        ...items,
+        {
+          role: "ai",
+          text: "我会先结合当前课程上下文定位知识点，再给你一个可以直接复习的短答案，并附上教材页码和错题记录。"
+        }
+      ]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await bookcourseRepository.queryRag({
+        book_id: uploadedFile.bookId,
+        chapter_id: activeChapter?.chapter_id ?? null,
+        history,
+        question: text
+      });
+      const citation = result.citations[0];
+      const source = citation
+        ? [
+            citation.chapter_title,
+            citation.location_label || `第 ${citation.page} 页`
+          ].filter(Boolean).join(" · ")
+        : undefined;
+      setMessages((items) => [
+        ...items,
+        { role: "ai", source, text: result.answer }
+      ]);
+    } catch (error) {
+      setMessages((items) => [
+        ...items,
+        {
+          role: "ai",
+          text: error instanceof Error
+            ? `这次没有完成教材检索：${error.message}`
+            : "这次没有完成教材检索，请稍后再试。"
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const writePendingDragTransform = useCallback(() => {
@@ -878,7 +1043,7 @@ function GlobalAIAssistant({
       moved: false
     };
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDragging(true);
+    setOrbInteraction("pressed");
   }
 
   function handleOrbPointerMove(event: PointerEvent<HTMLButtonElement>) {
@@ -886,8 +1051,12 @@ function GlobalAIAssistant({
     const dx = event.clientX - dragState.current.startX;
     const dy = event.clientY - dragState.current.startY;
     if (Math.hypot(dx, dy) > 6) {
-      dragState.current.moved = true;
+      if (!dragState.current.moved) {
+        dragState.current.moved = true;
+        setOrbInteraction("dragging");
+      }
     }
+    if (!dragState.current.moved) return;
     dragState.current.currentX = event.clientX;
     dragState.current.currentY = event.clientY;
     scheduleDragTransform(dx, dy);
@@ -902,7 +1071,7 @@ function GlobalAIAssistant({
     }
     dragState.current.pointerId = -1;
     suppressOrbClickRef.current = moved;
-    setDragging(false);
+    setOrbInteraction("idle");
     if (!moved) {
       clearOrbMotion();
       return;
@@ -977,22 +1146,26 @@ function GlobalAIAssistant({
     <>
       <button
         ref={orbRef}
-        className={`ai-orb glass-button ${dragging ? "dragging" : ""}`}
+        className={`ai-orb ai-orb-mascot glass-button ${dragging ? "dragging" : ""}`}
         type="button"
-        aria-label="打开 AI 助手"
+        aria-label={dragging ? "正在拖动 AI 助手入口" : "打开 AI 助手"}
         aria-controls="ai-assistant-dialog"
         aria-expanded={dialogVisible}
         aria-haspopup="dialog"
-        aria-hidden={dialogVisible ? true : undefined}
+        aria-hidden={orbSuppressed || dialogVisible ? true : undefined}
+        data-interaction={orbInteraction}
+        data-side={orbPosition.side}
         data-ai-orb-hidden={dialogVisible ? "true" : "false"}
         data-mouse-drag-scroll="ignore"
-        tabIndex={dialogVisible ? -1 : undefined}
+        hidden={orbSuppressed}
+        tabIndex={orbSuppressed || dialogVisible ? -1 : undefined}
         style={orbStyle}
-        onClick={() => {
+        onClick={(event) => {
           if (suppressOrbClickRef.current) {
             suppressOrbClickRef.current = false;
             return;
           }
+          dialogOriginRef.current = event.currentTarget;
           requestDialogOpen();
         }}
         onPointerDown={handleOrbPointerDown}
@@ -1000,14 +1173,16 @@ function GlobalAIAssistant({
         onPointerUp={handleOrbPointerUp}
         onPointerCancel={handleOrbPointerCancel}
       >
-        <MessageCircle size={24} aria-hidden="true" />
+        <img src={orbImageSource} alt="" aria-hidden="true" decoding="async" draggable={false} />
       </button>
       <AIAssistantDialog
+          content={assistantContent}
           visible={dialogVisible}
           state={dialogPresence.state}
           presenceId={dialogPresence.presenceId}
-          originRef={orbRef}
+          originRef={dialogOriginRef}
           input={input}
+          loading={loading}
           messages={messages}
           onClose={requestDialogClose}
           onAnimationEnd={dialogPresence.onAnimationEnd}
@@ -1020,11 +1195,13 @@ function GlobalAIAssistant({
 }
 
 function AIAssistantDialog({
+  content,
   visible,
   state,
   presenceId,
   originRef,
   input,
+  loading,
   messages,
   onClose,
   onAnimationEnd,
@@ -1032,17 +1209,19 @@ function AIAssistantDialog({
   setInput,
   submitMessage
 }: {
+  content: AiAssistantContent;
   visible: boolean;
   state: MotionState;
   presenceId: number;
   originRef: RefObject<HTMLButtonElement | null>;
   input: string;
-  messages: { role: "ai" | "user"; text: string }[];
+  loading: boolean;
+  messages: AiAssistantMessage[];
   onClose: () => void;
   onAnimationEnd: (event: MotionAnimationEvent) => void;
   onAnimationCancel: (event: MotionAnimationEvent) => void;
   setInput: (value: string) => void;
-  submitMessage: (event: FormEvent<HTMLFormElement>) => void;
+  submitMessage: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   const layerRef = useRef<HTMLDivElement | null>(null);
   const sharedSurfaceRef = useRef<HTMLDivElement | null>(null);
@@ -1170,7 +1349,13 @@ function AIAssistantDialog({
         data-motion-state={state}
         aria-hidden="true"
       >
-        <MessageCircle size={24} aria-hidden="true" />
+        <img
+          src="/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          draggable={false}
+        />
       </span>
       <aside
         key={panelKey}
@@ -1211,37 +1396,42 @@ function AIAssistantDialog({
           </div>
           <section className="ai-current-book">
             <div className="ai-current-book-head">
-              <strong>当前书籍</strong>
-              <span>09 / 九月学习</span>
+              <strong>{content.contextLabel}</strong>
+              <span>{content.contextMeta}</span>
             </div>
             <div className="ai-current-book-body">
-              <h3>期末复习效率如何提升？</h3>
-              <p>学习相关的问题，都可以问我。</p>
+              <h3>{content.contextTitle}</h3>
+              <p>{content.contextBody}</p>
               <div className="ai-topic-row">
-                <button type="button">科普</button>
-                <button type="button">学习方法</button>
+                {content.topics.map((item) => (
+                  <button type="button" key={item} onClick={() => setInput(`请讲解“${item}”`)}>
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
           </section>
           <p className="ai-suggest-title">你可能感兴趣</p>
           <div className="ai-suggest-list">
-            {["长时间学习如何避免疲惫", "如何规划复习节奏？"].map((item) => (
-              <button type="button" key={item} onClick={() => setInput(item)}>
+            {content.suggestions.map((item) => (
+              <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
                 <MessageCircle size={15} aria-hidden="true" />
                 {item}
               </button>
             ))}
           </div>
-          <div className="ai-message-list">
+          <div className="ai-message-list" aria-live="polite" aria-busy={loading}>
             {messages.map((message, index) => (
-              <p className={`ai-message ${message.role}`} key={`${message.role}-${index}`}>
-                {message.text}
-              </p>
+              <div className={`ai-message ${message.role}`} key={`${message.role}-${index}`}>
+                <p>{message.text}</p>
+                {message.source ? <small>{message.source}</small> : null}
+              </div>
             ))}
+            {loading ? <p className="ai-message ai">正在检索当前章节的教材片段…</p> : null}
           </div>
           <div className="ai-mode-row">
-            {["知识点讲解", "作业解析", "错题复盘"].map((item) => (
-              <button type="button" key={item}>
+            {content.modes.map((item) => (
+              <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
                 {item}
               </button>
             ))}
@@ -1252,11 +1442,14 @@ function AIAssistantDialog({
             ref={inputRef}
             value={input}
             aria-label="向 AI 助手提问"
+            disabled={loading}
             onChange={(event) => setInput(event.target.value)}
             placeholder="问教材、问错题、问计划..."
           />
-          <button type="submit" aria-label="发送">
-            <SendHorizontal size={18} aria-hidden="true" />
+          <button type="submit" aria-label="发送" disabled={loading || !input.trim()}>
+            {loading
+              ? <Loader2 className="spin" size={18} aria-hidden="true" />
+              : <SendHorizontal size={18} aria-hidden="true" />}
           </button>
         </form>
       </aside>

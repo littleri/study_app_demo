@@ -7,7 +7,7 @@ import {
   type ScreenDirection,
   type ScreenSurface
 } from "./screenTransitionMachine";
-import { globalMotionFallbackMs } from "./timing";
+import { globalEmphasisMotionFallbackMs, globalMotionFallbackMs } from "./timing";
 
 export type ScreenTransitionProps = {
   screenKey: Screen;
@@ -104,12 +104,15 @@ export function ScreenTransition({
     if (reducedMotion || renderedSnapshot.state !== "transitioning") return;
 
     const activeNonce = renderedSnapshot.current.nonce;
+    const fallbackMs = renderedSnapshot.current.screen === "assignment"
+      ? globalEmphasisMotionFallbackMs
+      : globalMotionFallbackMs;
     const fallback = window.setTimeout(() => {
       setSnapshot((current) => settleScreenTransition(current, activeNonce));
-    }, globalMotionFallbackMs);
+    }, fallbackMs);
 
     return () => window.clearTimeout(fallback);
-  }, [reducedMotion, renderedSnapshot.current.nonce, renderedSnapshot.state]);
+  }, [reducedMotion, renderedSnapshot.current.nonce, renderedSnapshot.current.screen, renderedSnapshot.state]);
 
   const renderSurface = (surface: ScreenSurface, role: "current" | "previous") => {
     const isPrevious = role === "previous";

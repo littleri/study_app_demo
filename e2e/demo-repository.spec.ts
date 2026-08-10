@@ -49,6 +49,41 @@ test.describe("local DemoRepository P0 flow", () => {
     await expect(page.locator(".assignment-card textarea")).toBeFocused();
   });
 
+  test("keeps the complete import path free of Toast popups", async ({ page }) => {
+    test.setTimeout(35_000);
+
+    await page.goto("/?embedded=device-preview");
+    await expectScreenReady(page, ".home-dashboard", "quiet import home");
+    await clickUniqueAction(page, page.locator('[data-home-global-action="upload"]'), "open quiet import");
+    await expectScreenReady(page, ".upload-sheet-screen", "quiet import upload");
+
+    await page.locator("input[type=file]").setInputFiles({
+      name: "biology-quiet-import.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 quiet import fixture")
+    });
+    await clickUniqueAction(page, page.getByRole("button", { name: "上传并继续", exact: true }), "finish quiet upload");
+    await expectScreenReady(page, ".parse-ready-screen", "quiet parse ready");
+    await expect(page.locator(".toast"), "upload completion does not open a Toast").toHaveCount(0);
+
+    await clickUniqueAction(page, page.getByRole("button", { name: "开始解析", exact: true }), "start quiet parsing");
+    await expectScreenReady(page, ".processing-flow-screen", "quiet processing");
+    await expect(page.locator(".toast"), "parse startup does not open a Toast").toHaveCount(0);
+
+    await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 12_000 });
+    await expectScreenReady(page, ".chapter-confirm-screen", "quiet chapter confirmation");
+    await expect(page.locator(".toast"), "parse completion does not open a Toast").toHaveCount(0);
+
+    await clickUniqueAction(
+      page,
+      page.getByRole("button", { name: "确认生成课程", exact: true }),
+      "generate the quiet course"
+    );
+    await expect(page.locator(".course-ready-screen")).toBeVisible({ timeout: 10_000 });
+    await expectScreenReady(page, ".course-ready-screen", "quiet course ready");
+    await expect(page.locator(".toast"), "course generation does not open a Toast").toHaveCount(0);
+  });
+
   test("replays upload through lesson completion with deterministic local data only", async ({ page }) => {
     test.setTimeout(75_000);
 

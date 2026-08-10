@@ -26,6 +26,8 @@ import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 
+const curatedBiologyBookId = "book_biology_2";
+
 function getDefaultLocation(chapters: ApiChapter[]): StudyLocation {
   const [firstRoot] = buildChapterTree(chapters);
   const firstSection = firstRoot ? getStudySections(firstRoot)[0]?.chapter ?? firstRoot.chapter : null;
@@ -332,7 +334,7 @@ function StudyChapter({
               depth={depth}
               expanded={location.expandedSectionId === chapter.chapter_id}
               key={chapter.chapter_id}
-              progress={calculateChapterProgress(tasks, chapterIds)}
+              progress={node.children.length === 0 ? progress : calculateChapterProgress(tasks, chapterIds)}
               onToggle={() => onToggleSection(chapter.chapter_id)}
             />
           ))}
@@ -457,7 +459,17 @@ export function StudyScreen() {
 
   const totalTasks = currentStudyPlan?.tasks.length ?? 0;
   const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
-  const planProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const usesCuratedBiologyProgress = currentBookId === curatedBiologyBookId;
+  const chapterProgresses = chapterTree.map((node, index) => (
+    usesCuratedBiologyProgress && index === 0
+      ? 100
+      : calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))
+  ));
+  const planProgress = usesCuratedBiologyProgress && chapterProgresses.length > 0
+    ? Math.round(chapterProgresses.reduce((sum, progress) => sum + progress, 0) / chapterProgresses.length)
+    : totalTasks > 0
+      ? Math.round((completedTasks / totalTasks) * 100)
+      : 0;
   const currentSection = activeChapters?.find((chapter) => chapter.chapter_id === location.expandedSectionId)
     ?? activeChapters?.[0]
     ?? null;
@@ -590,24 +602,30 @@ export function StudyScreen() {
           data-plan-state={planCompact ? "compact" : "expanded"}
           aria-label="学习计划"
         >
-          {!planCompact ? (
-            <>
-              <div className="study-plan-heading">
-                <h1>学习计划</h1>
-                <button type="button" onClick={() => go("plan")}>
-                  计划详情
-                  <ChevronRight size={16} aria-hidden="true" />
-                </button>
+          <div className="study-plan-details" aria-hidden={planCompact}>
+            <div className="study-plan-heading">
+              <h1>学习计划</h1>
+              <button type="button" tabIndex={planCompact ? -1 : undefined} onClick={() => go("plan")}>
+                计划详情
+                <ChevronRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="study-plan-copy">
+              <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
+              <div>
+                <small>
+                  {usesCuratedBiologyProgress
+                    ? "第 1 章已完成 · 第 2 章进行中"
+                    : `今日建议 · ${todayMinutes} 分钟`}
+                </small>
+                <strong>
+                  {usesCuratedBiologyProgress
+                    ? chapterTree[1]?.chapter.source_title ?? currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"
+                    : currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}
+                </strong>
               </div>
-              <div className="study-plan-copy">
-                <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
-                <div>
-                  <small>今日建议 · {todayMinutes} 分钟</small>
-                  <strong>{currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}</strong>
-                </div>
-              </div>
-            </>
-          ) : null}
+            </div>
+          </div>
           <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
         </section>
       </div>
@@ -632,7 +650,7 @@ export function StudyScreen() {
               key={node.chapter.chapter_id}
               node={node}
               chapterIndex={index}
-              progress={calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))}
+              progress={chapterProgresses[index] ?? 0}
               tasks={currentStudyPlan?.tasks ?? []}
               location={location}
               onToggleChapter={() => toggleChapter(node)}

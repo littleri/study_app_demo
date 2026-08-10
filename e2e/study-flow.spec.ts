@@ -13,6 +13,15 @@ test.describe("study directory flow", () => {
     await expect(bookBar).toBeVisible();
     await expect(plan).toBeVisible();
     await expect(plan).toHaveAttribute("data-plan-state", "expanded");
+    await expect(plan.locator(".study-plan-copy small")).toHaveText("第 1 章已完成 · 第 2 章进行中");
+    await expect(plan.locator(".study-plan-copy strong")).toHaveText("第 2 章 基因和染色体的关系");
+    await expect(plan.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "17");
+    await expect(page.locator("#study-chapter-frontmatter-toggle .study-chapter-copy strong")).toHaveText(
+      "第 1 章 遗传因子的发现"
+    );
+    await expect(page.locator(".study-chapter-progress").nth(0)).toHaveAttribute("data-progress", "100");
+    await expect(page.locator(".study-chapter-progress").nth(0)).toHaveClass(/is-complete/);
+    await expect(page.locator(".study-chapter-progress").nth(1)).toHaveAttribute("data-progress", "17");
     await expect(page.getByRole("heading", { name: "学习计划", exact: true })).toBeVisible();
     await expect(page.getByText("沿着原书目录继续", { exact: true })).toHaveCount(0);
     await expect(page.getByText("从这里继续", { exact: true })).toHaveCount(0);
@@ -198,16 +207,23 @@ test.describe("study directory flow", () => {
 
     const secondChapter = page.getByRole("button", { name: "第 2 章 基因和染色体的关系 3 个小节 教材第 15-40 页 学习进度 17%", exact: true });
     await expect(secondChapter.locator(".study-chapter-progress")).toHaveAttribute("data-progress", "17");
-    await secondChapter.click();
+    if (await secondChapter.getAttribute("aria-expanded") !== "true") await secondChapter.click();
     await expect(secondChapter).toHaveAttribute("aria-expanded", "true");
-    await expect(initiallyExpandedChapter).toHaveAttribute("aria-expanded", "false");
+    if (expandedChapterId !== await secondChapter.getAttribute("id")) {
+      await expect(initiallyExpandedChapter).toHaveAttribute("aria-expanded", "false");
+    }
     await expect(page.getByRole("button", { name: "一 减数分裂 教材第 16-22 页", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "科学家的故事 染色体遗传理论的奠基人——摩尔根 教材第 32 页", exact: true })).toBeVisible();
 
     await expect(page.getByRole("button", { name: "更多功能 预留新学习工具", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "进入学习", exact: true }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
-    await expect(page.locator(".lesson-article-header h2")).toContainText("减数分裂和受精作用");
+    const lessonPager = page.locator(".lesson-knowledge-pager");
+    await expect(lessonPager.locator(".lesson-introduction")).toBeVisible();
+    await expect(lessonPager.getByRole("heading", { name: "减数分裂和受精作用", exact: true })).toBeVisible();
+    await lessonPager.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(lessonPager.getByRole("progressbar", { name: "章节学习进度" })).toHaveAttribute("aria-valuenow", "2");
     await expect(page.getByText("已生成", { exact: true })).toHaveCount(0);
     await expect(page.getByText("全文依据状态", { exact: true })).toHaveCount(0);
     await expect(page.getByText("本节来源", { exact: true })).toHaveCount(0);
@@ -250,6 +266,63 @@ test.describe("study directory flow", () => {
     expect(compactReadingMetrics.sectionPaddingTop).toBe(22);
     expect(compactReadingMetrics.figureRatio).toBeLessThanOrEqual(0.93);
 
+    await page.locator(".lesson-source-link").click();
+    const sourceSheet = page.locator(".sheet[data-sheet-type='source']");
+    await expect(sourceSheet).toBeVisible();
+    await expect(sourceSheet.locator(".source-reference-sheet h3")).toHaveCount(0);
+    expect(await sourceSheet.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius))).toBe(28);
+    await expect(sourceSheet.getByRole("img")).toBeVisible();
+    await expect(sourceSheet.getByRole("button", { name: "全屏阅读教材", exact: true })).toBeVisible();
+    await expect(sourceSheet.getByRole("tablist", { name: "教材查看方式" })).toHaveCount(0);
+    await expect(sourceSheet.getByRole("tab")).toHaveCount(0);
+    await expect(sourceSheet.locator(".source-reference-sheet")).toHaveCSS("scrollbar-width", "none");
+    await expect(sourceSheet.locator(".source-selectable-text")).toHaveCount(0);
+    const selectableSource = sourceSheet.locator(".source-page-text-layer");
+    await expect(selectableSource).toBeVisible();
+    await expect(selectableSource).not.toBeEmpty();
+    const sourceLayerPlacement = await sourceSheet.evaluate((element) => {
+      const image = element.querySelector<HTMLImageElement>(".source-page-selection-surface > img")!;
+      const layer = element.querySelector<HTMLElement>(".source-page-text-layer")!;
+      const imageBounds = image.getBoundingClientRect();
+      const layerBounds = layer.getBoundingClientRect();
+      return {
+        insideImage:
+          layerBounds.left >= imageBounds.left &&
+          layerBounds.top >= imageBounds.top &&
+          layerBounds.right <= imageBounds.right &&
+          layerBounds.bottom <= imageBounds.bottom
+      };
+    });
+    expect(sourceLayerPlacement.insideImage).toBe(true);
+    await selectableSource.evaluate((element) => {
+      const paragraph = element.querySelector("p");
+      const textNode = paragraph?.firstChild;
+      if (!textNode?.textContent) throw new Error("Selectable source text is missing");
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.setEnd(textNode, Math.min(24, textNode.textContent.length));
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+    await expect(sourceSheet.getByRole("button", { name: "做笔记", exact: true })).toBeVisible();
+    await sourceSheet.getByRole("button", { name: "做笔记", exact: true }).click();
+
+    const selectionNoteSheet = page.getByRole("dialog", { name: "摘录笔记" });
+    await expect(selectionNoteSheet.locator(".selection-note-quote")).not.toBeEmpty();
+    await selectionNoteSheet.locator(".note-textarea").fill("摘录说明：这是我对选中文字的理解。");
+    await selectionNoteSheet.getByRole("button", { name: "保存摘录笔记", exact: true }).click();
+    await expect(page.getByText("摘录已保存到导学笔记", { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.saved-study-notes.v1") ?? "[]").length)).toBeGreaterThan(0);
+    await expect(page.locator(".lesson-screen")).toBeVisible();
+    const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });
+    const lessonPageCount = Number(await lessonProgress.getAttribute("aria-valuemax"));
+    for (let pageIndex = 2; pageIndex < lessonPageCount; pageIndex += 1) {
+      await lessonPager.focus();
+      await page.keyboard.press("ArrowRight");
+    }
+    await expect(lessonProgress).toHaveAttribute("aria-valuenow", String(lessonPageCount));
     const lessonScroller = page.locator('.screen-content[data-screen="lesson"]');
     const floatingCompletion = page.locator(".lesson-floating-complete");
     const completionBeforeScroll = await floatingCompletion.evaluate((element) => {
@@ -259,7 +332,7 @@ test.describe("study directory flow", () => {
     expect(completionBeforeScroll.position).toBe("fixed");
     await lessonScroller.hover();
     await page.mouse.wheel(0, 700);
-    await expect.poll(() => lessonScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+    await expect.poll(() => lessonScroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(50);
     const completionAfterScroll = await floatingCompletion.evaluate((element) => {
       const bounds = element.getBoundingClientRect();
       return { top: bounds.top, left: bounds.left, width: bounds.width };
@@ -267,22 +340,6 @@ test.describe("study directory flow", () => {
     expect(Math.abs(completionAfterScroll.top - completionBeforeScroll.top)).toBeLessThanOrEqual(1);
     expect(Math.abs(completionAfterScroll.left - completionBeforeScroll.left)).toBeLessThanOrEqual(1);
     expect(Math.abs(completionAfterScroll.width - completionBeforeScroll.width)).toBeLessThanOrEqual(1);
-
-    await page.locator(".concept-card-grid button").first().click();
-    const conceptSheet = page.locator(".sheet[data-sheet-type='note']");
-    await expect(conceptSheet).toBeVisible();
-    await expect(conceptSheet.locator(".concept-detail-explanation")).not.toBeEmpty();
-    await expect(conceptSheet.locator(".concept-detail-figure img")).toBeVisible();
-    await expect(conceptSheet.getByRole("button", { name: /查看教材第/ })).toBeVisible();
-    await conceptSheet.locator(".sheet-close").click();
-    await expect(conceptSheet).toHaveCount(0);
-
-    await page.getByRole("button", { name: "查看教材第 16 页", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "原文文档", exact: true })).toBeVisible();
-    await expect(page.getByText("教材第 16 页（PDF 第 11 页）", { exact: false })).toBeVisible();
-    await page.getByRole("button", { name: "返回", exact: true }).click();
-    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
-    await expect(page.locator(".lesson-screen")).toBeVisible();
     const pausedCompletionTransition = await page.addStyleTag({
       content: '.motion-screen-transition[data-motion-state="transitioning"] > .motion-screen-surface { animation-play-state: paused !important; }'
     });

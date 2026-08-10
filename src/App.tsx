@@ -112,6 +112,15 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   profile: { title: "我的", subtitle: "学习数据与偏好" }
 };
 
+const toastQuietScreens = new Set<Screen>([
+  "upload",
+  "parseReady",
+  "processing",
+  "chapterConfirm",
+  "courseReady",
+  "communityImport"
+]);
+
 function getSheetViewKey(view: ActionSheetView) {
   return view.key;
 }
@@ -222,6 +231,13 @@ export default function App() {
   const commitNavigation = useCallback((resolve: (current: NavigationSnapshot) => NavigationSnapshot) => {
     const next = resolve(navigationRef.current);
     navigationRef.current = next;
+    if (toastQuietScreens.has(next.screen)) {
+      if (toastTimerRef.current !== undefined) {
+        window.clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = undefined;
+      }
+      setToast(null);
+    }
     setNavigation(next);
     return next;
   }, []);
@@ -338,6 +354,7 @@ export default function App() {
   }, []);
 
   const showToast = useCallback((text: string, tone: ToastTone = "success") => {
+    if (toastQuietScreens.has(navigationRef.current.screen)) return;
     if (toastTimerRef.current !== undefined) window.clearTimeout(toastTimerRef.current);
     const id = toastIdRef.current + 1;
     toastIdRef.current = id;
@@ -638,7 +655,6 @@ export default function App() {
           if (!isCurrentParseSession()) return;
           completedParseJobRef.current = activeParseJobId;
           void refreshCourses();
-          showToast("后台 OCR/解析完成，课程目录已生成");
           if (navigationRef.current.screen === "parseReady" || navigationRef.current.screen === "processing") {
             replaceScreen("chapterConfirm");
           }
@@ -646,15 +662,12 @@ export default function App() {
         }
 
         if (job.status === "failed") {
-          showToast(job.error ?? "后台 OCR/解析失败，请检查文件后重试", "warning");
           return;
         }
 
         timer = window.setTimeout(pollParseJob, 2500);
-      } catch (err) {
+      } catch {
         if (!isCurrentParseSession()) return;
-        const message = err instanceof Error ? err.message : "后台解析状态获取失败";
-        showToast(message, "warning");
         timer = window.setTimeout(pollParseJob, 4000);
       }
     }
@@ -664,7 +677,7 @@ export default function App() {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [bookcourseRepository, parseJobId, refreshCourses, replaceScreen, showToast, uploadedFile]);
+  }, [bookcourseRepository, parseJobId, refreshCourses, replaceScreen, uploadedFile]);
 
   const sharedProps = useMemo(
     () => ({
@@ -800,18 +813,35 @@ export default function App() {
         key: `source:${sheet.title}:${sheet.page}`,
         sheet,
         title: "查看原文",
-        content: <SourceSheetContent title={sheet.title} page={sheet.page} image={sheet.image} />
+        content: (
+          <SourceSheetContent
+            title={sheet.title}
+            page={sheet.page}
+            image={sheet.image}
+            text={sheet.text}
+            onCreateNote={(quote) => openSheet({
+              type: "note",
+              kind: "selection",
+              concept: sheet.title,
+              quote,
+              sourceLabel: sheet.page
+            })}
+            onOpenFullSource={sheet.source ? () => openSourcePage(sheet.source!) : undefined}
+          />
+        )
       };
     }
 
     if (sheet.type === "note") {
       return {
-        key: `note:${sheet.concept}`,
+        key: `note:${sheet.kind ?? "concept"}:${sheet.concept}:${sheet.quote?.slice(0, 24) ?? ""}`,
         sheet,
-        title: "核心概念",
+        title: sheet.kind === "selection" ? "摘录笔记" : "核心概念",
         content: (
           <NoteSheetContent
             concept={sheet.concept}
+            kind={sheet.kind}
+            quote={sheet.quote}
             explanation={sheet.explanation}
             sourceLabel={sheet.sourceLabel}
             image={sheet.image}
@@ -858,13 +888,11 @@ export default function App() {
               item.chapter_id === nextChapter.chapter_id ? nextChapter : item
             )) ?? null);
             closeSheet();
-            showToast("本章修改已保存，请继续确认目录");
           }}
           onDelete={(chapterIds) => {
             const removalIds = new Set(chapterIds);
             setParsedChapters((current) => current?.filter((item) => !removalIds.has(item.chapter_id)) ?? null);
             closeSheet();
-            showToast(`已移除 ${chapterIds.length} 个目录项`, "info");
           }}
         />
       )
@@ -873,6 +901,7 @@ export default function App() {
     activeChapterId,
     closeSheet,
     openSheet,
+    openSourcePage,
     parsedChapters,
     parsedScanResult?.page_count,
     sheet,

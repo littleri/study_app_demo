@@ -132,6 +132,7 @@ test.describe("assignment entry geometry", () => {
       const transitionBounds = transition.getBoundingClientRect();
       const cardBounds = card.getBoundingClientRect();
       return {
+        animationDuration: getComputedStyle(surface).animationDuration,
         animationName: getComputedStyle(surface).animationName,
         cardExtendsPastTransition: cardBounds.left < transitionBounds.left && cardBounds.right > transitionBounds.right,
         leftInset: cardBounds.left - shellBounds.left,
@@ -141,6 +142,7 @@ test.describe("assignment entry geometry", () => {
     });
 
     expect(entryGeometry.animationName).toBe("motion-screen-assignment-in");
+    expect(entryGeometry.animationDuration).toBe("0.45s");
     expect(entryGeometry.cardExtendsPastTransition).toBe(true);
     expect(Math.abs(entryGeometry.leftInset)).toBeLessThanOrEqual(1);
     expect(Math.abs(entryGeometry.rightInset)).toBeLessThanOrEqual(1);

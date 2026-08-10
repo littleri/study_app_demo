@@ -52,7 +52,7 @@ export function SourceReaderScreen() {
     .sort((left, right) => right.level - left.level || (left.page_end - left.page_start) - (right.page_end - right.page_start))[0];
   const isBiologyFrontMatter = bookId === "book_biology_2" && currentPage < 10;
   const displayTitle = isBiologyFrontMatter
-    ? "封面、编者信息、目录与科学家访谈"
+    ? "第 1 章 遗传因子的发现"
     : currentChapter?.source_title ?? sourcePageTarget?.title ?? uploadedFile?.name ?? "教材原文";
   const exactLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === targetStart);
   const sourceRange = targetStart === targetEnd && typeof exactLocation?.label === "string"
