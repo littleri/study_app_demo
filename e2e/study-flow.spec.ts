@@ -369,10 +369,43 @@ test.describe("study directory flow", () => {
     await expect(switcher).toBeVisible();
     await switcher.click();
 
-    await expect(page.getByRole("dialog", { name: "切换教材" })).toBeVisible();
+    const dialog = page.getByRole("dialog", { name: "切换教材" });
+    await expect(dialog).toBeVisible();
     await expect(page.getByRole("button", { name: "添加新教材", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "管理全部教材", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "关闭", exact: true }).click();
+    const mathBook = dialog.getByRole("button", { name: "数学 必修 第二册 可以学习", exact: true });
+    await expect(mathBook).toBeVisible();
+    await expect(mathBook.locator("img")).toHaveAttribute("src", "/assets/book-covers/high-school-math-required-2.webp");
+
+    const sheetGeometry = await dialog.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const overlay = element.closest<HTMLElement>(".sheet-overlay")?.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        bottomGap: overlay ? Math.round(overlay.bottom - bounds.bottom) : null,
+        bottomLeftRadius: Number.parseFloat(style.borderBottomLeftRadius),
+        bottomRightRadius: Number.parseFloat(style.borderBottomRightRadius),
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth
+      };
+    });
+    expect(Math.abs(sheetGeometry.bottomGap ?? Number.POSITIVE_INFINITY)).toBeLessThanOrEqual(1);
+    expect(sheetGeometry.bottomLeftRadius).toBe(0);
+    expect(sheetGeometry.bottomRightRadius).toBe(0);
+    expect(sheetGeometry.documentWidth).toBeLessThanOrEqual(sheetGeometry.viewportWidth);
+
+    await mathBook.click();
+    await expect(page.getByRole("button", { name: "当前教材 人教 A 版高中数学必修第二册", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", {
+      name: "第六章 平面向量及其应用 4 个小节 教材第 1-66 页 学习进度 0%",
+      exact: true
+    })).toBeVisible();
+    await expect(page.getByRole("button", { name: "6.1 平面向量的概念 教材第 2-6 页", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", {
+      name: "第十章 概率 3 个小节 教材第 225-264 页 学习进度 0%",
+      exact: true
+    })).toBeVisible();
+
     await page.getByRole("button", { name: "添加", exact: true }).click();
     await expect(page.getByRole("heading", { name: "上传书籍", exact: true })).toBeVisible();
   });

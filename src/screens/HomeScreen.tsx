@@ -17,6 +17,8 @@ import {
 import { buildHomeGlobalActions, type HomeGlobalActionId } from "./homeGlobalActions";
 import { resolveHomeNextStep } from "./homeNextStep";
 
+const defaultDemoBookId = "book_biology_2";
+
 function globalActionIcon(actionId: HomeGlobalActionId) {
   switch (actionId) {
     case "plan":
@@ -142,9 +144,15 @@ export function HomeScreen() {
       ) {
         return loadedBookId;
       }
+      if (!hasUserSelectedBookRef.current && !loadedBookId && demoShelfEnabled) {
+        const defaultDemoBook = books.find((book) => (
+          book.bookId === defaultDemoBookId && book.status === "ready"
+        ));
+        if (defaultDemoBook) return defaultDemoBook.bookId;
+      }
       return resolveHomeBookSelection(books, current, loadedBookId);
     });
-  }, [books, loadedBookId]);
+  }, [books, demoShelfEnabled, loadedBookId]);
 
   useEffect(() => {
     if (pendingBookId && !books.some((book) => book.bookId === pendingBookId)) {

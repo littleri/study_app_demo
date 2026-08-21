@@ -21,6 +21,15 @@ export function sourcePageImageUrl(_bookId: string, page: number) {
   return `/assets/textbook/pages/page_${String(safePage).padStart(3, "0")}.jpeg`;
 }
 
+const courseCoverUrls: Readonly<Record<string, string>> = {
+  book_biology_2: "/assets/book-covers/biology-required-2.webp",
+  catalog_high_school_math_required_2: "/assets/book-covers/high-school-math-required-2.webp"
+};
+
+export function courseCoverImageUrl(bookId: string) {
+  return courseCoverUrls[bookId] ?? sourcePageImageUrl(bookId, 1);
+}
+
 
 export function sourcePageLabel(pageStart: number, pageEnd?: number) {
   return pageEnd && pageEnd !== pageStart ? `第 ${pageStart}-${pageEnd} 页` : `第 ${pageStart} 页`;
@@ -54,6 +63,7 @@ export function chapterConcepts(chapter: ApiChapter | null, chunk?: ApiChunk | n
 
 
 const BIOLOGY_BOOK_DISPLAY_NAME = "人教版高中生物必修二遗传与进化";
+const MATH_BOOK_DISPLAY_NAME = "人教 A 版高中数学必修第二册";
 
 function isBiologyGeneticsBookTitle(value: string) {
   const normalized = value.replace(/\s+/g, "");
@@ -62,6 +72,7 @@ function isBiologyGeneticsBookTitle(value: string) {
 
 export function liveBookTitle(uploadedFile?: UploadedCourseFile | null, scan?: ScanResult | null) {
   const title = uploadedFile?.name ?? scan?.filename ?? "未选择教材";
+  if (uploadedFile?.bookId === "catalog_high_school_math_required_2") return MATH_BOOK_DISPLAY_NAME;
   return isBiologyGeneticsBookTitle(title) ? BIOLOGY_BOOK_DISPLAY_NAME : title;
 }
 
@@ -211,7 +222,7 @@ export function ChapterEvidenceSummary({ evidence }: { evidence: ChapterEvidence
 
 
 export function CourseCover({ course }: { course: { bookId?: string; title: string; cover?: string } }) {
-  const cover = course.bookId ? sourcePageImageUrl(course.bookId, 1) : course.cover;
+  const cover = course.bookId ? courseCoverImageUrl(course.bookId) : course.cover;
   const imageMotion = useStageThreeImageMotion(cover);
   if (cover && imageMotion.state !== "failed") {
     return (

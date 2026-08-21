@@ -74,6 +74,10 @@ import {
 } from "./screens/courseResourceIdentity";
 
 const studyLocationsStorageKey = "bookcourse.study-locations.v1";
+const demoParseJobPollIntervalMs = 700;
+const demoParseJobRetryIntervalMs = 1200;
+const parseJobPollIntervalMs = 1500;
+const parseJobRetryIntervalMs = 3000;
 
 function loadStudyLocations(): Record<string, StudyLocation> {
   try {
@@ -96,7 +100,7 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
   community: { title: "社区", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
-  communityImport: { title: "导入成功", subtitle: "已生成可学习内容", back: true },
+  communityImport: { title: "导入成功", back: true, hideNav: true },
   study: {},
   book: {},
   plan: { title: "学习计划", subtitle: "科学规划，高效学习", back: true, hideNav: true },
@@ -644,6 +648,13 @@ export default function App() {
       setLoadedBookId(bookId);
     }
 
+    const pollIntervalMs = bookcourseRepository === demoRepository
+      ? demoParseJobPollIntervalMs
+      : parseJobPollIntervalMs;
+    const retryIntervalMs = bookcourseRepository === demoRepository
+      ? demoParseJobRetryIntervalMs
+      : parseJobRetryIntervalMs;
+
     async function pollParseJob() {
       try {
         const job = await bookcourseRepository.getJob(activeParseJobId);
@@ -665,10 +676,10 @@ export default function App() {
           return;
         }
 
-        timer = window.setTimeout(pollParseJob, 2500);
+        timer = window.setTimeout(pollParseJob, pollIntervalMs);
       } catch {
         if (!isCurrentParseSession()) return;
-        timer = window.setTimeout(pollParseJob, 4000);
+        timer = window.setTimeout(pollParseJob, retryIntervalMs);
       }
     }
 

@@ -1474,7 +1474,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
   test("keeps Community same-state direct while rebuilt local surfaces and covers receive one new DOM entry", async ({ page }) => {
     await gotoApp(page);
-    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-detail-overview, .community-import-success, .community-cover-image");
+    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-detail-overview, .community-cover-image");
     await page.locator(".primary-nav .nav-item").nth(1).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
@@ -1513,8 +1513,8 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await expect(detail).toHaveAttribute("data-motion-item-state", "idle");
     expect((await readAnimation(detail)).name).toBe("none");
     await page.locator(".community-detail-actions .button").first().click();
-    const imported = page.locator(".community-import-success");
-    await expect(imported).toHaveAttribute("data-motion-item-state", "idle");
+    const imported = page.locator(".community-import-screen .course-ready-success-mark");
+    await expect(imported).toHaveAttribute("data-motion-course-ready-state", "idle");
     expect((await readAnimation(imported)).name).toBe("none");
     await pause.evaluate((element) => element.remove());
   });

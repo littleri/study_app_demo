@@ -1043,8 +1043,10 @@
 }
 
 .book-switcher-list {
+  min-height: 0;
   max-height: min(46dvh, 390px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
   background: var(--color-surface);
@@ -1146,6 +1148,14 @@
 
 .book-switcher-actions .button {
   min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .sheet[data-sheet-type="bookSwitcher"] {
+    overflow: hidden;
+    border-bottom: 0;
+    border-radius: 28px 28px 0 0;
+  }
 }
 
 .sr-only {

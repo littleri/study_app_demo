@@ -19,7 +19,6 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, "..");
 const moviesDirectory = path.join(projectRoot, "movies");
 const rehearsalDirectory = path.join(projectRoot, "output", "recording-rehearsal", "manual");
-const sourceDirectory = path.join(projectRoot, "output", "recording-source");
 const statusPath = path.join(projectRoot, "output", "manual-recording-status.json");
 const defaultFfmpegPath = path.join(
   projectRoot,
@@ -39,6 +38,8 @@ const recordingSize = { width: 1440, height: 2880 };
 const chromaGreen = "#00FF00";
 const defaultBaseUrl =
   "http://127.0.0.1:5173/?device=iphone-17-pro&orientation=portrait&quality=fit&chrome=1";
+const defaultUploadFilePath =
+  "C:\\Users\\asd25\\Desktop\\示范文件\\人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所, 生物课程教材研究开发中心.pdf";
 
 function optionValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -47,6 +48,18 @@ function optionValue(name, fallback) {
 
 function createStamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function sanitizeRecordingName(value, fallback) {
+  const sanitized = value
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+    .replace(/[. ]+$/g, "")
+    .trim();
+  if (!sanitized) return fallback;
+  if (/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(sanitized)) {
+    return `录制-${sanitized}`;
+  }
+  return sanitized.slice(0, 80);
 }
 
 async function ensureFile(filePath, label) {
@@ -154,9 +167,14 @@ const greenScreenCss = [
   "  border-radius: var(--iphone-screen-radius) !important;",
   "  box-shadow: none !important;",
   "}",
-  ".device-preview-studio .device-preview-frame--iphone-17-pro > .device-preview-iframe {",
+  ".device-preview-studio .device-preview-frame--iphone-17-pro > .device-preview-screen-clip {",
+  "  overflow: hidden !important;",
   "  border-radius: var(--iphone-screen-radius) !important;",
   "  clip-path: inset(0 round var(--iphone-screen-radius)) !important;",
+  "}",
+  ".device-preview-studio .device-preview-frame--iphone-17-pro > .device-preview-screen-clip > .device-preview-iframe {",
+  "  border-radius: inherit !important;",
+  "  clip-path: none !important;",
   "}",
   ".device-preview-studio .device-preview-bezel {",
   "  box-shadow:",
@@ -248,13 +266,25 @@ async function installTouchOverlay(appFrame) {
   });
 }
 
-async function openRecordingController(previewPage) {
+function escapeHtml(value) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+async function openRecordingController(previewPage, uploadFileName, recordingName) {
+  const escapedUploadFileName = escapeHtml(uploadFileName);
+  const escapedRecordingName = escapeHtml(recordingName);
   const popupPromise = previewPage.waitForEvent("popup", { timeout: 10_000 });
   await previewPage.evaluate(() => {
     window.open(
       "about:blank",
       "codex-recording-controller",
-      "popup=yes,width=390,height=360,left=42,top=90,resizable=no,scrollbars=no"
+      "popup=yes,width=410,height=440,left=42,top=70,resizable=no,scrollbars=no"
     );
   });
   const controllerPage = await popupPromise;
@@ -263,7 +293,7 @@ async function openRecordingController(previewPage) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>录制控制台｜不会进入成片</title>
+  <title>${escapedRecordingName}｜录制控制台（不入镜）</title>
   <style>
     :root { color-scheme: light; font-family: Inter, "Microsoft YaHei", system-ui, sans-serif; }
     * { box-sizing: border-box; }
@@ -280,6 +310,11 @@ async function openRecordingController(previewPage) {
     .eyebrow { margin: 0 0 8px; color: #7357da; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
     h1 { margin: 0; font-size: 22px; line-height: 1.2; }
     .hint { margin: 9px 0 16px; color: #6a687c; font-size: 13px; line-height: 1.55; }
+    .autofill {
+      margin: -6px 0 16px; padding: 10px 12px; border: 1px solid rgba(79,165,134,.20); border-radius: 12px;
+      background: #effaf6; color: #307b64; font-size: 11px; line-height: 1.45; overflow-wrap: anywhere;
+    }
+    .autofill strong { display: block; margin-top: 3px; color: #215f4c; }
     .status {
       display: flex; align-items: center; gap: 9px; margin-bottom: 16px; padding: 11px 13px;
       border-radius: 14px; background: #f4f1ff; color: #5f46bd; font-size: 13px; font-weight: 750;
@@ -305,8 +340,9 @@ async function openRecordingController(previewPage) {
 <body>
   <main class="panel">
     <p class="eyebrow">RECORDING CONTROLLER</p>
-    <h1>手机演示录制</h1>
+    <h1>${escapedRecordingName}</h1>
     <p class="hint">按钮与本控制台位于独立窗口，不会进入手机绿幕成片。</p>
+    <p class="autofill">📎 已启用上传文件自动填充<strong>${escapedUploadFileName}</strong></p>
     <div id="status" class="status" data-state="ready">
       <span class="dot"></span><span id="label">预览已就绪，等待开始</span><span id="time" class="time">00:00</span>
     </div>
@@ -355,28 +391,37 @@ async function openRecordingController(previewPage) {
 
 const baseUrl = optionValue("--base-url", defaultBaseUrl);
 const ffmpegPath = path.resolve(optionValue("--ffmpeg", defaultFfmpegPath));
+const uploadFilePath = path.resolve(optionValue("--upload-file", defaultUploadFilePath));
+const uploadFileName = path.basename(uploadFilePath);
+const requestedRecordingName = optionValue("--name", "").trim();
+const recordingName = requestedRecordingName || "手机演示录制";
+const recordingFileLabel = sanitizeRecordingName(requestedRecordingName, "manual-green-screen-2k");
 const touchIndicator = !process.argv.includes("--no-touch-indicator");
 const rehearsal = process.argv.includes("--rehearse");
 const headless = process.argv.includes("--headless");
 const demoTouch = process.argv.includes("--demo-touch");
+const demoAutofill = process.argv.includes("--demo-autofill");
 const autoStopMs = Number(optionValue("--auto-stop-ms", "0"));
 const stamp = createStamp();
-const outputDirectory = rehearsal ? rehearsalDirectory : moviesDirectory;
-const rawOutputDirectory = rehearsal ? rehearsalDirectory : sourceDirectory;
+const recordingsRootDirectory = rehearsal ? rehearsalDirectory : moviesDirectory;
 const outputStem = rehearsal
-  ? `manual-green-screen-2k-rehearsal-${stamp}`
-  : `manual-green-screen-2k-${stamp}`;
-const rawVideoPath = path.join(rawOutputDirectory, `${outputStem}-source.webm`);
-const outputWebmPath = path.join(outputDirectory, `${outputStem}.webm`);
-const outputMp4Path = path.join(outputDirectory, `${outputStem}.mp4`);
-const manifestPath = path.join(outputDirectory, `${outputStem}.json`);
-const stagingDirectory = path.join(projectRoot, "output", "recording-staging", outputStem);
+  ? `${recordingFileLabel}-rehearsal-${stamp}`
+  : `${recordingFileLabel}-${stamp}`;
+// Each take is self-contained, so the delivered files, raw browser capture,
+// metadata and transient staging area never mix with another recording.
+const takeDirectory = path.join(recordingsRootDirectory, outputStem);
+const rawVideoPath = path.join(takeDirectory, `${outputStem}-source.webm`);
+const outputWebmPath = path.join(takeDirectory, `${outputStem}.webm`);
+const outputMp4Path = path.join(takeDirectory, `${outputStem}.mp4`);
+const manifestPath = path.join(takeDirectory, `${outputStem}.json`);
+const stagingDirectory = path.join(takeDirectory, "staging");
 
 await ensureFile(ffmpegPath, "FFmpeg 编码器");
-await mkdir(outputDirectory, { recursive: true });
-await mkdir(rawOutputDirectory, { recursive: true });
+await ensureFile(uploadFilePath, "自动填充的上传文件");
+const uploadFileDetails = await stat(uploadFilePath);
+await mkdir(takeDirectory, { recursive: true });
 await mkdir(stagingDirectory, { recursive: true });
-await writeStatus("starting", { baseUrl, outputStem });
+await writeStatus("starting", { baseUrl, outputStem, recordingName, takeDirectory });
 
 let resolveStart;
 const startPromise = new Promise((resolve) => {
@@ -475,8 +520,30 @@ const rawClockStartedAt = performance.now();
 const page = await context.newPage();
 const recordedVideo = page.video();
 const pageErrors = [];
+const autoUploadEvents = [];
 page.on("pageerror", (error) => pageErrors.push(error.message));
 page.on("close", () => requestStop("page-closed"));
+page.on("filechooser", async (fileChooser) => {
+  try {
+    const input = fileChooser.element();
+    const accept = await input.getAttribute("accept").catch(() => null);
+    await fileChooser.setFiles(uploadFilePath);
+    const event = {
+      accept,
+      atSeconds: captureStartedAt
+        ? Number(((performance.now() - captureStartedAt) / 1_000).toFixed(3))
+        : null,
+      fileName: uploadFileName,
+      fileSize: uploadFileDetails.size
+    };
+    autoUploadEvents.push(event);
+    console.log(`[auto-upload] 已自动填充：${uploadFileName}`);
+  } catch (error) {
+    const message = `自动填充上传文件失败：${error instanceof Error ? error.message : String(error)}`;
+    pageErrors.push(message);
+    console.error(`[auto-upload-error] ${message}`);
+  }
+});
 
 let captureStartedAt = null;
 let captureEndedAt = null;
@@ -521,13 +588,15 @@ try {
   if (headless || rehearsal) {
     requestStart("automatic");
   } else {
-    controllerPage = await openRecordingController(page);
+    controllerPage = await openRecordingController(page, uploadFileName, recordingName);
     controllerPage.on("close", () => {
       if (!stopRequested) requestStop(startRequested ? "controller-closed" : "controller-closed-before-start");
     });
     await writeStatus("ready", {
       instructions: "在独立录制控制台点击开始录制；完成后点击停止录制。控制台不会进入成片。",
       outputStem,
+      takeDirectory,
+      recordingName,
       resolution: recordingSize,
       touchIndicator
     });
@@ -543,16 +612,28 @@ try {
   }
 
   captureStartedAt = startRequestedAt || performance.now();
-  await page.evaluate(() => {
-    document.title = "● REC｜控制台停止或按 F8";
-  });
+  await page.evaluate((name) => {
+    document.title = `● REC｜${name}｜控制台停止或按 F8`;
+  }, recordingName);
   await writeStatus("recording", {
     instructions: "在手机预览中操作；点击独立控制台的停止录制，或在预览窗口按 F8。",
     outputStem,
+    takeDirectory,
+    recordingName,
     resolution: recordingSize,
     touchIndicator
   });
   console.log("[recording] 已开始。请在手机预览中操作，通过控制台停止。");
+
+  if (demoAutofill) {
+    const app = page.frameLocator("iframe.device-preview-iframe");
+    await app.getByRole("button", { name: "导入课程", exact: true }).click();
+    await app.locator(".upload-sheet-screen").waitFor({ state: "visible", timeout: 12_000 });
+    await app.getByRole("button", { name: "选择学习资料", exact: true }).click();
+    await app.locator(".upload-selected-file-item").waitFor({ state: "visible", timeout: 12_000 });
+    const selectedLabel = await app.locator(".upload-selected-file-item").first().textContent();
+    console.log(`[auto-upload-demo] 上传页已自动选中：${selectedLabel?.trim() || uploadFileName}`);
+  }
 
   if (demoTouch) {
     const frameBounds = await frame.boundingBox();
@@ -584,12 +665,13 @@ try {
 
   stopReason = await stopPromise;
   captureEndedAt = performance.now();
-  await writeStatus("finalizing", { outputStem, stopReason });
+  await writeStatus("finalizing", { outputStem, stopReason, takeDirectory });
 } catch (error) {
   captureEndedAt = performance.now();
   await writeStatus("error", {
     message: error instanceof Error ? error.message : String(error),
-    outputStem
+    outputStem,
+    takeDirectory
   });
   throw error;
 } finally {
@@ -698,6 +780,13 @@ for (const [label, metadata] of [["WebM", webmMetadata], ["MP4", mp4Metadata]]) 
 }
 
 const manifest = {
+  autoUpload: {
+    enabled: true,
+    events: autoUploadEvents,
+    fileName: uploadFileName,
+    filePath: uploadFilePath,
+    fileSize: uploadFileDetails.size
+  },
   baseUrl,
   chromaKey: {
     color: chromaGreen,
@@ -721,7 +810,9 @@ const manifest = {
   operatorViewport,
   output: recordingSize,
   pageErrors,
+  recordingName,
   stopReason,
+  takeDirectory,
   touchIndicator,
   videoMetadata: {
     h264Mp4: mp4Metadata,
@@ -735,6 +826,8 @@ await writeStatus("completed", {
   manifestPath,
   outputFiles: manifest.files,
   outputStem,
+  takeDirectory,
+  recordingName,
   videoMetadata: manifest.videoMetadata
 });
 

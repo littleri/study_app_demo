@@ -21,7 +21,7 @@ import { CollapsibleRegion, MotionIconSwap } from "../motion";
 import type { ApiChapter, StudyTask } from "../types/api";
 import type { StudyLocation } from "../types/app";
 import { buildChapterTree, type ChapterTreeNode } from "../utils/chapterStructure";
-import { liveBookTitle, sourcePageImageUrl, sourcePageLabel } from "./shared";
+import { courseCoverImageUrl, liveBookTitle, sourcePageLabel } from "./shared";
 import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
@@ -63,7 +63,9 @@ function chapterPageLabel(chapter: ApiChapter): string {
 }
 
 function countFormalSections(node: ChapterTreeNode): number {
-  return node.children.filter((child) => /^第\s*\d+\s*节/.test(child.chapter.source_title)).length;
+  return node.children.filter((child) => (
+    /^(?:第\s*\d+\s*节|\d+\.\d+\*?\s*)/.test(child.chapter.source_title)
+  )).length;
 }
 
 function getChapterNodeIds(node: ChapterTreeNode): string[] {
@@ -585,7 +587,7 @@ export function StudyScreen() {
       <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
         <header className="study-book-bar">
           <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
-            <img src={sourcePageImageUrl(uploadedFile.bookId, 1)} alt="" />
+            <img src={courseCoverImageUrl(uploadedFile.bookId)} alt="" />
             <span>
               <small>当前教材</small>
               <strong>{bookTitle}</strong>

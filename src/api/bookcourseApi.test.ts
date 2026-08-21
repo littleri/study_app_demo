@@ -2,15 +2,36 @@ import { describe, expect, it } from "vitest";
 import { bookcourseApi } from "./bookcourseApi";
 
 describe("demo repository boundary", () => {
-  it("returns the fixed local course without a network request", async () => {
+  it("returns the fixed local courses without a network request", async () => {
     const courses = await bookcourseApi.listCourses();
 
-    expect(courses).toHaveLength(1);
+    expect(courses).toHaveLength(2);
     expect(courses[0]).toMatchObject({
       book_id: "book_biology_2",
       status: "ready",
       rag_index_provider: "local-fixture"
     });
+    expect(courses[1]).toMatchObject({
+      book_id: "catalog_high_school_math_required_2",
+      title: "数学 必修 第二册",
+      status: "ready",
+      chapter_count: 5,
+      rag_index_provider: "toc-screenshot-fixture"
+    });
+  });
+
+  it("builds the mathematics directory from the uploaded catalog screenshots", async () => {
+    const chapters = await bookcourseApi.getChapters("catalog_high_school_math_required_2");
+
+    expect(chapters.filter((chapter) => chapter.level === 1).map((chapter) => chapter.source_title)).toEqual([
+      "第六章 平面向量及其应用",
+      "第七章 复数",
+      "第八章 立体几何初步",
+      "第九章 统计",
+      "第十章 概率"
+    ]);
+    expect(chapters.some((chapter) => chapter.source_title === "8.6 空间直线、平面的垂直")).toBe(true);
+    expect(chapters.some((chapter) => chapter.source_title === "10.3 频率与概率")).toBe(true);
   });
 
   it("runs the deterministic parse lifecycle", async () => {

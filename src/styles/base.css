@@ -3684,6 +3684,14 @@ html {
   touch-action: pan-y;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .lesson-screen,
+  .lesson-screen * {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
 .lesson-ai-entry {
   --lesson-ai-entry-drag-x: 0px;
   --lesson-ai-entry-drag-y: 0px;

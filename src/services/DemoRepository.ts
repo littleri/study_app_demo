@@ -1,4 +1,16 @@
 import demoStateJson from "../data/generated/demo-state.json";
+import {
+  demoMathAssets,
+  demoMathBookId,
+  demoMathChapters,
+  demoMathChunks,
+  demoMathFlashcards,
+  demoMathLessons,
+  demoMathQuizzes,
+  demoMathScan,
+  demoMathStudyPlan,
+  demoMathSummary
+} from "../data/demoMathCourse";
 import type {
   ApiAsset,
   ApiChapter,
@@ -158,7 +170,7 @@ export class DemoRepository {
       parse_job_message: "MinerU 结构化课程已就绪",
       parse_job_error: null,
       updated_at: 1785638400
-    }];
+    }, clone(demoMathSummary)];
   }
 
   async deleteCourse(_bookId: string) {
@@ -205,13 +217,15 @@ export class DemoRepository {
     };
   }
 
-  async getScanResult(_bookId: string) {
+  async getScanResult(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathScan);
     return clone(this.state.scan);
   }
 
-  async getChapters(_bookId: string) {
+  async getChapters(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathChapters);
     return clone(this.state.chapters);
   }
 
@@ -272,8 +286,9 @@ export class DemoRepository {
     return clone(this.state.chapters);
   }
 
-  async getChunks(_bookId: string) {
+  async getChunks(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathChunks);
     return clone(this.state.chunks);
   }
 
@@ -322,8 +337,9 @@ export class DemoRepository {
     };
   }
 
-  async getLessons(_bookId: string) {
+  async getLessons(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathLessons);
     return clone(this.state.lessons);
   }
 
@@ -340,8 +356,9 @@ export class DemoRepository {
     return clone(this.state.flashcards.filter((card) => !requested || requested.has(card.chapter_id)));
   }
 
-  async getFlashcards(_bookId: string) {
+  async getFlashcards(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathFlashcards);
     return clone(this.state.flashcards);
   }
 
@@ -351,13 +368,15 @@ export class DemoRepository {
     return clone(this.state.quizzes.filter((quiz) => !requested || requested.has(quiz.chapter_id)));
   }
 
-  async getQuizzes(_bookId: string) {
+  async getQuizzes(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathQuizzes);
     return clone(this.state.quizzes);
   }
 
-  async getAssets(_bookId: string) {
+  async getAssets(bookId: string) {
     await wait();
+    if (bookId === demoMathBookId) return clone(demoMathAssets);
     return clone(this.state.assets);
   }
 
@@ -458,8 +477,9 @@ export class DemoRepository {
     return clone(this.state.studyPlan);
   }
 
-  async getStudyPlan(_bookId: string, userId = "local_user") {
+  async getStudyPlan(bookId: string, userId = "local_user") {
     await wait();
+    if (bookId === demoMathBookId) return { ...clone(demoMathStudyPlan), user_id: userId };
     return { ...clone(this.state.studyPlan), user_id: userId };
   }
 

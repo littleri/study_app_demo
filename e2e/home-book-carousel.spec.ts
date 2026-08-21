@@ -779,19 +779,19 @@ test.describe("default homepage visual regression", () => {
     expect(layout.documentOverflow).toBeLessThanOrEqual(0);
   });
 
-  test("keeps the bundled shelf books as cover-only previews until import", async ({ page }) => {
+  test("keeps the remaining bundled shelf books as cover-only previews until import", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     const listbox = page.getByRole("listbox", { name: "选择教材" });
-    const previewBook = listbox.getByRole("option", { name: /高中数学 必修 第二册/ });
+    const previewBook = listbox.getByRole("option", { name: /物理 必修 第三册/ });
 
     await previewBook.click();
     await expect(previewBook).toHaveAttribute("aria-selected", "true");
     await expect(previewBook.locator("img")).toHaveAttribute(
       "src",
-      "/assets/book-covers/high-school-math-required-2.webp"
+      "/assets/book-covers/physics-required-3.webp"
     );
 
-    const workspace = page.locator('.home-book-workspace[data-book-id="catalog_high_school_math_required_2"]');
+    const workspace = page.locator('.home-book-workspace[data-book-id="catalog_physics_required_3"]');
     await expect(workspace).toHaveAttribute("data-loaded", "false");
     await expect(workspace.getByRole("heading", { name: "这本示范教材还未导入" })).toBeVisible();
     await expect(workspace.getByRole("button", { name: "导入这本教材" })).toBeVisible();

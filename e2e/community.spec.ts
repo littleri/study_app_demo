@@ -707,10 +707,19 @@ test.describe("community discovery", () => {
     }
 
     await page.getByRole("button", { name: "导入到我的课程", exact: true }).click();
-    await expect(page.locator(".community-import-screen").getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
-    await expect(page.getByText("已把「函数与导数系统提升课」加入你的课程空间，并生成章节进度、闪卡、练习和笔记模块。", { exact: true })).toBeVisible();
-    await expect(page.locator(".community-import-screen .metric-card").filter({ hasText: "章节" }).locator("strong")).toHaveText("3");
-    await expect(page.locator(".community-import-screen .metric-card").filter({ hasText: "闪卡" }).locator("strong")).toHaveText("16");
+    const imported = page.locator(".community-import-screen");
+    await expect(imported).toHaveClass(/course-ready-screen/);
+    await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
+    await expect(imported.locator(".success-hero-image")).toBeVisible();
+    await expect(imported).toContainText("已将《函数与导数系统提升课》编排为 1 节 AI 课程。");
+    await expect(imported.locator(".course-ready-support .metric-card strong")).toHaveText([
+      "1",
+      "16",
+      "3",
+      "混合",
+    ]);
+    await expect(imported.getByRole("button", { name: "查看学习计划", exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
   });
 
   test("opens and imports a PDF-backed chemistry course", async ({ page }) => {
@@ -728,9 +737,13 @@ test.describe("community discovery", () => {
     await detail.getByRole("button", { name: "导入到我的课程", exact: true }).click();
     const imported = page.locator(".community-import-screen");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
-    await expect(imported).toContainText("已把「化学必修第二册同步课」加入你的课程空间");
-    await expect(imported.locator(".metric-card").filter({ hasText: "章节" }).locator("strong")).toHaveText("4");
-    await expect(imported.locator(".metric-card").filter({ hasText: "闪卡" }).locator("strong")).toHaveText("26");
+    await expect(imported).toContainText("已将《化学必修第二册同步课》编排为 1 节 AI 课程。");
+    await expect(imported.locator(".course-ready-support .metric-card strong")).toHaveText([
+      "1",
+      "26",
+      "4",
+      "混合",
+    ]);
   });
 
   test("keeps card geometry stable when generated covers fail", async ({ page }) => {

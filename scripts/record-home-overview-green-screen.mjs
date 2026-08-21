@@ -31,6 +31,16 @@ const defaultFfmpegPath = path.join(
 );
 const recordingViewport = { height: 2880, width: 1440 };
 const chromaGreen = "#00FF00";
+// Scale against the complete hardware-control union, not only the silver bezel.
+// At 0.908 the side buttons remain inside the same 120 px horizontal safe area.
+const compositionScale = 0.908;
+const compositionLimits = {
+  maxCenterError: 2,
+  maxShellHeight: 2502,
+  maxShellWidth: 1202,
+  minHorizontalMargin: 120,
+  minVerticalMargin: 190
+};
 
 function optionValue(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -167,6 +177,8 @@ async function applyGreenScreenLayout(page) {
     "  overflow: visible !important;",
     "  border-radius: 0 !important;",
     "  box-shadow: none !important;",
+    `  transform: scale(${compositionScale}) !important;`,
+    "  transform-origin: center center !important;",
     `  background: ${chromaGreen} !important;`,
     "}",
     ".device-preview-studio .device-preview-frame--iphone-17-pro {",
@@ -204,20 +216,75 @@ async function applyGreenScreenLayout(page) {
   await page.waitForTimeout(250);
 
   return await page.locator('[data-testid="device-preview-frame"]').evaluate((frame) => {
-    const rounded = (rect) => ({
-      height: Math.round(rect.height),
-      width: Math.round(rect.width),
-      x: Math.round(rect.x),
-      y: Math.round(rect.y)
+    const measured = (rect) => ({
+      bottom: Number(rect.bottom.toFixed(3)),
+      height: Number(rect.height.toFixed(3)),
+      left: Number(rect.left.toFixed(3)),
+      right: Number(rect.right.toFixed(3)),
+      top: Number(rect.top.toFixed(3)),
+      width: Number(rect.width.toFixed(3)),
+      x: Number(rect.x.toFixed(3)),
+      y: Number(rect.y.toFixed(3))
     });
     const bezelElement = frame.querySelector(".device-preview-bezel");
     const islandElement = frame.querySelector(".device-preview-dynamic-island");
+    const shellElements = [
+      bezelElement,
+      ...frame.querySelectorAll(".device-preview-hardware-control")
+    ].filter(Boolean);
+    const shellRects = shellElements.map((element) => element.getBoundingClientRect());
+    const shellBounds = shellRects.length > 0
+      ? {
+          bottom: Math.max(...shellRects.map((rect) => rect.bottom)),
+          left: Math.min(...shellRects.map((rect) => rect.left)),
+          right: Math.max(...shellRects.map((rect) => rect.right)),
+          top: Math.min(...shellRects.map((rect) => rect.top))
+        }
+      : frame.getBoundingClientRect();
+    const shellRect = {
+      bottom: shellBounds.bottom,
+      height: shellBounds.bottom - shellBounds.top,
+      left: shellBounds.left,
+      right: shellBounds.right,
+      top: shellBounds.top,
+      width: shellBounds.right - shellBounds.left,
+      x: shellBounds.left,
+      y: shellBounds.top
+    };
     return {
-      bezel: bezelElement ? rounded(bezelElement.getBoundingClientRect()) : null,
-      dynamicIsland: islandElement ? rounded(islandElement.getBoundingClientRect()) : null,
-      screen: rounded(frame.getBoundingClientRect())
+      bezel: bezelElement ? measured(bezelElement.getBoundingClientRect()) : null,
+      dynamicIsland: islandElement ? measured(islandElement.getBoundingClientRect()) : null,
+      screen: measured(frame.getBoundingClientRect()),
+      shell: measured(shellRect)
     };
   });
+}
+
+function validateComposition(shellMetadata) {
+  const shell = shellMetadata?.shell;
+  if (!shell) throw new Error("无法测量完整手机外壳边界");
+
+  const margins = {
+    bottom: Number((recordingViewport.height - shell.bottom).toFixed(3)),
+    left: Number(shell.left.toFixed(3)),
+    right: Number((recordingViewport.width - shell.right).toFixed(3)),
+    top: Number(shell.top.toFixed(3))
+  };
+  const centerError = {
+    x: Number(Math.abs(shell.left + shell.width / 2 - recordingViewport.width / 2).toFixed(3)),
+    y: Number(Math.abs(shell.top + shell.height / 2 - recordingViewport.height / 2).toFixed(3))
+  };
+  const failures = [];
+  if (shell.width > compositionLimits.maxShellWidth) failures.push(`外壳宽度 ${shell.width}px`);
+  if (shell.height > compositionLimits.maxShellHeight) failures.push(`外壳高度 ${shell.height}px`);
+  if (margins.left < compositionLimits.minHorizontalMargin) failures.push(`左边距 ${margins.left}px`);
+  if (margins.right < compositionLimits.minHorizontalMargin) failures.push(`右边距 ${margins.right}px`);
+  if (margins.top < compositionLimits.minVerticalMargin) failures.push(`上边距 ${margins.top}px`);
+  if (margins.bottom < compositionLimits.minVerticalMargin) failures.push(`下边距 ${margins.bottom}px`);
+  if (centerError.x > compositionLimits.maxCenterError) failures.push(`水平中心误差 ${centerError.x}px`);
+  if (centerError.y > compositionLimits.maxCenterError) failures.push(`垂直中心误差 ${centerError.y}px`);
+  if (failures.length > 0) throw new Error(`手机安全构图校验失败：${failures.join("；")}`);
+  return { centerError, limits: compositionLimits, margins, scale: compositionScale, shell };
 }
 
 async function prepareHomePage(page, appFrame) {
@@ -415,6 +482,7 @@ let captureStartedAt = null;
 let captureEndedAt = null;
 let canvasMetadata = null;
 let deviceShellMetadata = null;
+let compositionMetadata = null;
 let initialMetrics = null;
 let finalMetrics = null;
 let overviewMotion = null;
@@ -433,6 +501,7 @@ try {
   });
 
   deviceShellMetadata = await applyGreenScreenLayout(activePage);
+  compositionMetadata = validateComposition(deviceShellMetadata);
   const canvas = activePage.locator('[data-testid="device-preview-canvas"]');
   await canvas.waitFor({ state: "visible", timeout: 15_000 });
   await waitForAttribute(activePage, canvas, "data-canvas-width", "1206");
@@ -615,6 +684,7 @@ const manifest = {
     shellIncluded: true
   },
   deviceShellMetadata,
+  composition: compositionMetadata,
   files: outputFiles,
   frameRate: 30,
   initialMetrics,
