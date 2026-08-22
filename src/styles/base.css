@@ -3421,9 +3421,9 @@ html {
 
 .ai-message-citations {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin-top: 10px;
   padding-top: 8px;
   border-top: 1px solid #e8ecf4;
@@ -3432,24 +3432,72 @@ html {
   font-weight: 650;
 }
 
-.ai-message-citation-item {
-  display: inline-flex;
+.ai-message-citations-head {
+  display: flex;
   align-items: center;
   gap: 5px;
-  border-radius: 999px;
-  padding-left: 10px;
-  color: #5942d6;
-  background: #f0edff;
+}
+
+.ai-message-citations-head > strong {
+  color: #3d4960;
+  font-size: 12px;
+}
+
+.ai-message-citations-head > span {
+  margin-left: auto;
+  color: #7b879b;
+  font-weight: 600;
+}
+
+.ai-message-citation-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 10px;
+  border: 1px solid #e4defe;
+  border-radius: 12px;
+  padding: 9px 10px;
+  color: #4d38c3;
+  background: #f7f5ff;
+}
+
+.ai-message-citation-item > strong {
+  overflow: hidden;
+  color: #3f337f;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-message-citation-item > span {
+  color: #6855c6;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.ai-message-citation-item > blockquote {
+  display: -webkit-box;
+  grid-column: 1 / -1;
+  overflow: hidden;
+  margin: 2px 0 1px;
+  color: #56627a;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .ai-message-citation-item > button {
   display: inline-flex;
+  grid-column: 1 / -1;
   align-items: center;
   justify-content: center;
   gap: 4px;
+  min-height: 44px;
   border: 0;
-  border-radius: 999px;
-  padding: 6px 9px;
+  border-radius: 10px;
+  padding: 7px 10px;
   color: #4d38c3;
   background: #e7e1ff;
   font: inherit;
@@ -3467,6 +3515,18 @@ html {
 
 .ai-message-citation-item > button:active {
   background: #d2c8ff;
+}
+
+.ai-message-rag-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e8ecf4;
+  color: #7b879b;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .ai-message-row-loading .ai-message > p {

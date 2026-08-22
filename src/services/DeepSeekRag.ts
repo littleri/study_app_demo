@@ -10,6 +10,7 @@ import type {
   ApiChunk,
   Citation,
   RagQuery,
+  RagRetrievalSummary,
   RagResponse
 } from "../types/api";
 import type { TextbookRetriever } from "./TextbookRetriever";
@@ -70,7 +71,13 @@ type DeepSeekToolDefinition = {
 
 type DeepSeekRequestOptions = {
   tools?: DeepSeekToolDefinition[];
-  toolChoice?: "auto" | "none";
+  toolChoice?: "auto" | "none" | {
+    type: "function";
+    function: {
+      name: string;
+    };
+  };
+  maxTokens?: number;
 };
 
 type DeepSeekAssistantResponse = {
@@ -82,6 +89,8 @@ type SearchToolInvocation = {
   call: DeepSeekToolCall;
   query: string;
   rankedChunks: RankedChunk[];
+  method: string | null;
+  errorCode: string | null;
 };
 
 export type DeepSeekRagCorpus = {
@@ -119,12 +128,13 @@ export const LOCAL_TEXTBOOK_CONTEXT_LIMIT = 3;
 const CURRENT_CHAPTER_BOOST = 0.2;
 const TOOL_QUERY_MAX_LENGTH = 500;
 const TOOL_CHUNK_MAX_LENGTH = 1_800;
+const RETRIEVAL_PLANNER_MAX_TOKENS = 180;
 
 export const searchTextbookTool: DeepSeekToolDefinition = {
   type: "function",
   function: {
     name: "search_textbook",
-    description: "Search locally bundled textbook passages only when the student needs reliable evidence from the current course textbook. Do not use this for greetings, casual chat, or questions that do not need textbook evidence.",
+    description: "Required first-stage lookup for every user message. Create one concise query for the locally bundled current-course textbook; the local retriever will decide whether reliable evidence exists.",
     parameters: {
       type: "object",
       properties: {
@@ -369,6 +379,56 @@ function normalizeHistory(history: RagQuery["history"]): DeepSeekHistoryMessage[
   return messages.slice(-8);
 }
 
+function normalizedContextLine(label: string, value: string | null | undefined) {
+  const text = value?.trim();
+  return `${label}：${text || "未指定"}`;
+}
+
+function textbookContextLines(query: RagQuery) {
+  const context = query.context;
+  const concepts = context?.key_concepts
+    ?.map((concept) => concept.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .join("、");
+  return [
+    normalizedContextLine("当前教材", context?.book_title),
+    normalizedContextLine("当前章节", context?.chapter_title),
+    normalizedContextLine("当前小节", context?.section_title),
+    normalizedContextLine("当前页码范围", context?.page_label),
+    normalizedContextLine("当前知识点", concepts)
+  ];
+}
+
+function buildFallbackSearchQuery(query: RagQuery) {
+  const question = query.question.trim();
+  const needsResolvedContext = /(?:本章|本节|这一章|这一节|这章|这节|这里|这个概念|概括|主要内容|讲什么)/u.test(question);
+  if (!needsResolvedContext) return trimForPrompt(question, TOOL_QUERY_MAX_LENGTH);
+  const contextTerms = [
+    query.context?.chapter_title,
+    query.context?.section_title,
+    ...(query.context?.key_concepts ?? []).slice(0, 6)
+  ]
+    .map((value) => value?.trim())
+    .filter((value): value is string => Boolean(value));
+  return trimForPrompt([...contextTerms, question].join(" "), TOOL_QUERY_MAX_LENGTH);
+}
+
+export function collectChapterScopeIds(chapters: readonly ApiChapter[], chapterId?: string | null) {
+  if (!chapterId) return [];
+  const scope = new Set<string>([chapterId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    chapters.forEach((chapter) => {
+      if (!chapter.parent_id || !scope.has(chapter.parent_id) || scope.has(chapter.chapter_id)) return;
+      scope.add(chapter.chapter_id);
+      changed = true;
+    });
+  }
+  return [...scope];
+}
+
 function getProviderErrorMessage(_payload: unknown, status: number) {
   if (status === 401 || status === 403) return "DeepSeek API Key 无效、已过期或无权限。";
   if (status === 429) return "DeepSeek 请求过于频繁或当前额度不足，请稍后再试。";
@@ -389,7 +449,7 @@ async function requestDeepSeek(messages: DeepSeekMessage[], options: DeepSeekReq
   const body = {
     model: deepSeekConfig.model,
     messages,
-    max_tokens: deepSeekConfig.maxTokens,
+    max_tokens: options.maxTokens ?? deepSeekConfig.maxTokens,
     stream: false,
     thinking: { type: "disabled" },
     ...(options.tools
@@ -482,30 +542,38 @@ function parseSearchToolQuery(argumentsText: string) {
   }
 }
 
-function toolNoReliableMatch(message: string) {
+function toolNoReliableMatch(message: string, query?: string | null) {
   return JSON.stringify({
     status: "no_reliable_textbook_match",
+    query: query ?? null,
     message,
     sources: []
   });
 }
 
 function toolReliableMatches(
+  query: string,
   rankedChunks: RankedChunk[],
   chapters: ApiChapter[]
 ) {
   const citations = rankedChunks.map((item) => createLocalCitation(item, chapters));
   return JSON.stringify({
     status: "reliable_textbook_match",
-    sources: rankedChunks.map(({ chunk }, index) => ({
-      chunk_id: chunk.chunk_id,
-      chapter_id: chunk.chapter_id,
+    query,
+    sources: rankedChunks.map((ranked, index) => ({
+      retrieval_method: ranked.retrievalMethod ?? "on-device-keyword-rag",
+      score: Number(ranked.score.toFixed(4)),
+      chunk_id: ranked.chunk.chunk_id,
+      chapter_id: ranked.chunk.chapter_id,
+      section_id: "section_id" in ranked.chunk && typeof ranked.chunk.section_id === "string"
+        ? ranked.chunk.section_id
+        : null,
       chapter_title: citations[index]?.chapter_title ?? "教材原文",
-      pdf_page: citations[index]?.page ?? chunk.page_start,
-      textbook_page: asPageNumberList(chunk.source_metadata?.printed_pages)[0]
-        ?? chunk.printed_page_start
+      pdf_page: citations[index]?.page ?? ranked.chunk.page_start,
+      textbook_page: asPageNumberList(ranked.chunk.source_metadata?.printed_pages)[0]
+        ?? ranked.chunk.printed_page_start
         ?? null,
-      text: trimForPrompt(chunk.text, TOOL_CHUNK_MAX_LENGTH)
+      text: trimForPrompt(ranked.chunk.text, TOOL_CHUNK_MAX_LENGTH)
     }))
   });
 }
@@ -516,20 +584,29 @@ async function rankToolChunks(
   chapterId?: string | null
 ) {
   if (!corpus.textbookRetriever) {
-    return selectReliableLocalChunks(question, corpus.chunks, chapterId);
+    return {
+      rankedChunks: selectReliableLocalChunks(question, corpus.chunks, chapterId),
+      method: "on-device-keyword-rag",
+      errorCode: null
+    };
   }
   const response = await corpus.textbookRetriever.search({
     query: question,
     chapterId,
+    chapterScopeIds: collectChapterScopeIds(corpus.chapters, chapterId),
     limit: 5,
     reliableOnly: true
   });
-  return response.hits.slice(0, LOCAL_TEXTBOOK_CONTEXT_LIMIT).map((hit) => ({
-    chunk: hit.chunk,
-    score: hit.score,
-    retrievalMethod: response.method,
-    reliabilityThreshold: response.minimum_evidence_threshold ?? undefined
-  }));
+  return {
+    rankedChunks: response.hits.slice(0, LOCAL_TEXTBOOK_CONTEXT_LIMIT).map((hit) => ({
+      chunk: hit.chunk,
+      score: hit.score,
+      retrievalMethod: response.method,
+      reliabilityThreshold: response.minimum_evidence_threshold ?? undefined
+    })),
+    method: response.method,
+    errorCode: response.error_code ?? null
+  };
 }
 
 async function prepareToolFollowup(
@@ -545,10 +622,13 @@ async function prepareToolFollowup(
     const query = parseSearchToolQuery(call.function.arguments);
     queryByCallId.set(call.id, query);
     if (!query) continue;
+    const ranked = await rankToolChunks(query, corpus, chapterId);
     searchInvocations.push({
       call,
       query,
-      rankedChunks: await rankToolChunks(query, corpus, chapterId)
+      rankedChunks: ranked.rankedChunks,
+      method: ranked.method,
+      errorCode: ranked.errorCode
     });
   }
 
@@ -593,12 +673,24 @@ async function prepareToolFollowup(
       role: "tool",
       tool_call_id: call.id,
       content: callChunks.length > 0
-        ? toolReliableMatches(callChunks, corpus.chapters)
-        : toolNoReliableMatch("没有可靠教材命中。请不要引用教材页码；可直接说明当前教材片段不足，或回答无需教材证据的部分。")
+        ? toolReliableMatches(query, callChunks, corpus.chapters)
+        : toolNoReliableMatch("没有可靠教材命中。请不要引用教材页码；可直接说明当前教材片段不足，或回答无需教材证据的部分。", query)
     };
   });
 
-  return { injectedChunks, toolMessages };
+  const firstSuccessfulInvocation = searchInvocations.find((item) => item.rankedChunks.length > 0);
+  const firstInvocation = firstSuccessfulInvocation ?? searchInvocations[0];
+  const unavailable = searchInvocations.length > 0
+    && searchInvocations.every((item) => item.method === "unavailable");
+  const retrieval: RagRetrievalSummary = {
+    attempted: true,
+    status: injectedChunks.length > 0 ? "hit" : unavailable ? "unavailable" : "no_match",
+    method: firstInvocation?.method ?? null,
+    hit_count: injectedChunks.length,
+    error_code: firstInvocation?.errorCode ?? null
+  };
+
+  return { injectedChunks, toolMessages, retrieval };
 }
 
 function selectRelatedAssets(assets: ApiAsset[], rankedChunks: RankedChunk[]) {
@@ -620,27 +712,63 @@ function asDirectError(error: unknown) {
   return new DeepSeekDirectError("无法连接 DeepSeek。请检查网络、个人 Key 和 API 服务状态。");
 }
 
-function assistantSystemMessage(): DeepSeekSystemMessage {
+function retrievalPlannerSystemMessage(query: RagQuery): DeepSeekSystemMessage {
   return {
     role: "system",
     content: [
-      "你是中文学习助手。先判断用户是在正常闲聊、一般学习交流，还是需要核验当前教材中的事实。",
-      "对于你好、问候、寒暄、轻松聊天或不需要教材证据的问题，直接自然回答，不调用教材工具，也不要杜撰出处。",
-      "只有在用户明确询问当前教材中的概念、原文、页码、事实或需要教材依据的题目解析时，才调用 search_textbook。",
-      "调用工具时，query 应是能代表待核验概念的简洁中文检索词。",
-      "工具返回可靠来源时，只依据其中有限的教材片段陈述教材事实；工具返回无可靠命中时，不得编造教材内容、教材页码或引用。",
-      "最终回答面向学生，不提及内部工具、检索流程、模型选择或内部判断。"
+      "你是教材检索查询规划器。对于每一条用户消息都必须调用 search_textbook，不能直接生成最终回答。",
+      ...textbookContextLines(query),
+      "调用工具时，query 必须是适合检索当前教材的简洁中文检索词。",
+      "如果用户使用‘本章’‘本节’‘这里’‘这个概念’等指代，必须结合当前章节、小节和知识点改写成具体概念。",
+      "如果用户是问候、闲聊或教材外问题，也必须调用 search_textbook；本地检索器会决定是否有可靠教材证据。",
+      "不得在第一阶段回答问题，不得编造教材内容或页码。"
     ].join("\n")
   };
+}
+
+function answerSystemMessage(query: RagQuery): DeepSeekSystemMessage {
+  return {
+    role: "system",
+    content: [
+      "你是中文教材学习助手。你已经收到 search_textbook 的本地检索结果。",
+      ...textbookContextLines(query),
+      "当工具返回 reliable_textbook_match 时，教材事实只能依据 sources 中的有限 text；先直接回答，再用适合学生的语言解释。",
+      "不得引用 sources 之外的教材页码，也不要在正文中伪造引用编号；真实来源由前端显示。",
+      "当工具返回 no_reliable_textbook_match 时，不得声称回答来自当前教材，不得编造教材原文或页码。",
+      "对于问候可自然回答；对于教材问题应说明当前教材证据不足；对于一般问题可简短回答，但必须与教材依据区分。",
+      "最终回答不提及 Tool Call、向量、BM25、阈值、模型选择或内部检索流程。"
+    ].join("\n")
+  };
+}
+
+function ensureSearchToolCall(firstResponse: DeepSeekAssistantResponse, query: RagQuery) {
+  const toolCalls = [...firstResponse.toolCalls];
+  const hasUsableSearchCall = toolCalls.some((call) => (
+    call.function.name === searchTextbookTool.function.name
+    && parseSearchToolQuery(call.function.arguments)
+  ));
+  if (hasUsableSearchCall) return toolCalls;
+  toolCalls.push({
+    id: "local_search_fallback",
+    type: "function",
+    function: {
+      name: searchTextbookTool.function.name,
+      arguments: JSON.stringify({
+        query: buildFallbackSearchQuery(query),
+        scope: "whole_book"
+      })
+    }
+  });
+  return toolCalls;
 }
 
 /**
  * Direct BYOK chat with optional local textbook evidence.
  *
- * Request one intentionally contains no textbook text. The model may either
- * answer immediately (for a greeting or non-textbook request) or ask for the
- * local search_textbook tool. Only a reliable local result is included in
- * request two, and every returned citation is recreated from that injected
+ * Request one intentionally contains no textbook text and is forced to plan a
+ * search_textbook call. Request two always runs, receives either reliable
+ * local chunks or an explicit no-match result, and produces the student-facing
+ * answer. Every returned citation is recreated from an actually injected
  * local chunk rather than from model output.
  */
 export async function askDeepSeekWithLocalRag(
@@ -654,7 +782,7 @@ export async function askDeepSeekWithLocalRag(
   if (question.length > 2_000) throw new DeepSeekDirectError("问题过长，请控制在 2,000 个字符以内。");
 
   const initialMessages: DeepSeekMessage[] = [
-    assistantSystemMessage(),
+    retrievalPlannerSystemMessage(query),
     ...normalizeHistory(query.history),
     { role: "user", content: question }
   ];
@@ -663,7 +791,11 @@ export async function askDeepSeekWithLocalRag(
   try {
     firstPayload = await requestDeepSeek(initialMessages, {
       tools: [searchTextbookTool],
-      toolChoice: "auto"
+      toolChoice: {
+        type: "function",
+        function: { name: searchTextbookTool.function.name }
+      },
+      maxTokens: RETRIEVAL_PLANNER_MAX_TOKENS
     });
   } catch (error) {
     throw asDirectError(error);
@@ -674,29 +806,23 @@ export async function askDeepSeekWithLocalRag(
     throw new DeepSeekDirectError("DeepSeek 没有返回可显示的回答，请重试。");
   }
 
-  if (firstResponse.toolCalls.length === 0) {
-    if (!firstResponse.content) {
-      throw new DeepSeekDirectError("DeepSeek 没有返回可显示的回答，请重试。");
-    }
-    return {
-      answer: firstResponse.content,
-      citations: [],
-      related_assets: [],
-      confidence: "low"
-    };
-  }
-
-  const { injectedChunks, toolMessages } = await prepareToolFollowup(
-    firstResponse.toolCalls,
+  const effectiveToolCalls = ensureSearchToolCall(firstResponse, query);
+  const { injectedChunks, toolMessages, retrieval } = await prepareToolFollowup(
+    effectiveToolCalls,
     corpus,
     query.chapter_id
   );
   const followupMessages: DeepSeekMessage[] = [
-    ...initialMessages,
+    answerSystemMessage(query),
+    ...normalizeHistory(query.history),
+    { role: "user", content: question },
     {
       role: "assistant",
-      content: firstResponse.content,
-      tool_calls: firstResponse.toolCalls
+      // The first request is only a retrieval planner. Discard any prose the
+      // provider returned so ungrounded preliminary text cannot influence the
+      // student-facing answer in stage two.
+      content: null,
+      tool_calls: effectiveToolCalls
     },
     ...toolMessages
   ];
@@ -721,6 +847,7 @@ export async function askDeepSeekWithLocalRag(
     answer: secondResponse.content,
     citations,
     related_assets: selectRelatedAssets(corpus.assets, injectedChunks),
-    confidence: responseConfidence(injectedChunks)
+    confidence: responseConfidence(injectedChunks),
+    retrieval
   };
 }

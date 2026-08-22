@@ -325,6 +325,7 @@ export class TextbookRetriever {
             bm25: corpus.bm25,
             dimension: BIOLOGY_RAG_VECTOR_DIMENSION,
             chapterId: request.chapterId,
+            chapterScopeIds: request.chapterScopeIds,
             weights: corpus.manifest.retrieval.weights,
             limit: Math.min(5, Math.max(1, request.limit ?? 5)),
             reliableThreshold: corpus.manifest.retrieval.lexical_fallback_threshold,

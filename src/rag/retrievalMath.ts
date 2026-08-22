@@ -78,6 +78,7 @@ export function rankTextbookChunks({
   queryVector,
   dimension,
   chapterId,
+  chapterScopeIds,
   weights,
   limit = 5,
   reliableThreshold,
@@ -90,6 +91,7 @@ export function rankTextbookChunks({
   queryVector?: ArrayLike<number>;
   dimension: number;
   chapterId?: string | null;
+  chapterScopeIds?: readonly string[];
   weights: { semantic: number; bm25: number; chapterPrior: number };
   limit?: number;
   reliableThreshold: number;
@@ -99,12 +101,18 @@ export function rankTextbookChunks({
   if (semanticEnabled && (!vectors || !queryVector)) {
     throw new Error("Semantic ranking requires a query vector.");
   }
+  const chapterScope = new Set(chapterScopeIds ?? []);
   const hits = chunks.map((chunk, index) => {
     const bm25Score = lexicalScores[index] ?? 0;
     const semanticScore = queryVector
       ? cosineDotProduct(queryVector, vectors!, chunk.vector_position, dimension)
       : null;
-    const chapterPrior = chapterId && chapterId === chunk.chapter_id ? 1 : 0;
+    const chapterPrior = chapterId && (
+      chapterId === chunk.chapter_id
+      || chapterId === chunk.section_id
+      || chapterScope.has(chunk.chapter_id)
+      || chapterScope.has(chunk.section_id)
+    ) ? 1 : 0;
     const score = semanticScore === null
       ? bm25Score
       : weights.semantic * semanticScore

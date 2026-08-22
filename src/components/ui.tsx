@@ -17,7 +17,7 @@ import {
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
-import type { Citation } from "../types/api";
+import type { Citation, RagRetrievalSummary } from "../types/api";
 import { globalMotionFallbackMs, localSlowMotionDurationSeconds, localStateGsapEase, StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
 import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
@@ -622,6 +622,7 @@ type OpenGlobalAiAssistantDetail = {
 
 type AiAssistantMessage = {
   citations?: Citation[];
+  retrieval?: RagRetrievalSummary;
   role: "ai" | "user";
   text: string;
 };
@@ -1038,11 +1039,23 @@ function GlobalAIAssistant({
         book_id: ragBookId,
         chapter_id: activeChapter?.chapter_id ?? null,
         history,
-        question: text
+        question: text,
+        context: {
+          book_title: activeCourse?.title ?? uploadedFile?.name ?? null,
+          chapter_title: activeChapter?.source_title ?? null,
+          section_title: activeLesson?.title ?? activeChapter?.ai_title ?? null,
+          page_label: assistantContent.contextMeta,
+          key_concepts: activeLesson?.key_concepts.filter(Boolean).slice(0, 8) ?? []
+        }
       });
       setMessages((items) => [
         ...items,
-        { citations: result.citations, role: "ai", text: result.answer }
+        {
+          citations: result.citations,
+          retrieval: result.retrieval,
+          role: "ai",
+          text: result.answer
+        }
       ]);
     } catch (error) {
       setMessages((items) => [
@@ -1500,27 +1513,40 @@ function AIAssistantDialog({
                   <p>{message.text}</p>
                   {message.citations?.length ? (
                     <div className="ai-message-citations" aria-label="教材来源">
-                      <span>来源于</span>
+                      <div className="ai-message-citations-head">
+                        <BookOpenCheck size={14} aria-hidden="true" />
+                        <strong>教材原文依据</strong>
+                        <span>{getUniqueCitationPages(message.citations).length} 处</span>
+                      </div>
                       {getUniqueCitationPages(message.citations).map((citation) => {
                         const printedPage = getCitationPrintedPage(citation);
                         const label = printedPage ? `教材第 ${printedPage} 页` : `PDF 第 ${citation.page} 页`;
                         return (
-                          <span
+                          <article
                             className="ai-message-citation-item"
-                            key={printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`}
+                            key={citation.chunk_id || (printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`)}
                           >
+                            <strong>{citation.chapter_title || "教材原文"}</strong>
                             <span>{label}</span>
+                            {citation.quote ? <blockquote>{citation.quote}</blockquote> : null}
                             <button
                               type="button"
-                              aria-label={`查看${label}`}
+                              aria-label={`查看${label}教材原文`}
                               onClick={() => onOpenCitation(citation)}
                             >
                               <BookOpenCheck size={14} aria-hidden="true" />
-                              <span>查看该页</span>
+                              <span>查看教材原文</span>
                             </button>
-                          </span>
+                          </article>
                         );
                       })}
+                    </div>
+                  ) : message.retrieval?.attempted && message.retrieval.status !== "hit" ? (
+                    <div className="ai-message-rag-status" role="status">
+                      <BookOpenCheck size={13} aria-hidden="true" />
+                      <span>{message.retrieval.status === "unavailable"
+                        ? "教材资料暂时不可用"
+                        : "当前教材未检索到可靠原文"}</span>
                     </div>
                   ) : null}
                 </div>

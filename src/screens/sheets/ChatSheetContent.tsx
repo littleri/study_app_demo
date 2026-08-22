@@ -82,7 +82,16 @@ export function ChatSheetContent({
         book_id: uploadedFile.bookId,
         chapter_id: activeChapter?.chapter_id ?? null,
         history,
-        question: normalizedQuestion
+        question: normalizedQuestion,
+        context: {
+          book_title: uploadedFile.name,
+          chapter_title: activeChapter?.source_title ?? null,
+          section_title: activeChapter?.ai_title ?? null,
+          page_label: activeChapter
+            ? `原书 ${activeChapter.printed_page_start ?? activeChapter.page_start}–${activeChapter.printed_page_end ?? activeChapter.page_end} 页`
+            : null,
+          key_concepts: []
+        }
       });
       setMessages((items) => [...items, { role: "assistant", text: result.answer }]);
       setCitations(result.citations.slice(0, 3).map((item) => ({
@@ -126,7 +135,7 @@ export function ChatSheetContent({
             page={citation.page}
             quote={citation.quote}
             image={citation.image}
-            openLabel="查看该页"
+            openLabel="查看教材原文"
             onOpen={() => openSheet({
               type: "source",
               title: citation.title,

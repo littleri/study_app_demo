@@ -1,6 +1,10 @@
 import demoStateJson from "../data/generated/demo-state.json";
 import { hasDirectDeepSeekKey } from "../config/deepseek";
-import { askDeepSeekWithLocalRag, createLocalCitation } from "./DeepSeekRag";
+import {
+  askDeepSeekWithLocalRag,
+  collectChapterScopeIds,
+  createLocalCitation
+} from "./DeepSeekRag";
 import { getTextbookRetriever } from "./TextbookRetriever";
 import {
   demoMathAssets,
@@ -215,7 +219,13 @@ export function createOfflineTextbookRagResponse(
       answer: "我可以陪你一起学习。不过当前教材中没有找到足够可靠的对应内容，所以这里不附教材页码。",
       citations: [],
       related_assets: [],
-      confidence: "low"
+      confidence: "low",
+      retrieval: {
+        attempted: true,
+        status: "no_match",
+        method: null,
+        hit_count: 0
+      }
     };
   }
 
@@ -228,7 +238,13 @@ export function createOfflineTextbookRagResponse(
     // manifest. Do not return unrelated fixture figures as citation evidence;
     // the source reader uses the verified page and keeps this chunk as fallback.
     related_assets: [],
-    confidence: "high"
+    confidence: "high",
+    retrieval: {
+      attempted: true,
+      status: "hit",
+      method: bookScopedChunks[0]?.retrievalMethod ?? "on-device-keyword-rag",
+      hit_count: citations.length
+    }
   };
 }
 
@@ -567,6 +583,7 @@ export class DemoRepository {
       const retrieved = await getTextbookRetriever().search({
         query: payload.question,
         chapterId: payload.chapter_id,
+        chapterScopeIds: collectChapterScopeIds(chapters, payload.chapter_id),
         limit: 3,
         reliableOnly: true
       });

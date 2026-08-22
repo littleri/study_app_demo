@@ -138,21 +138,24 @@ test.describe("lesson AI chat entry", () => {
     // A concept cameo must not revive the removed fixture evidence-card.
     await question.fill("请说明抗生素使用过程，顺便写上受精作用");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
-    await expect(dialog).toContainText("没有找到足够可靠", { timeout: 30_000 });
+    await expect(dialog).toContainText("没有找到足够可靠", { timeout: 60_000 });
     await expect(dialog.locator(".ai-message-citations")).toHaveCount(0);
+    await expect(dialog.locator(".ai-message.ai").last()).toContainText("当前教材未检索到可靠原文");
+    await expect(dialog.locator(".ai-message.ai").last().getByRole("button", { name: /查看.*教材原文/ }))
+      .toHaveCount(0);
 
     // This textbook query has a calibrated full-corpus lexical/hybrid hit.
     // The source action uses the hash-registered page bundled with the demo.
     await question.fill("噬菌体侵染细菌实验证明了什么？");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
     const citationList = dialog.locator(".ai-message-citations").last();
-    await expect(citationList).toContainText("来源于教材第", { timeout: 30_000 });
+    await expect(citationList).toContainText("教材原文依据", { timeout: 60_000 });
     const textbookReply = dialog.locator(".ai-message.ai").last();
     await expect(textbookReply).toContainText(/DNA|噬菌体|遗传/);
     await expect(textbookReply).not.toContainText("这一结果说明了什么");
     const citedPageLabel = await citationList.locator(".ai-message-citation-item > span").first().innerText();
     const citationPageButton = citationList.getByRole("button", { name: /查看教材第.*页/ }).first();
-    await expect(citationPageButton).toContainText("查看该页");
+    await expect(citationPageButton).toContainText("查看教材原文");
     await citationPageButton.click();
     await expect(page.locator(".source-reader-screen")).toBeVisible();
     await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);

@@ -127,6 +127,7 @@ export type TextbookRetrievalStatus =
 export type TextbookSearchRequest = {
   query: string;
   chapterId?: string | null;
+  chapterScopeIds?: string[];
   limit?: number;
   reliableOnly?: boolean;
 };

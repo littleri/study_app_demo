@@ -341,6 +341,21 @@ export type RagQuery = {
   chapter_id?: string | null;
   question: string;
   history?: Array<Record<string, unknown>>;
+  context?: {
+    book_title?: string | null;
+    chapter_title?: string | null;
+    section_title?: string | null;
+    page_label?: string | null;
+    key_concepts?: string[];
+  };
+};
+
+export type RagRetrievalSummary = {
+  attempted: boolean;
+  status: "hit" | "no_match" | "unavailable";
+  method: string | null;
+  hit_count: number;
+  error_code?: string | null;
 };
 
 export type RagResponse = {
@@ -348,6 +363,7 @@ export type RagResponse = {
   citations: Citation[];
   related_assets: ApiAsset[];
   confidence: "low" | "medium" | "high" | string;
+  retrieval?: RagRetrievalSummary;
 };
 
 export type AssignmentSubmitRequest = {

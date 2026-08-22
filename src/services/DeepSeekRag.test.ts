@@ -11,6 +11,7 @@ import {
 import type { TextbookRetriever } from "./TextbookRetriever";
 import {
   askDeepSeekWithLocalRag,
+  collectChapterScopeIds,
   createCitationExcerpt,
   createLocalCitation,
   DeepSeekDirectError,
@@ -103,7 +104,14 @@ const ragQuery: RagQuery = {
   book_id: "book-1",
   chapter_id: "chapter-genetics",
   history: [{ role: "user", content: "上一题我没理解。" }],
-  question: "DNA 的碱基互补配对是什么？"
+  question: "DNA 的碱基互补配对是什么？",
+  context: {
+    book_title: "生物教材",
+    chapter_title: "遗传的分子基础",
+    section_title: "DNA 的结构",
+    page_label: "教材第 13 页",
+    key_concepts: ["DNA", "碱基互补配对"]
+  }
 };
 
 function enableDirectCallForTest() {
@@ -131,7 +139,11 @@ function getRequestBody(fetchMock: { mock: { calls: unknown[][] } }, index: numb
       tool_call_id?: string;
     }>;
     tools?: Array<{ function: { name: string } }>;
-    tool_choice?: string;
+    tool_choice?: string | {
+      type: "function";
+      function: { name: string };
+    };
+    max_tokens?: number;
   };
 }
 
@@ -147,44 +159,82 @@ function textbookToolCall(argumentsText: string, id = "call_textbook") {
 }
 
 describe("two-stage local textbook tool routing", () => {
-  it("answers a greeting in one direct request without sending textbook text or citations", async () => {
+  it("collects the active chapter and all of its descendant section ids", () => {
+    const hierarchy: ApiChapter[] = [
+      { ...chapters[0]!, chapter_id: "c2", parent_id: null },
+      { ...chapters[0]!, chapter_id: "c2s1", parent_id: "c2" },
+      { ...chapters[0]!, chapter_id: "c2s1a", parent_id: "c2s1" },
+      { ...chapters[0]!, chapter_id: "c2s1b", parent_id: "c2s1" },
+      { ...chapters[0]!, chapter_id: "c2s2", parent_id: "c2" }
+    ];
+
+    expect(collectChapterScopeIds(hierarchy, "c2s1")).toEqual(["c2s1", "c2s1a", "c2s1b"]);
+  });
+
+  it("forces a textbook search and a second request even for a greeting", async () => {
     enableDirectCallForTest();
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({
-      choices: [{ message: { content: "你好！今天想聊什么？" } }]
-    }));
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "你好！今天想聊什么？" } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "你好！今天想聊什么？" } }]
+      }));
 
     const response = await askDeepSeekWithLocalRag({
       ...ragQuery,
       question: "你好"
     }, { assets, chapters, chunks });
 
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const firstBody = getRequestBody(fetchMock, 0);
-    expect(firstBody.tool_choice).toBe("auto");
+    expect(firstBody.tool_choice).toEqual({
+      type: "function",
+      function: { name: "search_textbook" }
+    });
+    expect(firstBody.max_tokens).toBeLessThan(300);
     expect(firstBody.tools?.[0]?.function.name).toBe("search_textbook");
     expect(firstBody.messages.at(-1)).toMatchObject({ role: "user", content: "你好" });
+    expect(firstBody.messages[0]?.content).toContain("当前教材：生物教材");
+    expect(firstBody.messages[0]?.content).toContain("当前章节：遗传的分子基础");
     expect(JSON.stringify(firstBody.messages)).not.toContain("DNA 分子通常由两条");
+    const secondBody = getRequestBody(fetchMock, 1);
+    expect(secondBody.tool_choice).toBe("none");
+    expect(secondBody.messages.find((message) => message.role === "tool")?.content)
+      .toContain("no_reliable_textbook_match");
     expect(response).toMatchObject({
       answer: "你好！今天想聊什么？",
       citations: [],
-      related_assets: []
+      related_assets: [],
+      retrieval: { attempted: true, status: "no_match", hit_count: 0 }
     });
   });
 
-  it("fails with a controlled error when the first response has no choices or no displayable content", async () => {
+  it("fails on a missing first response but locally forces search when content has no tool call", async () => {
     enableDirectCallForTest();
     const fetchMock = vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse({ choices: [] }))
       .mockResolvedValueOnce(jsonResponse({
         choices: [{ message: { content: null } }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "已根据教材片段回答。" } }]
       }));
 
     await expect(askDeepSeekWithLocalRag(ragQuery, { assets, chapters, chunks }))
       .rejects.toBeInstanceOf(DeepSeekDirectError);
     await expect(askDeepSeekWithLocalRag(ragQuery, { assets, chapters, chunks }))
-      .rejects.toThrow("DeepSeek 没有返回可显示的回答");
+      .resolves.toMatchObject({
+        answer: "已根据教材片段回答。",
+        citations: [{ chunk_id: "dna-structure" }]
+      });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const fallbackBody = getRequestBody(fetchMock, 2);
+    expect(fallbackBody.messages).toContainEqual(expect.objectContaining({
+      role: "assistant",
+      tool_calls: [expect.objectContaining({ id: "local_search_fallback" })]
+    }));
   });
 
   it("executes a reliable textbook tool call and returns only injected local citations", async () => {
@@ -211,6 +261,7 @@ describe("two-stage local textbook tool routing", () => {
     expect(secondBody.tool_choice).toBe("none");
     expect(secondBody.messages).toContainEqual(expect.objectContaining({
       role: "assistant",
+      content: null,
       tool_calls: [expect.objectContaining({ id: "call_textbook" })]
     }));
     const toolResult = secondBody.messages.find((message) => message.role === "tool");
@@ -373,8 +424,14 @@ describe("two-stage local textbook tool routing", () => {
     const toolResult = secondBody.messages.find((message) => message.role === "tool");
     expect(toolResult?.content).toContain("no_reliable_textbook_match");
     expect(toolResult?.content).not.toContain("DNA 分子通常由两条");
+    expect(secondBody.messages.filter((message) => message.role === "tool")).toHaveLength(1);
     expect(response.citations).toEqual([]);
     expect(response.related_assets).toEqual([]);
+    expect(response.retrieval).toMatchObject({
+      attempted: true,
+      status: "no_match",
+      hit_count: 0
+    });
     expect(response.confidence).toBe("low");
   });
 
@@ -413,6 +470,7 @@ describe("two-stage local textbook tool routing", () => {
 
     expect(textbookRetriever.search).toHaveBeenCalledWith(expect.objectContaining({
       query: "你好",
+      chapterScopeIds: ["chapter-genetics"],
       reliableOnly: true
     }));
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -420,6 +478,12 @@ describe("two-stage local textbook tool routing", () => {
     expect(toolResult?.content).toContain("no_reliable_textbook_match");
     expect(response.citations).toEqual([]);
     expect(response.related_assets).toEqual([]);
+    expect(response.retrieval).toMatchObject({
+      attempted: true,
+      status: "no_match",
+      method: "on-device-bm25-fallback",
+      hit_count: 0
+    });
   });
 
   it("treats the current chapter as a small boost rather than a hard retrieval filter", () => {
@@ -460,11 +524,13 @@ describe("two-stage local textbook tool routing", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const secondBody = getRequestBody(fetchMock, 1);
-    const toolResult = secondBody.messages.find((message) => message.role === "tool");
-    expect(toolResult).toMatchObject({ tool_call_id: "call_unknown" });
-    expect(toolResult?.content).toContain("工具不可用");
-    expect(response.citations).toEqual([]);
-    expect(response.related_assets).toEqual([]);
+    expect(secondBody.messages.filter((message) => message.role === "tool")).toHaveLength(2);
+    expect(secondBody.messages.find((message) => message.tool_call_id === "call_unknown")?.content)
+      .toContain("工具不可用");
+    expect(secondBody.messages.find((message) => message.tool_call_id === "local_search_fallback")?.content)
+      .toContain("reliable_textbook_match");
+    expect(response.citations).toEqual([expect.objectContaining({ chunk_id: "dna-structure" })]);
+    expect(response.retrieval).toMatchObject({ status: "hit", hit_count: 1 });
   });
 
   it("returns a no-match tool result for malformed tool arguments without throwing", async () => {
@@ -486,10 +552,13 @@ describe("two-stage local textbook tool routing", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const secondBody = getRequestBody(fetchMock, 1);
-    const toolResult = secondBody.messages.find((message) => message.role === "tool");
-    expect(toolResult?.content).toContain("检索参数无效");
-    expect(response.citations).toEqual([]);
-    expect(response.related_assets).toEqual([]);
+    expect(secondBody.messages.filter((message) => message.role === "tool")).toHaveLength(2);
+    expect(secondBody.messages.find((message) => message.tool_call_id === "call_textbook")?.content)
+      .toContain("检索参数无效");
+    expect(secondBody.messages.find((message) => message.tool_call_id === "local_search_fallback")?.content)
+      .toContain("reliable_textbook_match");
+    expect(response.citations).toEqual([expect.objectContaining({ chunk_id: "dna-structure" })]);
+    expect(response.retrieval).toMatchObject({ status: "hit", hit_count: 1 });
   });
 
   it("fails before network access when no personal key is configured", async () => {

@@ -7,7 +7,7 @@ const chunks: TextbookRagChunk[] = [
     chunk_id: "current-chapter",
     book_id: "book_biology_2",
     chapter_id: "c2",
-    section_id: "c2s1",
+    section_id: "c2s1a",
     page_start: 11,
     page_end: 11,
     content_type: "body",
@@ -72,6 +72,29 @@ describe("static textbook retrieval math", () => {
     expect(hits[0]?.chapter_prior).toBe(0);
     expect(hits[1]?.chapter_prior).toBe(1);
     expect(hits[0]?.reliable).toBe(true);
+  });
+
+  it("applies the chapter prior to descendant section ids without hard-filtering the book", () => {
+    const hits = rankTextbookChunks({
+      query: "减数分裂",
+      chunks,
+      bm25: emptyBm25,
+      vectors: new Float32Array([
+        0.9, 0.1,
+        1, 0
+      ]),
+      queryVector: new Float32Array([1, 0]),
+      dimension: 2,
+      chapterId: "c2s1",
+      chapterScopeIds: ["c2s1", "c2s1a", "c2s1b"],
+      weights: { semantic: 0.75, bm25: 0.20, chapterPrior: 0.05 },
+      reliableThreshold: 0.6,
+      semanticEnabled: true
+    });
+
+    expect(hits.find((hit) => hit.chunk.chunk_id === "current-chapter")?.chapter_prior).toBe(1);
+    expect(hits.find((hit) => hit.chunk.chunk_id === "strong-other-chapter")?.chapter_prior).toBe(0);
+    expect(hits.map((hit) => hit.chunk.chunk_id)).toContain("strong-other-chapter");
   });
 
   it("can rank a lexical fallback without a vector or accidental semantic citation", () => {
