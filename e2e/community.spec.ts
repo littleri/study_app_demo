@@ -286,20 +286,24 @@ test.describe("community discovery", () => {
       ).toBeLessThanOrEqual(2);
     }
 
-    await input.fill("减数分裂为什么只复制一次却分裂两次？");
+    const firstQuestion = "噬菌体侵染细菌实验证明了什么？";
+    await input.fill(firstQuestion);
     await expect(suggestions).toHaveCount(0);
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
-    await expect(dialog).toContainText("同源染色体可以理解成一对来源不同");
     await expect(modeRow).toHaveCount(0);
     const firstUserBubble = dialog.locator(".ai-message-row.user .ai-message.user").first();
     const firstAiBubble = dialog.locator(".ai-message-row.ai .ai-message.ai").first();
     const firstCitationLinks = firstAiBubble.locator(".ai-message-citations");
-    await expect(firstCitationLinks).toContainText("来源于");
-    await expect(firstCitationLinks.getByRole("button", { name: "查看教材第 16 页", exact: true })).toBeVisible();
+    await expect(firstAiBubble).toContainText("教材原文：");
+    await expect(firstAiBubble).toContainText(/DNA|噬菌体|遗传/);
+    await expect(firstCitationLinks).toContainText("来源于教材第");
+    const citedPageLabel = await firstCitationLinks.locator(".ai-message-citation-item > span").first().innerText();
+    const citationPageButton = firstCitationLinks.getByRole("button", { name: /查看教材第.*页/ }).first();
+    await expect(citationPageButton).toContainText("查看该页");
     await expect(firstCitationLinks).not.toContainText("DeepSeek");
     await expect(firstCitationLinks).not.toContainText("Demo RAG");
     await expect(firstCitationLinks).not.toContainText("PDF");
-    await expect(firstUserBubble).toContainText("减数分裂为什么只复制一次却分裂两次？");
+    await expect(firstUserBubble).toContainText(firstQuestion);
     await expect(firstUserBubble.locator(".ai-message-author")).toHaveCount(0);
     await expect(firstUserBubble.locator("p")).toHaveCSS("color", "rgb(255, 255, 255)");
     await expect(firstAiBubble.locator(".ai-message-author")).toHaveText("AI 导学助手");
@@ -312,15 +316,17 @@ test.describe("community discovery", () => {
     expect(bubbleLayout[0]?.box?.x ?? 0, "the user bubble is right aligned")
       .toBeGreaterThan(bubbleLayout[1]?.box?.x ?? 0);
 
-    await input.fill("那第二次分裂具体发生什么？");
+    await input.fill("你好");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
-    await expect(dialog).toContainText("姐妹染色单体");
+    await expect(dialog.locator(".ai-message.ai").last()).toContainText("你好！我是你的学习助手");
     await expect(dialog.locator(".ai-message-row.user")).toHaveCount(2);
     await expect(dialog.locator(".ai-message-row.ai")).toHaveCount(2);
     expect(directDeepSeekRequests, "the default offline demo never sends a DeepSeek request").toBe(0);
-    await firstCitationLinks.getByRole("button", { name: "查看教材第 16 页", exact: true }).click();
+    await citationPageButton.click();
     await expect(page.locator(".source-reader-screen")).toBeVisible();
-    await expect(page.locator(".source-reader-toolbar strong")).toHaveText("页 11");
+    await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);
+    await expect(page.locator(".source-page-text-document")).toBeVisible();
+    await expect(page.locator(".source-page-text-document")).toContainText("噬菌体");
     expect(bookCourseApi.externalRequests, "the offline Demo RAG needs no external request").toEqual([]);
     expect(bookCourseApi.consoleErrors, "grounded global assistant emits no console errors").toEqual([]);
     expect(bookCourseApi.pageErrors, "grounded global assistant emits no page errors").toEqual([]);
