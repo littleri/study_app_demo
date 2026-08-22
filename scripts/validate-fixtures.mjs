@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+  BIOLOGY_FRONTMATTER,
+  BIOLOGY_RAG,
+  assertMissingChapterOneFrontmatterMetadata
+} from "./rag-common.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const dir = join(root, "src", "data", "generated");
+const curatedPath = join(root, "src", "data", "seed", "curated-content.json");
 const latestPath = join(root, ".cache", "mineru", "latest.json");
 const required = ["demo-state.json", "book.json", "chapters.json", "lessons.json", "quiz.json", "flashcards.json", "ai-responses.json"];
 
@@ -30,15 +36,50 @@ function jsonHash(value) {
 }
 
 for (const name of required) read(name);
-assert(existsSync(latestPath), "MinerU manifest is missing; run `npm run demo:mineru` first.");
 
 const state = read("demo-state.json");
 const book = read("book.json");
 const chapters = read("chapters.json");
+const curated = JSON.parse(readFileSync(curatedPath, "utf8"));
 const lessons = read("lessons.json");
 const quizzes = read("quiz.json");
 const flashcards = read("flashcards.json");
 const replies = read("ai-responses.json");
+// The checked-in demo must remain locally verifiable without an ignored
+// MinerU cache. When a developer has a raw run available we retain the much
+// stricter provenance checks below; otherwise validate the published fixture
+// contract and report that raw-cache-only checks were intentionally skipped.
+assert(state.provenance?.parser === "mineru", "Fixtures must declare MinerU as parser.");
+assert(book.id === "book_biology_2" && book.pages === 125, "Unexpected book metadata.");
+assert(Array.isArray(chapters) && chapters.length >= 3, "Chapter fixture is too small.");
+assertMissingChapterOneFrontmatterMetadata({
+  missingChapterOneBody: BIOLOGY_RAG.missingChapterOneBody,
+  chapters: curated.chapters,
+  label: "Curated demo content seed"
+});
+assertMissingChapterOneFrontmatterMetadata({
+  missingChapterOneBody: BIOLOGY_RAG.missingChapterOneBody,
+  chapters,
+  label: "Generated demo directory"
+});
+const generatedFrontmatter = chapters.find((chapter) => chapter.chapter_id === BIOLOGY_FRONTMATTER.chapterId);
+const curatedFrontmatter = curated.chapters.find((chapter) => chapter.chapter_id === BIOLOGY_FRONTMATTER.chapterId);
+assert(
+  JSON.stringify(generatedFrontmatter) === JSON.stringify(curatedFrontmatter),
+  "Generated frontmatter metadata drifted from the curated seed. Run npm run demo:content."
+);
+assert(
+  chapters.filter((chapter) => chapter.level === 1 && chapter.chapter_id !== BIOLOGY_FRONTMATTER.chapterId).length === book.chapterCount,
+  "Generated book chapter count must exclude the frontmatter node."
+);
+assert(book.chapterCount === curated.book.chapterCount, "Generated book chapter count drifted from the curated seed.");
+assert(Array.isArray(lessons) && lessons.some((lesson) => lesson.chapter_id === "c2s1"), "Core meiosis lesson is missing.");
+assert(flashcards.length >= 6 && quizzes.length >= 3, "P0 practice fixtures are incomplete.");
+assert(replies.default && replies.quiz, "AI response fixtures are incomplete.");
+if (!existsSync(latestPath)) {
+  console.log("Fixtures valid without ignored MinerU cache: " + chapters.length + " chapters, " + state.chunks.length + " chunks, " + flashcards.length + " flashcards, " + quizzes.length + " quizzes.");
+  process.exit(0);
+}
 const manifest = JSON.parse(readFileSync(latestPath, "utf8"));
 
 assert(manifest.status === "completed" && manifest.parser === "mineru", "Latest MinerU manifest is not completed by MinerU.");

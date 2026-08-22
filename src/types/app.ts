@@ -78,6 +78,12 @@ export type SourcePageTarget = {
   pageEnd?: number | null;
   printedPageStart?: number | null;
   printedPageEnd?: number | null;
+  /**
+   * Locally bundled citation-chunk text. When present, the source reader
+   * renders this controlled text instead of guessing an unpublished page-image
+   * URL, while retaining the citation's actual page mapping.
+   */
+  sourceText?: string | null;
   from?: Screen | null;
 };
 

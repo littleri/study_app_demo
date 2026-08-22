@@ -5,8 +5,20 @@ test.describe("lesson AI chat entry", () => {
 
   test("switches mascot states, docks across edges, and opens the shared course-aware AI dialog", async ({ page }) => {
     let directDeepSeekRequests = 0;
+    let unexpectedRemoteModelRequests = 0;
+    let unpublishedCitationPageRequests = 0;
     await page.route("https://api.deepseek.com/chat/completions", async (route) => {
       directDeepSeekRequests += 1;
+      await route.abort("blockedbyclient");
+    });
+    for (const remotePattern of ["**://huggingface.co/**", "**://cdn.jsdelivr.net/**"]) {
+      await page.route(remotePattern, async (route) => {
+        unexpectedRemoteModelRequests += 1;
+        await route.abort("blockedbyclient");
+      });
+    }
+    await page.route("**/assets/textbook/pages/**", async (route) => {
+      unpublishedCitationPageRequests += 1;
       await route.abort("blockedbyclient");
     });
     await page.goto("/?embedded=device-preview");
@@ -124,15 +136,36 @@ test.describe("lesson AI chat entry", () => {
     expect(compactContextBounds?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(132);
 
     const question = dialog.getByRole("textbox", { name: "向 AI 助手提问" });
-    await question.fill("请结合原文举一个受精作用的例子");
+    // A concept cameo must not revive the removed fixture evidence-card.
+    await question.fill("请说明抗生素使用过程，顺便写上受精作用");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
-    await expect(dialog).toContainText("如果体细胞里有一对 1 号同源染色体");
-    await expect(dialog.locator(".ai-message-citations")).toContainText("来源于教材第");
-    await expect(dialog.locator(".ai-message-citations").getByRole("button").first()).toBeVisible();
-    expect(directDeepSeekRequests).toBe(0);
+    await expect(dialog).toContainText("没有找到足够可靠");
+    await expect(dialog.locator(".ai-message-citations")).toHaveCount(0);
 
-    await dialog.locator(".ai-close").click();
-    await expect(dialog).toHaveCount(0);
+    // This textbook query has a calibrated full-corpus lexical/hybrid hit.
+    // The source action must remain usable without an author-local page bitmap.
+    await question.fill("噬菌体侵染细菌实验证明了什么？");
+    await dialog.getByRole("button", { name: "发送", exact: true }).click();
+    const citationList = dialog.locator(".ai-message-citations").last();
+    await expect(citationList).toContainText("来源于教材第");
+    const textbookReply = dialog.locator(".ai-message.ai").last();
+    await expect(textbookReply).toContainText(/DNA|噬菌体|遗传/);
+    await expect(textbookReply).not.toContainText("这一结果说明了什么");
+    const citedPageLabel = await citationList.locator(".ai-message-citation-item > span").first().innerText();
+    const citationPageButton = citationList.getByRole("button", { name: /查看教材第.*页/ }).first();
+    await expect(citationPageButton).toContainText("查看该页");
+    await citationPageButton.click();
+    await expect(page.locator(".source-reader-screen")).toBeVisible();
+    await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);
+    await expect(page.locator(".source-page-text-document")).toBeVisible();
+    await expect(page.locator(".source-page-text-document")).toContainText("噬菌体");
+    await expect(page.locator(".source-page-image")).toHaveCount(0);
+    expect(directDeepSeekRequests).toBe(0);
+    expect(unexpectedRemoteModelRequests).toBe(0);
+    expect(unpublishedCitationPageRequests).toBe(0);
+
+    await page.getByRole("button", { name: "回到课程", exact: true }).click();
+    await expect(page.locator(".lesson-screen")).toBeVisible();
     const pager = page.locator(".lesson-knowledge-pager");
     const progress = pager.getByRole("progressbar", { name: "章节学习进度" });
     const pageCount = Number(await progress.getAttribute("aria-valuemax"));

@@ -1,6 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+  BIOLOGY_RAG,
+  assertMissingChapterOneFrontmatterMetadata
+} from "./rag-common.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const generatedDir = join(root, "src", "data", "generated");
@@ -25,6 +29,11 @@ if (!existsSync(curatedPath)) {
 }
 
 const curated = JSON.parse(readFileSync(curatedPath, "utf8"));
+assertMissingChapterOneFrontmatterMetadata({
+  missingChapterOneBody: BIOLOGY_RAG.missingChapterOneBody,
+  chapters: curated.chapters,
+  label: "Curated demo content seed"
+});
 const rawOutput = manifest.output_dir;
 const rawFiles = manifest.files ?? [];
 const markdownFile = rawFiles.find((file) => file.toLowerCase().endsWith(".md"));

@@ -3,7 +3,12 @@ import { basename, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const expectedPageCount = 125;
-const destination = join(root, "public", "assets", "textbook", "pages");
+// Original textbook page scans are retained only as a recoverable local cache.
+// Publishing a scan requires a separate tracked + SHA-256 registry entry; see
+// citation-source-assets.mjs. Keeping the refresh target out of public means a
+// routine demo refresh cannot silently put unreviewed page bitmaps into dist or
+// an Android APK.
+const destination = join(root, ".cache", "unpublished-textbook-pages");
 
 function pageFile(page) {
   return `page_${String(page).padStart(3, "0")}.jpeg`;

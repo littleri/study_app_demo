@@ -16,6 +16,7 @@ tmp/
 .venv-mineru/
 public/assets/textbook/pages/
 public/assets/textbook/figures/
+public/rag/**/*.tmp
 
 # Editors and operating systems
 .DS_Store

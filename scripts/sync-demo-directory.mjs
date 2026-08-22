@@ -1,5 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import {
+  BIOLOGY_RAG,
+  assertMissingChapterOneFrontmatterMetadata
+} from "./rag-common.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const generatedDir = join(root, "src", "data", "generated");
@@ -30,7 +34,7 @@ const chapters = curated.chapters.map((chapter) => chapter.chapter_id === "c2s1"
   ? { ...chapter, source: "manual_toc_reference+mineru" }
   : chapter);
 const ids = new Set(chapters.map((chapter) => chapter.chapter_id));
-const rootCount = chapters.filter((chapter) => chapter.level === 1).length;
+const rootCount = chapters.filter((chapter) => chapter.level === 1 && chapter.chapter_id !== "frontmatter").length;
 const formalSectionCount = chapters.filter((chapter) => /^第\s*\d+\s*节/.test(chapter.source_title)).length;
 
 assert(ids.size === chapters.length, "Directory contains duplicate chapter IDs.");
@@ -39,7 +43,12 @@ assert(formalSectionCount === curated.book.sectionCount, "Directory section coun
 assert(chapters.every((chapter) => !chapter.parent_id || ids.has(chapter.parent_id)), "Directory contains an unknown parent ID.");
 assert(chapters.every((chapter) => chapter.page_start <= chapter.page_end), "Directory contains an invalid PDF page range.");
 assert(chapters.every((chapter) => chapter.printed_page_start <= chapter.printed_page_end), "Directory contains an invalid printed page range.");
-const directoryPolicy = "目录按当前 PDF 实际页核验；源文件缺少第 1 章印刷页 1–14，第 2 章起使用 MinerU OCR 证据。";
+assertMissingChapterOneFrontmatterMetadata({
+  missingChapterOneBody: BIOLOGY_RAG.missingChapterOneBody,
+  chapters,
+  label: "Demo directory seed"
+});
+const directoryPolicy = "目录按当前 PDF 实际页核验：PDF 第 1–9 页为教材封面、前言与目录；源文件缺少第 1 章正文，第 2 章起使用 MinerU OCR 证据。";
 const provenance = {
   ...demoState.provenance,
   content_scope: curated.provenance.content_scope,
@@ -67,4 +76,4 @@ writeJson(demoStatePath, {
 });
 writeJson(metaPath, { ...meta, provenance, studyPlan: curated.studyPlan });
 
-console.log(`Synced ${chapters.length} directory entries (${rootCount} chapters, ${formalSectionCount} formal sections).`);
+console.log(`Synced ${chapters.length} directory entries (${rootCount} chapters plus frontmatter, ${formalSectionCount} formal sections).`);

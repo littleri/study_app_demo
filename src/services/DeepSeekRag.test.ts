@@ -1,9 +1,17 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deepSeekConfig, deepSeekKeySetupMessage } from "../config/deepseek";
+import { demoMathBookId } from "../data/demoMathCourse";
 import type { ApiAsset, ApiChapter, ApiChunk, RagQuery } from "../types/api";
-import { DemoRepository } from "./DemoRepository";
+import {
+  createOfflineTextbookRagResponse,
+  DemoRepository,
+  selectOfflineReliableChunksForBook
+} from "./DemoRepository";
+import type { TextbookRetriever } from "./TextbookRetriever";
 import {
   askDeepSeekWithLocalRag,
+  createCitationExcerpt,
   createLocalCitation,
   DeepSeekDirectError,
   LOCAL_TEXTBOOK_RELIABILITY_THRESHOLD,
@@ -11,6 +19,10 @@ import {
 } from "./DeepSeekRag";
 
 const originalDeepSeekConfig = { ...deepSeekConfig };
+
+function readPublishedJson<T>(relativePath: string): T {
+  return JSON.parse(readFileSync(new URL(relativePath, import.meta.url), "utf8")) as T;
+}
 
 afterEach(() => {
   Object.assign(deepSeekConfig, originalDeepSeekConfig);
@@ -366,6 +378,50 @@ describe("two-stage local textbook tool routing", () => {
     expect(response.confidence).toBe("low");
   });
 
+  it("does not create a citation when the complete local retriever rejects a greeting after lexical fallback", async () => {
+    enableDirectCallForTest();
+    const textbookRetriever = {
+      search: vi.fn().mockResolvedValue({
+        status: "lexical_fallback",
+        method: "on-device-bm25-fallback",
+        corpus_version: "biology-required-2-rag-v1",
+        high_confidence_threshold: 0.6037,
+        minimum_evidence_threshold: 0.6037,
+        hits: [],
+        error_code: "worker_unavailable"
+      })
+    } as unknown as TextbookRetriever;
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{
+          message: {
+            content: null,
+            tool_calls: [textbookToolCall(JSON.stringify({ query: "你好" }))]
+          }
+        }]
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [{ message: { content: "你好！有什么可以帮你的吗？" } }]
+      }));
+
+    const response = await askDeepSeekWithLocalRag({ ...ragQuery, question: "你好" }, {
+      assets,
+      chapters,
+      chunks,
+      textbookRetriever
+    });
+
+    expect(textbookRetriever.search).toHaveBeenCalledWith(expect.objectContaining({
+      query: "你好",
+      reliableOnly: true
+    }));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const toolResult = getRequestBody(fetchMock, 1).messages.find((message) => message.role === "tool");
+    expect(toolResult?.content).toContain("no_reliable_textbook_match");
+    expect(response.citations).toEqual([]);
+    expect(response.related_assets).toEqual([]);
+  });
+
   it("treats the current chapter as a small boost rather than a hard retrieval filter", () => {
     const ranked = rankLocalChunks(
       "自然选择如何改变种群的基因频率？",
@@ -494,9 +550,111 @@ describe("two-stage local textbook tool routing", () => {
       retrieval_method: "on-device-keyword-rag"
     });
   });
+
+  it("keeps the actual PDF 1–9 corpus and generated directory distinct from the missing Chapter 1 body", () => {
+    const actualChapters = readPublishedJson<ApiChapter[]>("../data/generated/chapters.json");
+    const actualChunks = readPublishedJson<{ chunks: ApiChunk[] }>(
+      "../../public/rag/biology-required-2-rag-v1/chunks.json"
+    ).chunks;
+    const frontmatterQueryTerms = ["普通高中课程标准实验教科书", "遗传与进化"];
+    const compact = (value: string) => value.replace(/\s/gu, "");
+    const frontmatterChunk = actualChunks.find((chunk) => (
+      chunk.chapter_id === "frontmatter"
+      && chunk.page_start === 1
+      // The cover inserts the word “必修” on its own line between these two
+      // literal query terms, so assert both actual evidence terms instead of
+      // pretending the OCR line break did not exist.
+      && frontmatterQueryTerms.every((term) => compact(chunk.text).includes(term))
+    ));
+    const actualChapterChunk = actualChunks.find((chunk) => chunk.chapter_id === "c2" && chunk.page_start === 10);
+
+    expect(frontmatterChunk).toBeDefined();
+    expect(actualChapterChunk).toBeDefined();
+
+    const frontmatterCitation = createLocalCitation({
+      chunk: frontmatterChunk!,
+      score: 0.99,
+      retrievalMethod: "on-device-hybrid-rag"
+    }, actualChapters);
+    const actualChapterCitation = createLocalCitation({
+      chunk: actualChapterChunk!,
+      score: 0.99,
+      retrievalMethod: "on-device-hybrid-rag"
+    }, actualChapters);
+
+    // This is the real generated-directory + published-corpus path used by
+    // DemoRepository before SourceReader receives its target fields.
+    expect(frontmatterCitation).toMatchObject({
+      chapter_id: "frontmatter",
+      chapter_title: "教材封面、前言与目录",
+      page: 1
+    });
+    expect(frontmatterCitation.chapter_title).not.toMatch(/第\s*1\s*章|遗传因子的发现/u);
+    expect(actualChapterCitation.chapter_title).toBe("第 2 章 基因和染色体的关系");
+  });
+
+  it("selects a substantive source sentence instead of an OCR question prompt", () => {
+    const source = ",这一结果说明了什么？\n进一步观察发现：细菌裂解释放出的噬菌体中，可以检测到 DNA。\n赫尔希和蔡斯的实验表明：噬菌体侵染细菌时，DNA 进入细菌的细胞中，而蛋白质外壳仍留在外面。";
+    const quote = createCitationExcerpt(source);
+
+    expect(quote).toBe("赫尔希和蔡斯的实验表明：噬菌体侵染细菌时，DNA 进入细菌的细胞中，而蛋白质外壳仍留在外面。");
+    expect(quote).not.toContain("这一结果说明了什么");
+    expect(source).toContain(quote);
+  });
+
+  it("keeps a normal declarative excerpt and falls back to controlled source text when every fragment is short", () => {
+    const declarativeSource = "DNA 分子由两条反向平行的脱氧核苷酸链组成。碱基按照互补配对原则连接。";
+    const shortSource = "图。\n45。\n注。";
+    const declarativeQuote = createCitationExcerpt(declarativeSource);
+    const shortFallbackQuote = createCitationExcerpt(shortSource);
+
+    expect(declarativeQuote).toBe("DNA 分子由两条反向平行的脱氧核苷酸链组成。");
+    expect(shortFallbackQuote).toBe(shortSource);
+    expect(declarativeSource).toContain(declarativeQuote);
+    expect(shortSource).toContain(shortFallbackQuote);
+
+    const promptChunk = {
+      ...chunks[0],
+      text: ",这一结果说明了什么？\n赫尔希和蔡斯的实验表明：DNA 才是真正的遗传物质。"
+    };
+    const response = createOfflineTextbookRagResponse([{
+      chunk: promptChunk,
+      score: 0.91,
+      sectionId: "chapter-genetics",
+      retrievalMethod: "on-device-hybrid-rag",
+      reliabilityThreshold: 0.6
+    }], chapters, "book-1");
+
+    expect(response.citations[0]?.quote).toBe("赫尔希和蔡斯的实验表明：DNA 才是真正的遗传物质。");
+    expect(response.answer).toBe(`教材原文：${response.citations[0]?.quote}`);
+  });
 });
 
 describe("offline demo fallback", () => {
+  it("does not turn composite, negated, or concept-cameo questions into a fixture citation", async () => {
+    deepSeekConfig.mode = "demo";
+    deepSeekConfig.apiKey = "";
+    const repository = new DemoRepository();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    for (const question of [
+      "请说明抗生素使用过程，顺便写上受精作用",
+      "不要解释受精作用，只说抗生素如何使用",
+      "受精作用这个词出现在题干里，但请讲光合作用"
+    ]) {
+      const response = await repository.queryRag({
+        book_id: "book_biology_2",
+        chapter_id: "c2s1",
+        question
+      });
+      expect(response.citations).toEqual([]);
+      expect(response.related_assets).toEqual([]);
+      expect(response.answer).not.toContain("如果体细胞里有一对 1 号同源染色体");
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("answers simple greetings without citations or a network request when no key exists", async () => {
     deepSeekConfig.mode = "auto";
     deepSeekConfig.apiKey = "";
@@ -517,20 +675,103 @@ describe("offline demo fallback", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps the existing fixed demo answer for an explicit textbook question", async () => {
-    deepSeekConfig.mode = "demo";
-    const repository = new DemoRepository();
+  it("answers a normal textbook question only from a reliable full-corpus chunk and makes the answer entailed by its quote", () => {
+    const response = createOfflineTextbookRagResponse([{
+      chunk: chunks[0],
+      score: 0.91,
+      sectionId: "chapter-genetics",
+      retrievalMethod: "on-device-hybrid-rag",
+      reliabilityThreshold: 0.6
+    }], chapters, "book-1");
 
-    const response = await repository.queryRag({
-      book_id: "book_biology_2",
-      chapter_id: "c2s1",
-      question: "请结合原文给一个受精作用的例子"
-    });
-
+    expect(response.citations).toHaveLength(1);
+    expect(response.related_assets).toEqual([]);
     expect(response.citations[0]).toMatchObject({
-      chunk_id: "chunk_c2s1_19",
-      page: 19,
-      location_label: "教材第 24 页（PDF 第 19 页）"
+      chunk_id: "dna-structure",
+      page: 15,
+      location_label: "教材第 13 页（PDF 第 15 页）"
     });
+    // The no-key answer is a controlled rendering of the exact cited quote,
+    // rather than a fixture answer selected by a substring in the question.
+    expect(response.answer).toBe(`教材原文：${response.citations[0].quote}`);
+    expect(response.citations[0].source_metadata.retrieved_chunk_text).toBe(chunks[0].text);
+  });
+
+  it("rejects cross-book and unrecognised-section hits before a local citation is created", () => {
+    const reliableHit = {
+      chunk: chunks[0],
+      score: 0.91,
+      sectionId: "chapter-genetics",
+      retrievalMethod: "on-device-hybrid-rag"
+    };
+    const wrongBookHit = {
+      ...reliableHit,
+      chunk: { ...chunks[0], book_id: demoMathBookId }
+    };
+    const wrongSectionHit = {
+      ...reliableHit,
+      sectionId: "math-section"
+    };
+
+    expect(selectOfflineReliableChunksForBook([reliableHit], chapters, "book-1"))
+      .toHaveLength(1);
+    expect(selectOfflineReliableChunksForBook([wrongBookHit], chapters, "book-1"))
+      .toEqual([]);
+    expect(selectOfflineReliableChunksForBook([wrongSectionHit], chapters, "book-1"))
+      .toEqual([]);
+    expect(createOfflineTextbookRagResponse([wrongBookHit], chapters, "book-1").citations)
+      .toEqual([]);
+    expect(createOfflineTextbookRagResponse([wrongSectionHit], chapters, "book-1").citations)
+      .toEqual([]);
+  });
+
+  it("never lets biology fixture wording leak into math, unknown, or no-worker biology requests", async () => {
+    deepSeekConfig.mode = "demo";
+    deepSeekConfig.apiKey = "";
+    const repository = new DemoRepository();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const requests = [
+      { bookId: demoMathBookId, chapterId: "math-chapter" },
+      { bookId: "book_unknown", chapterId: "unknown-section" },
+      { bookId: "book_biology_2", chapterId: "c2s1" }
+    ];
+
+    for (const { bookId, chapterId } of requests) {
+      for (const question of [
+        "第二次分裂举例说明",
+        "请举一个例子",
+        "受精作用是什么"
+      ]) {
+        const response = await repository.queryRag({
+          book_id: bookId,
+          chapter_id: chapterId,
+          question
+        });
+        expect(response.citations).toEqual([]);
+        expect(response.related_assets).toEqual([]);
+        expect(response.answer).not.toContain("如果体细胞里有一对 1 号同源染色体");
+        expect(response.citations.some((citation) => citation.chunk_id.startsWith("chunk_c2s1_"))).toBe(false);
+      }
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not send a direct provider request or biology corpus for an unsupported book even when a Key is configured", async () => {
+    enableDirectCallForTest();
+    const repository = new DemoRepository();
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+
+    for (const bookId of [demoMathBookId, "book_unknown"]) {
+      const response = await repository.queryRag({
+        book_id: bookId,
+        chapter_id: "other-section",
+        question: "请举一个第二次受精作用的例子"
+      });
+      expect(response.citations).toEqual([]);
+      expect(response.related_assets).toEqual([]);
+    }
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

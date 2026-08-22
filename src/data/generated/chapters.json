@@ -2,15 +2,15 @@
   {
     "chapter_id": "frontmatter",
     "level": 1,
-    "source_title": "第 1 章 遗传因子的发现",
-    "ai_title": "第 1 章 遗传因子的发现",
+    "source_title": "教材封面、前言与目录",
+    "ai_title": "教材封面、前言与目录",
     "page_start": 1,
     "page_end": 9,
     "printed_page_start": null,
     "printed_page_end": null,
     "confidence": 100,
     "status": "已确认",
-    "source": "verified_pdf_page_map",
+    "source": "verified_pdf_frontmatter",
     "parent_id": null
   },
   {

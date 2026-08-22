@@ -27,6 +27,7 @@ import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 
 const curatedBiologyBookId = "book_biology_2";
+const frontmatterChapterId = "frontmatter";
 
 function getDefaultLocation(chapters: ApiChapter[]): StudyLocation {
   const [firstRoot] = buildChapterTree(chapters);
@@ -308,7 +309,7 @@ function StudyChapter({
               style={{ strokeDashoffset: 100 - progress }}
             />
           </svg>
-          <span>{complete ? <Check size={19} strokeWidth={3} /> : chapterIndex + 1}</span>
+          <span>{complete ? <Check size={19} strokeWidth={3} /> : node.chapter.chapter_id === frontmatterChapterId ? "前" : chapterIndex + 1}</span>
         </span>
         <span className="study-chapter-copy">
           <strong>{node.chapter.source_title}</strong>
@@ -410,6 +411,10 @@ export function StudyScreen() {
   });
   const activeChapters = hasLoadedCourse ? parsedChapters : null;
   const chapterTree = useMemo(() => buildChapterTree(activeChapters ?? []), [activeChapters]);
+  const actualChapterTree = useMemo(
+    () => chapterTree.filter((node) => node.chapter.chapter_id !== frontmatterChapterId),
+    [chapterTree]
+  );
   const currentBookId = hasLoadedCourse ? loadedBookId : null;
   const defaultLocation = useMemo(() => getDefaultLocation(activeChapters ?? []), [activeChapters]);
   const location = currentBookId ? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
@@ -462,8 +467,8 @@ export function StudyScreen() {
   const totalTasks = currentStudyPlan?.tasks.length ?? 0;
   const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
   const usesCuratedBiologyProgress = currentBookId === curatedBiologyBookId;
-  const chapterProgresses = chapterTree.map((node, index) => (
-    usesCuratedBiologyProgress && index === 0
+  const chapterProgresses = chapterTree.map((node) => (
+    usesCuratedBiologyProgress && node.chapter.chapter_id === frontmatterChapterId
       ? 100
       : calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))
   ));
@@ -617,12 +622,12 @@ export function StudyScreen() {
               <div>
                 <small>
                   {usesCuratedBiologyProgress
-                    ? "第 1 章已完成 · 第 2 章进行中"
+                    ? "前置页已完成 · 第 2 章进行中"
                     : `今日建议 · ${todayMinutes} 分钟`}
                 </small>
                 <strong>
                   {usesCuratedBiologyProgress
-                    ? chapterTree[1]?.chapter.source_title ?? currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"
+                    ? actualChapterTree[0]?.chapter.source_title ?? currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"
                     : currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}
                 </strong>
               </div>
@@ -644,7 +649,7 @@ export function StudyScreen() {
       >
         <div className="study-directory-heading">
           <h2 id="study-directory-title">教材目录</h2>
-          <span>{chapterTree.length} 章</span>
+          <span>{actualChapterTree.length} 章 · 前置页</span>
         </div>
         <div className="study-chapter-list">
           {chapterTree.map((node, index) => (

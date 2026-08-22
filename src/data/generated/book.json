@@ -1,7 +1,7 @@
 {
   "provenance": {
     "content_scope": "人教版高中生物必修 2《遗传与进化》当前 PDF 可用原文目录（源文件缺第 1 章正文）",
-    "fixture_policy": "目录按当前 PDF 实际页核验；源文件缺少第 1 章印刷页 1–14，第 2 章起使用 MinerU OCR 证据。",
+    "fixture_policy": "目录按当前 PDF 实际页核验：PDF 第 1–9 页为教材封面、前言与目录；源文件缺少第 1 章正文，第 2 章起使用 MinerU OCR 证据。",
     "source_file": "人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所, 生物课程教材研究开发中心.pdf",
     "source_sha256": "d35ca6844f22e87bef5cd3deb286c7965f386ba13924a8195eddaefa41db533a",
     "parser": "mineru",
@@ -197,6 +197,11 @@
         }
       ],
       "citation_policy": "每条课程引用必须保留原始 OCR 文本、PDF 页、教材印刷页、content_list 条目索引与哈希。"
+    },
+    "formal_asset_sync": {
+      "source_book_id": "book_2a3605650b10",
+      "asset_count": 267,
+      "source": "formal assets.json + persisted MinerU image files"
     }
   },
   "id": "book_biology_2",
@@ -206,7 +211,7 @@
   "publisher": "人民教育出版社",
   "pages": 125,
   "fileSize": "38.8 MB",
-  "chapterCount": 7,
+  "chapterCount": 6,
   "sectionCount": 17,
   "knowledgePointCount": 96,
   "progress": 18,

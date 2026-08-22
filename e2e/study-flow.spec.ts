@@ -13,11 +13,11 @@ test.describe("study directory flow", () => {
     await expect(bookBar).toBeVisible();
     await expect(plan).toBeVisible();
     await expect(plan).toHaveAttribute("data-plan-state", "expanded");
-    await expect(plan.locator(".study-plan-copy small")).toHaveText("第 1 章已完成 · 第 2 章进行中");
+    await expect(plan.locator(".study-plan-copy small")).toHaveText("前置页已完成 · 第 2 章进行中");
     await expect(plan.locator(".study-plan-copy strong")).toHaveText("第 2 章 基因和染色体的关系");
     await expect(plan.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "17");
     await expect(page.locator("#study-chapter-frontmatter-toggle .study-chapter-copy strong")).toHaveText(
-      "第 1 章 遗传因子的发现"
+      "教材封面、前言与目录"
     );
     await expect(page.locator(".study-chapter-progress").nth(0)).toHaveAttribute("data-progress", "100");
     await expect(page.locator(".study-chapter-progress").nth(0)).toHaveClass(/is-complete/);

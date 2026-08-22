@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   ApiChapter
 } from "../../types/api";
@@ -13,7 +13,8 @@ import {
 } from "../../components/ui";
 import { useBookCourseRepository } from "../../context/BookCourseRepositoryContext";
 import { getAiRuntimeLabel, hasDirectDeepSeekKey } from "../../config/deepseek";
-import { getExtractedCitationSourcePageImage } from "./citationSource";
+import { getTextbookRetriever } from "../../services/TextbookRetriever";
+import { getCitationSourceText, getExtractedCitationSourcePageImage } from "./citationSource";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -25,6 +26,7 @@ type ChatCitation = {
   page: string;
   pdfPage: number;
   quote: string;
+  pageText: string;
   image?: string;
   title: string;
 };
@@ -43,17 +45,22 @@ export function ChatSheetContent({
   const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId) ?? parsedChapters?.[0] ?? null;
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [citation, setCitation] = useState<ChatCitation | null>(null);
+  const [citations, setCitations] = useState<ChatCitation[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const intro = activeChapter
     ? `你好！可以聊聊，也可以问“${activeChapter.source_title}”。有可靠教材来源时会标出引用位置。`
     : "你好！可以聊天；需要教材依据的问题在有可靠来源时会标出引用位置。";
 
+  useEffect(() => {
+    if (uploadedFile?.bookId !== "book_biology_2") return;
+    void getTextbookRetriever().prewarm();
+  }, [uploadedFile?.bookId]);
+
   async function ask(nextQuestion = question) {
     if (loading) return;
     if (!uploadedFile) {
-      setError("请先上传并解析教材，再使用 RAG 问答。");
+      setError("请先上传并解析教材，再使用教材问答。");
       return;
     }
     if (!nextQuestion.trim()) {
@@ -67,7 +74,7 @@ export function ChatSheetContent({
     }));
     setQuestion("");
     setMessages((items) => [...items, { role: "user", text: normalizedQuestion }]);
-    setCitation(null);
+    setCitations([]);
     setLoading(true);
     setError(null);
     try {
@@ -77,18 +84,18 @@ export function ChatSheetContent({
         history,
         question: normalizedQuestion
       });
-      const firstCitation = result.citations[0];
       setMessages((items) => [...items, { role: "assistant", text: result.answer }]);
-      setCitation(firstCitation ? {
+      setCitations(result.citations.slice(0, 3).map((item) => ({
         bookId: uploadedFile.bookId,
-        page: firstCitation.location_label || `第 ${firstCitation.page} 页`,
-        pdfPage: firstCitation.page,
-        quote: firstCitation.quote,
-        image: getExtractedCitationSourcePageImage(firstCitation.chunk_id, result.related_assets),
-        title: firstCitation.chapter_title
-      } : null);
+        page: item.location_label || `第 ${item.page} 页`,
+        pdfPage: item.page,
+        quote: item.quote,
+        pageText: getCitationSourceText(item),
+        image: getExtractedCitationSourcePageImage(item.chunk_id, result.related_assets),
+        title: item.chapter_title
+      })));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "RAG 检索失败");
+      setError(err instanceof Error ? err.message : "教材资料暂时不可用");
     } finally {
       setLoading(false);
     }
@@ -112,12 +119,14 @@ export function ChatSheetContent({
         ))}
         {loading ? <div className="chat-bubble ai" aria-live="polite" aria-busy="true">正在准备回答…</div> : null}
         {error ? <p className="helper-text" role="alert">{error}</p> : null}
-        {citation ? (
+        {citations.length > 0 ? citations.map((citation) => (
           <CitationCard
+            key={`${citation.pdfPage}:${citation.title}:${citation.quote.slice(0, 24)}`}
             title={citation.title}
             page={citation.page}
             quote={citation.quote}
             image={citation.image}
+            openLabel="查看该页"
             onOpen={() => openSheet({
               type: "source",
               title: citation.title,
@@ -128,11 +137,12 @@ export function ChatSheetContent({
                 bookId: citation.bookId,
                 title: citation.title,
                 pageStart: citation.pdfPage,
-                pageEnd: citation.pdfPage
+                pageEnd: citation.pdfPage,
+                sourceText: citation.pageText
               }
             })}
           />
-        ) : (
+        )) : (
           <p className="helper-text">有可靠教材来源时会显示对应页码。</p>
         )}
         <div className="followups">

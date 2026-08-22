@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ApiAsset } from "../../types/api";
-import { getExtractedCitationSourcePageImage } from "./citationSource";
+import {
+  getCitationSourceText,
+  getExtractedCitationSourcePageImage,
+  isPublishedCitationSourcePageImage,
+  selectExtractedCitationSourcePageImage
+} from "./citationSource";
 
 const generatedDiagram: ApiAsset = {
   asset_id: "asset-generated-diagram",
@@ -35,7 +40,7 @@ const extractedCrop: ApiAsset = {
 };
 
 describe("citation source page image", () => {
-  it("rejects AI-generated assets and adopts only the extracted source page URL", () => {
+  it("rejects generated assets and unregistered extracted page URLs", () => {
     const generatedAssetWithPretendPage = {
       ...generatedDiagram,
       source_page_image_url: "/assets/not-a-textbook-page.webp"
@@ -44,7 +49,8 @@ describe("citation source page image", () => {
     expect(getExtractedCitationSourcePageImage("chunk-citation", [
       generatedAssetWithPretendPage,
       extractedCrop
-    ])).toBe("/assets/source-page-15.webp");
+    ])).toBeUndefined();
+    expect(isPublishedCitationSourcePageImage("/assets/source-page-15.webp")).toBe(false);
   });
 
   it("does not treat a generated diagram or a cropped image URL as a textbook original page", () => {
@@ -62,5 +68,31 @@ describe("citation source page image", () => {
 
   it("requires an exact citation chunk association", () => {
     expect(getExtractedCitationSourcePageImage("other-chunk", [extractedCrop])).toBeUndefined();
+  });
+
+  it("would adopt only the exact extracted source_page_image_url after release validation", () => {
+    const publishedOnlyThisPage = (value: unknown): value is string => value === "/assets/source-page-15.webp";
+    const generatedAssetWithForgedPublishedUrl = {
+      ...generatedDiagram,
+      source_page_image_url: "/assets/source-page-15.webp"
+    } as unknown as ApiAsset;
+    expect(selectExtractedCitationSourcePageImage("chunk-citation", [
+      generatedAssetWithForgedPublishedUrl,
+      extractedCrop
+    ], publishedOnlyThisPage)).toBe("/assets/source-page-15.webp");
+  });
+
+  it("uses only controlled local chunk text for the no-image source reader", () => {
+    expect(getCitationSourceText({
+      chapter_id: "chapter-1",
+      chapter_title: "第一章",
+      page: 15,
+      chunk_id: "chunk-citation",
+      quote: "受控摘录",
+      score: 1,
+      retrieval_method: "on-device-hybrid-rag",
+      source_type: "textbook",
+      source_metadata: { retrieved_chunk_text: "受控的完整本地教材片段。" }
+    })).toBe("受控的完整本地教材片段。");
   });
 });

@@ -1,0 +1,3 @@
+# Keep the verified upstream ONNX Runtime loader byte-for-byte identical to
+# the checksum recorded in the bundled model manifest.
+public/rag/runtime/wasm/*.mjs whitespace=-trailing-space

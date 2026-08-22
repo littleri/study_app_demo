@@ -27,6 +27,8 @@ import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { IosStatusBar } from "./IosStatusBar";
 import { getRuntimePlatform } from "../platform/nativeApp";
+import { getTextbookRetriever } from "../services/TextbookRetriever";
+import { getCitationSourceText } from "../screens/sheets/citationSource";
 
 gsap.registerPlugin(useGSAP);
 
@@ -765,7 +767,7 @@ function GlobalAIAssistant({
       const courseTitle = activeCourse?.title ?? "生物 必修 2《遗传与进化》";
       return {
         contextLabel: "当前教材",
-        contextMeta: activeCourse ? `${activeCourse.chunk_count} 个本地片段` : "Demo RAG 已就绪",
+        contextMeta: activeCourse ? "教材资料已准备" : "可在有可靠来源时查看教材页码",
         contextTitle: courseTitle,
         modes: ["知识点讲解", "原文问答", "复习计划"],
         suggestions: [
@@ -866,6 +868,7 @@ function GlobalAIAssistant({
       pageEnd: citation.page,
       printedPageStart: printedPage,
       printedPageEnd: printedPage,
+      sourceText: getCitationSourceText(citation),
       from: active
     });
   }, [active, openSourcePage, ragBookId, requestDialogClose]);
@@ -897,6 +900,11 @@ function GlobalAIAssistant({
     setMessages([]);
     setLoading(false);
   }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId]);
+
+  useEffect(() => {
+    if (!dialogVisible || ragBookId !== "book_biology_2") return;
+    void getTextbookRetriever().prewarm();
+  }, [dialogVisible, ragBookId]);
 
   useEffect(() => {
     [
@@ -1518,7 +1526,7 @@ function AIAssistantDialog({
                               onClick={() => onOpenCitation(citation)}
                             >
                               <BookOpenCheck size={14} aria-hidden="true" />
-                              <span>查看</span>
+                              <span>查看该页</span>
                             </button>
                           </span>
                         );
@@ -1740,6 +1748,7 @@ export function CitationCard({
   quote,
   image,
   onOpen,
+  openLabel = "查看该页",
   imageMotion = false
 }: {
   title: string;
@@ -1747,6 +1756,7 @@ export function CitationCard({
   quote: string;
   image?: string;
   onOpen: () => void;
+  openLabel?: string;
   imageMotion?: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -1765,7 +1775,7 @@ export function CitationCard({
         <p className="citation-meta">{title} · {page}</p>
         <p className="citation-quote">{quote}</p>
         <button className="inline-link" data-sheet-replacement="source" type="button" onClick={onOpen}>
-          查看原文
+          {openLabel}
         </button>
       </div>
       {image ? (

@@ -1,6 +1,7 @@
 import demoStateJson from "../data/generated/demo-state.json";
 import { hasDirectDeepSeekKey } from "../config/deepseek";
-import { askDeepSeekWithLocalRag } from "./DeepSeekRag";
+import { askDeepSeekWithLocalRag, createLocalCitation } from "./DeepSeekRag";
+import { getTextbookRetriever } from "./TextbookRetriever";
 import {
   demoMathAssets,
   demoMathBookId,
@@ -86,7 +87,6 @@ type DemoState = {
     review_page: string;
     hint: string;
   };
-  aiReplies: Record<string, string>;
 };
 
 type DemoJob = {
@@ -126,7 +126,13 @@ function asCitation(chapterId: string, chunkId: string, quote: string) {
     source_type: "textbook",
     location_type: "page" as const,
     location_label: printedPage ? `教材第 ${printedPage} 页（PDF 第 ${page} 页）` : `PDF 第 ${page} 页`,
-    source_metadata: { ...metadata, parser: seed.provenance.parser, parser_version: seed.provenance.parser_version, retrieval_quote: quote }
+    source_metadata: {
+      ...metadata,
+      parser: seed.provenance.parser,
+      parser_version: seed.provenance.parser_version,
+      retrieval_quote: quote,
+      retrieved_chunk_text: chunk?.text ?? quote
+    }
   };
 }
 
@@ -148,6 +154,82 @@ function isSimpleGreeting(question: string) {
     "下午好",
     "晚上好"
   ]).has(normalized);
+}
+
+function canUseBundledTextbookIndex() {
+  return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+type OfflineReliableChunk = {
+  chunk: ApiChunk;
+  score: number;
+  /**
+   * The static full-RAG section that emitted the chunk. It must resolve to a
+   * chapter in the requested book; an arbitrary fixture chunk cannot cross a
+   * book boundary merely because its text scored highly.
+   */
+  sectionId?: string;
+  retrievalMethod?: string;
+  reliabilityThreshold?: number;
+};
+
+export function selectOfflineReliableChunksForBook(
+  rankedChunks: readonly OfflineReliableChunk[],
+  chapters: readonly ApiChapter[],
+  bookId: string
+) {
+  const chaptersById = new Map(chapters.map((chapter) => [chapter.chapter_id, chapter]));
+  const sectionBelongsToChunkChapter = (sectionId: string, chapterId: string) => {
+    const visited = new Set<string>();
+    let currentId: string | null = sectionId;
+    while (currentId && !visited.has(currentId)) {
+      if (currentId === chapterId) return true;
+      visited.add(currentId);
+      currentId = chaptersById.get(currentId)?.parent_id ?? null;
+    }
+    return false;
+  };
+  return rankedChunks.filter((item) => (
+    item.chunk.book_id === bookId
+    && typeof item.sectionId === "string"
+    && chaptersById.has(item.chunk.chapter_id)
+    && chaptersById.has(item.sectionId)
+    && sectionBelongsToChunkChapter(item.sectionId, item.chunk.chapter_id)
+  ));
+}
+
+/**
+ * Browser no-key answers are allowed to cite only actual reliable hits from
+ * the complete static corpus. The response deliberately repeats the first
+ * locally-created citation excerpt, so the visible answer is supported by
+ * the same source text rather than a fixture template selected by wording.
+ */
+export function createOfflineTextbookRagResponse(
+  rankedChunks: readonly OfflineReliableChunk[],
+  chapters: ApiChapter[],
+  bookId: string
+): RagResponse {
+  const bookScopedChunks = selectOfflineReliableChunksForBook(rankedChunks, chapters, bookId);
+  if (bookScopedChunks.length === 0) {
+    return {
+      answer: "我可以陪你一起学习。不过当前教材中没有找到足够可靠的对应内容，所以这里不附教材页码。",
+      citations: [],
+      related_assets: [],
+      confidence: "low"
+    };
+  }
+
+  const citations = bookScopedChunks.map((item) => createLocalCitation(item, chapters));
+  const primaryCitation = citations[0];
+  return {
+    answer: `教材原文：${primaryCitation.quote}`,
+    citations,
+    // The complete static corpus does not publish source-page images. Do not
+    // return fixture figures here: the UI provides the cited local text page
+    // instead, and only a separately verified published page asset may appear.
+    related_assets: [],
+    confidence: "high"
+  };
 }
 
 export class DemoRepository {
@@ -440,13 +522,35 @@ export class DemoRepository {
   }
 
   async queryRag(payload: RagQuery): Promise<RagResponse> {
+    const supportsCompleteStaticRag = payload.book_id === this.state.book.id;
+    // The complete static corpus currently exists only for biology. Do not
+    // fall through to a biology fixture for math or an unknown book just
+    // because a question happens to contain words such as “例” or “第二次”.
+    if (!supportsCompleteStaticRag) {
+      await wait();
+      if (isSimpleGreeting(payload.question)) {
+        return {
+          answer: "你好！我是你的学习助手。想随便聊聊，还是一起复习当前教材？",
+          citations: [],
+          related_assets: [],
+          confidence: "low"
+        };
+      }
+      return createOfflineTextbookRagResponse([], [], payload.book_id);
+    }
+
     if (hasDirectDeepSeekKey()) {
       const [chunks, chapters, assets] = await Promise.all([
         this.getChunks(payload.book_id),
         this.getChapters(payload.book_id),
         this.getAssets(payload.book_id)
       ]);
-      return askDeepSeekWithLocalRag(payload, { assets, chapters, chunks });
+      return askDeepSeekWithLocalRag(payload, {
+        assets,
+        chapters,
+        chunks,
+        textbookRetriever: getTextbookRetriever()
+      });
     }
 
     await wait();
@@ -458,19 +562,30 @@ export class DemoRepository {
         confidence: "low"
       };
     }
-    const key = payload.question.includes("第二次") ? "quiz" : payload.question.includes("例") ? "example" : "default";
-    const chunkId = key === "quiz" ? "chunk_c2s1_13" : key === "example" ? "chunk_c2s1_19" : "chunk_c2s1_11";
-    const quote = key === "quiz"
-      ? "两条姐妹染色单体也随之分开"
-      : key === "example"
-        ? "受精作用是卵细胞和精子相互识别、融合成为受精卵的过程"
-        : "染色体只复制一次，而细胞分裂两次";
-    return {
-      answer: this.state.aiReplies[key],
-      citations: [asCitation("c2s1", chunkId, quote)],
-      related_assets: clone(this.state.assets.filter((asset) => asset.chapter_id === "c2s1")),
-      confidence: "high"
-    };
+    if (canUseBundledTextbookIndex()) {
+      const chapters = await this.getChapters(payload.book_id);
+      const retrieved = await getTextbookRetriever().search({
+        query: payload.question,
+        chapterId: payload.chapter_id,
+        limit: 3,
+        reliableOnly: true
+      });
+      if (retrieved.hits.length > 0) {
+        const rankedChunks = retrieved.hits.map((hit) => ({
+          chunk: hit.chunk,
+          score: hit.score,
+          sectionId: hit.chunk.section_id,
+          retrievalMethod: retrieved.method,
+          reliabilityThreshold: retrieved.minimum_evidence_threshold ?? undefined
+        }));
+        return createOfflineTextbookRagResponse(rankedChunks, chapters, payload.book_id);
+      }
+      return createOfflineTextbookRagResponse([], chapters, payload.book_id);
+    }
+    // Non-browser fixture execution cannot load the full published corpus or
+    // prove a hit. Keep the answer safe instead of reviving a fixed biology
+    // citation selected by question wording.
+    return createOfflineTextbookRagResponse([], this.state.chapters, payload.book_id);
   }
 
   async submitAssignment(assignmentId: string, _payload: AssignmentSubmitRequest): Promise<AssignmentSubmitResponse> {

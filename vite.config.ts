@@ -26,6 +26,13 @@ if (!hasLanCertificate) {
 
 export default defineConfig({
   plugins: [react()],
+  // Transformers.js imports ONNX Runtime inside the textbook Worker. Select
+  // ONNX Runtime's documented external-WASM condition so Vite does not copy a
+  // second bundled JSEP runtime; the pinned one-thread WASM lives under
+  // public/rag/runtime/wasm and is configured by the worker itself.
+  resolve: {
+    conditions: ["onnxruntime-web-use-extern-wasm", "module", "browser", "production"]
+  },
   server: {
     host: true,
     port: 5173,

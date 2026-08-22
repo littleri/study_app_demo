@@ -12,6 +12,7 @@ import type {
   RagQuery,
   RagResponse
 } from "../types/api";
+import type { TextbookRetriever } from "./TextbookRetriever";
 
 type DeepSeekSystemMessage = {
   role: "system";
@@ -87,11 +88,18 @@ export type DeepSeekRagCorpus = {
   assets: ApiAsset[];
   chapters: ApiChapter[];
   chunks: ApiChunk[];
+  /**
+   * Optional complete static textbook retriever. The legacy fixture chunks
+   * remain a deterministic fallback for tests and the small demo corpus.
+   */
+  textbookRetriever?: TextbookRetriever;
 };
 
 export type RankedChunk = {
   chunk: ApiChunk;
   score: number;
+  retrievalMethod?: string;
+  reliabilityThreshold?: number;
 };
 
 /**
@@ -103,8 +111,8 @@ export const LOCAL_TEXTBOOK_RELIABILITY_THRESHOLD = 2.4;
 
 /**
  * The direct-call mode never sends more than this many textbook chunks in one
- * tool result. Full textbook indexing and vector retrieval are deliberately
- * deferred to the separate frontend RAG plan.
+ * tool result. The optional TextbookRetriever supplies the complete,
+ * versioned frontend index; fixture scoring remains only as a test fallback.
  */
 export const LOCAL_TEXTBOOK_CONTEXT_LIMIT = 3;
 
@@ -123,6 +131,10 @@ export const searchTextbookTool: DeepSeekToolDefinition = {
         query: {
           type: "string",
           description: "A concise Chinese search query that captures the textbook concept or claim to verify."
+        },
+        scope: {
+          type: "string",
+          description: "Use whole_book unless the student explicitly limits the question to the current chapter. The local retriever still keeps the full book eligible."
         }
       },
       required: ["query"],
@@ -239,13 +251,67 @@ function asPageNumberList(value: unknown) {
     : [];
 }
 
-function createCitationExcerpt(text: string) {
-  const sentence = text
-    .split(/[。！？!?]/)
-    .map((item) => item.trim())
-    .find(Boolean)
-    ?? text.trim();
-  return sentence.length > 180 ? sentence.slice(0, 177) + "…" : sentence;
+const MAX_CITATION_EXCERPT_LENGTH = 180;
+const MIN_SUBSTANTIVE_CITATION_CHARACTERS = 12;
+
+function citationSentenceCandidates(text: string) {
+  return (text.match(/[^\n。！？!?]+[。！？!?]?/gu) ?? [])
+    .map((sentence) => sentence
+      .trim()
+      // OCR chunk boundaries sometimes begin in the middle of a sentence
+      // immediately after punctuation from the previous chunk. Removing only
+      // boundary punctuation still leaves an exact contiguous source substring.
+      .replace(/^[,，、;；:：]+/u, "")
+      .trim())
+    .filter(Boolean);
+}
+
+function meaningfulCitationCharacters(text: string) {
+  return text.replace(/[\s\p{P}\p{S}]/gu, "").length;
+}
+
+function isCitationPrompt(sentence: string) {
+  if (/[？?]/u.test(sentence)) return true;
+  if (/^(?:请|想一想|思考(?:一下)?|讨论|回答|分析|判断|解释|观察|阅读|比较|指出|结合)/u.test(sentence)) {
+    return true;
+  }
+  return /(?:什么|为何|为什么|如何|怎么|吗|呢|是否|可行)\s*[。！？!?]?\s*$/u.test(sentence);
+}
+
+function isConclusionLikeCitationSentence(sentence: string) {
+  return /(?:实验表明|研究表明|结果表明|证明|因此|由此|可见|意味着|说明|结论)/u.test(sentence);
+}
+
+function truncateCitationExcerpt(text: string) {
+  // Do not append an ellipsis: citations must remain a continuous substring
+  // of the locally bundled chunk, never generated presentation text.
+  return text.length > MAX_CITATION_EXCERPT_LENGTH
+    ? text.slice(0, MAX_CITATION_EXCERPT_LENGTH).trimEnd()
+    : text;
+}
+
+/**
+ * Select a readable, evidence-bearing sentence from a retrieved local chunk.
+ * The result is always copied from the chunk verbatim (apart from surrounding
+ * whitespace / a cut at the maximum length), so the no-key answer and source
+ * reader can never claim model-generated wording as textbook evidence.
+ */
+export function createCitationExcerpt(text: string) {
+  const controlledSource = text.trim();
+  if (!controlledSource) return "";
+
+  const substantiveCandidates = citationSentenceCandidates(controlledSource)
+    .filter((sentence) => (
+      meaningfulCitationCharacters(sentence) >= MIN_SUBSTANTIVE_CITATION_CHARACTERS
+      && !isCitationPrompt(sentence)
+    ));
+  const preferred = substantiveCandidates.find(isConclusionLikeCitationSentence)
+    ?? substantiveCandidates[0]
+    // When OCR only yielded labels, very short fragments, or prompts, retain
+    // the controlled chunk instead of manufacturing a paraphrase or citation.
+    ?? controlledSource;
+
+  return truncateCitationExcerpt(preferred);
 }
 
 export function createLocalCitation(
@@ -268,7 +334,7 @@ export function createLocalCitation(
     chunk_id: chunk.chunk_id,
     quote,
     score: Number(score.toFixed(3)),
-    retrieval_method: "on-device-keyword-rag",
+    retrieval_method: ranked.retrievalMethod ?? "on-device-keyword-rag",
     source_type: "textbook",
     location_type: "page",
     location_label: printedPage
@@ -276,7 +342,11 @@ export function createLocalCitation(
       : "PDF 第 " + page + " 页",
     source_metadata: {
       ...metadata,
-      retrieval_quote: quote
+      retrieval_quote: quote,
+      // This is locally bundled corpus text, not model output. It gives the
+      // source reader a usable offline page-text view when no released page
+      // bitmap is available.
+      retrieved_chunk_text: chunk.text
     }
   };
 }
@@ -440,7 +510,29 @@ function toolReliableMatches(
   });
 }
 
-function prepareToolFollowup(
+async function rankToolChunks(
+  question: string,
+  corpus: DeepSeekRagCorpus,
+  chapterId?: string | null
+) {
+  if (!corpus.textbookRetriever) {
+    return selectReliableLocalChunks(question, corpus.chunks, chapterId);
+  }
+  const response = await corpus.textbookRetriever.search({
+    query: question,
+    chapterId,
+    limit: 5,
+    reliableOnly: true
+  });
+  return response.hits.slice(0, LOCAL_TEXTBOOK_CONTEXT_LIMIT).map((hit) => ({
+    chunk: hit.chunk,
+    score: hit.score,
+    retrievalMethod: response.method,
+    reliabilityThreshold: response.minimum_evidence_threshold ?? undefined
+  }));
+}
+
+async function prepareToolFollowup(
   toolCalls: DeepSeekToolCall[],
   corpus: DeepSeekRagCorpus,
   chapterId?: string | null
@@ -448,17 +540,17 @@ function prepareToolFollowup(
   const searchInvocations: SearchToolInvocation[] = [];
   const queryByCallId = new Map<string, string | null>();
 
-  toolCalls.forEach((call) => {
-    if (call.function.name !== searchTextbookTool.function.name) return;
+  for (const call of toolCalls) {
+    if (call.function.name !== searchTextbookTool.function.name) continue;
     const query = parseSearchToolQuery(call.function.arguments);
     queryByCallId.set(call.id, query);
-    if (!query) return;
+    if (!query) continue;
     searchInvocations.push({
       call,
       query,
-      rankedChunks: selectReliableLocalChunks(query, corpus.chunks, chapterId)
+      rankedChunks: await rankToolChunks(query, corpus, chapterId)
     });
-  });
+  }
 
   const strongestByChunkId = new Map<string, RankedChunk>();
   searchInvocations.forEach((invocation) => {
@@ -518,8 +610,9 @@ function selectRelatedAssets(assets: ApiAsset[], rankedChunks: RankedChunk[]) {
 
 function responseConfidence(rankedChunks: RankedChunk[]) {
   const highestScore = rankedChunks[0]?.score ?? 0;
-  if (highestScore < LOCAL_TEXTBOOK_RELIABILITY_THRESHOLD) return "low";
-  return highestScore >= LOCAL_TEXTBOOK_RELIABILITY_THRESHOLD + 2 ? "high" : "medium";
+  const threshold = rankedChunks[0]?.reliabilityThreshold ?? LOCAL_TEXTBOOK_RELIABILITY_THRESHOLD;
+  if (highestScore < threshold) return "low";
+  return highestScore >= threshold + (threshold < 1 ? 0.08 : 2) ? "high" : "medium";
 }
 
 function asDirectError(error: unknown) {
@@ -593,7 +686,7 @@ export async function askDeepSeekWithLocalRag(
     };
   }
 
-  const { injectedChunks, toolMessages } = prepareToolFollowup(
+  const { injectedChunks, toolMessages } = await prepareToolFollowup(
     firstResponse.toolCalls,
     corpus,
     query.chapter_id

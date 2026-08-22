@@ -39,7 +39,7 @@ npm run android:apk
 
 ### 临时 DeepSeek 直连（个人 BYOK）
 
-默认是完全离线的演示回答：未配置 Key 时，聊天界面和 Android debug APK 都不会访问网络。简单问候会得到普通聊天回复且不显示教材引用；明确的教材问题仍使用固定演示答案与本地页码。
+默认不访问 DeepSeek、Hugging Face、CDN 或业务后端：未配置 Key 时，聊天界面和 Android debug APK 使用随应用打包的本地资料。简单问候得到普通聊天回复且不显示教材引用；浏览器/Android 中明确的生物教材问题会优先检索完整静态教材库，并只显示由本地 chunk 生成的真实页码。没有浏览器 Worker 的 Node fixture 测试仍保留固定离线回答，以保持测试稳定。
 
 如需本人短期调试直连，在 gitignored 的 `.env.local` 中创建以下内容后重新执行 `npm run android:sync`：
 
@@ -51,13 +51,30 @@ VITE_DEEPSEEK_API_KEY=your_short_lived_personal_key
 
 `VITE_DEEPSEEK_API_KEY` 会在 Vite 构建时进入浏览器或 APK 客户端产物，任何拿到产物的人都可能提取它。因此 BYOK 仅适合本人短期调试：不要提交 `.env.local`、不要分发包含该 Key 的构建，测试结束后立即撤销 Key。面向其他用户的版本必须改为服务端或 Serverless 代理。
 
-从相邻 `study_app` 后端正式包刷新目录、125 张原文页图和全部 MinerU 配图：
+### 完整前端生物教材 RAG
+
+biology-required-2 的完整静态教材检索库位于 public/rag。它覆盖指定扫描 PDF 的 125/125 个 PDF 页，包含 171 个语义 chunks、BM25、512 维 BGE 向量、页码映射、50 条评测集和完全本地的 ONNX/WASM 运行时。当前静态 RAG 总体积为 54,112,227 bytes；模型、索引和 runtime 都按需由 Web Worker 加载，并在模型不可用、Worker 失败或资源超时时安全退化到本地 BM25 或无教材引用。BM25 降级阈值基于正负例独立校准：没有可靠词法证据时（包括闲聊的非零字词重合）只返回无教材引用。实际发布体积和 APK 审计值必须由 `npm run rag:validate` 与发布流程重新确认，不能手工猜测或复用旧构建数字。
+
+完整架构、源 PDF 的“缺少第 1 章正文”边界、PDF 第 6 页恢复、哈希、版权和 Android 验收见 [docs/BIOLOGY_FRONTEND_RAG_PLAN.md](./docs/BIOLOGY_FRONTEND_RAG_PLAN.md)。路由层与 DeepSeek Tool Call 的边界见 [docs/AI_ASSISTANT_RAG_ROUTING_PLAN.md](./docs/AI_ASSISTANT_RAG_ROUTING_PLAN.md)。
+
+需要复核或重建时使用：
+
+~~~powershell
+npm run rag:validate
+npm run rag:evaluate
+npm run rag:validate:source
+npm run rag:build
+~~~
+
+source 校验与重新构建需要本机原 PDF 和经过确认的 MinerU 产物；它们不会提交到 Git。发布前应在无真实 Key 的环境中运行 rag validate、相关 Vitest、build、lesson AI E2E 以及 Android APK 资产检查。
+
+从相邻 `study_app` 后端正式包刷新目录、125 张原始页扫描缓存和全部 MinerU 配图：
 
 ```powershell
 npm run demo:refresh
 ```
 
-其中 `demo:assets` 会复制正式配图与缩略图、按已核验的 PDF 页范围映射 demo 章节，并把对应资产写入课程和课程讲解块。复制出的二进制图片只保留在本机并由 Git 忽略；生成的资产清单继续版本化，方便核验来源和数量。
+其中 `demo:pages` 仅把 125 张原始页扫描写入 gitignored 的 `.cache/unpublished-textbook-pages`，不会写入 `public`、`dist`、Android assets 或 APK。本轮已将此前误落在 public 的 125 张 JPEG（38,740,082 bytes）完整迁移到该可恢复缓存；发布清单为 0，且 public、dist、Android assets 与 APK 中的页图均为 0。要发布任何教材页位图，必须先登记到 `src/data/published-citation-source-page-assets.json`，并同时满足受 Git 跟踪与 SHA-256 校验；空清单要求发布目录没有任何支持格式的页图。`demo:assets` 会复制正式配图与缩略图、按已核验的 PDF 页范围映射 demo 章节，并把对应资产写入课程和课程讲解块。复制出的二进制图片只保留在本机并由 Git 忽略；生成的资产清单继续版本化，方便核验来源和数量。
 
 内容重建需要本机 PDF 路径和 MinerU 环境，详见 [docs/CONTENT_PROVENANCE.md](./docs/CONTENT_PROVENANCE.md)。视觉素材来源见 [docs/ASSET_PROVENANCE.md](./docs/ASSET_PROVENANCE.md)，源仓库基线见 [docs/SOURCE_BASELINE.md](./docs/SOURCE_BASELINE.md)。
 

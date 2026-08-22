@@ -24,18 +24,25 @@ export function SourceReaderScreen() {
   const unitName = sourceUnitName(sourceUnit);
   const targetStart = Math.max(1, sourcePageTarget?.pageStart ?? 1);
   const targetEnd = Math.max(targetStart, sourcePageTarget?.pageEnd ?? targetStart);
+  const inlineCitationText = sourcePageTarget?.sourceText?.trim() ?? "";
+  const hasInlineCitationText = inlineCitationText.length > 0;
   const [currentPage, setCurrentPage] = useState(targetStart);
   const [failedImageKey, setFailedImageKey] = useState<string | null>(null);
-  const imageUrl = bookId ? sourcePageImageUrl(bookId, currentPage) : "";
+  // A citation text target is deliberately rendered from its bundled chunk
+  // text. Never synthesize an unpublished /assets/textbook/pages/* URL for a
+  // citation: that path may exist only in an author's local MinerU cache.
+  const imageUrl = !hasInlineCitationText && bookId ? sourcePageImageUrl(bookId, currentPage) : "";
   const imageKey = `${bookId}:${currentPage}:${imageUrl}`;
   const imageFailed = Boolean(imageUrl) && failedImageKey === imageKey;
   const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content");
   const imageMotion = useImageMotion(imageUrl);
-  const sourceLoadState: LoadState = imageFailed || imageMotion.state === "failed"
-    ? "error"
-    : imageMotion.state === "loading"
-      ? "loading"
-      : "ready";
+  const sourceLoadState: LoadState = hasInlineCitationText
+    ? "ready"
+    : imageFailed || imageMotion.state === "failed"
+      ? "error"
+      : imageMotion.state === "loading"
+        ? "loading"
+        : "ready";
 
   useEffect(() => {
     setCurrentPage(targetStart);
@@ -46,14 +53,20 @@ export function SourceReaderScreen() {
     setFailedImageKey(null);
   }, [currentPage, imageUrl]);
 
-  const maxPage = Math.max(pageCount ?? targetEnd, targetEnd, 1);
+  const maxPage = hasInlineCitationText ? targetStart : Math.max(pageCount ?? targetEnd, targetEnd, 1);
   const currentChapter = parsedChapters
     ?.filter((chapter) => chapter.page_start <= currentPage && currentPage <= chapter.page_end)
     .sort((left, right) => right.level - left.level || (left.page_end - left.page_start) - (right.page_end - right.page_start))[0];
-  const isBiologyFrontMatter = bookId === "book_biology_2" && currentPage < 10;
-  const displayTitle = isBiologyFrontMatter
-    ? "第 1 章 遗传因子的发现"
-    : currentChapter?.source_title ?? sourcePageTarget?.title ?? uploadedFile?.name ?? "教材原文";
+  const citationTitle = sourcePageTarget?.title?.trim();
+  const chapterTitle = currentChapter?.source_title?.trim();
+  const fallbackTitle = uploadedFile?.name?.trim() || "教材原文";
+  // A citation carries the chapter title that was actually attached to its
+  // retrieved chunk. Do not infer a chapter from a PDF page range: this book
+  // deliberately records pages 1–9 as front matter because chapter-one body
+  // text is absent from the source corpus.
+  const displayTitle = hasInlineCitationText
+    ? citationTitle || chapterTitle || fallbackTitle
+    : chapterTitle || citationTitle || fallbackTitle;
   const exactLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === targetStart);
   const sourceRange = targetStart === targetEnd && typeof exactLocation?.label === "string"
     ? exactLocation.label
@@ -67,13 +80,11 @@ export function SourceReaderScreen() {
     : sourceRange;
   const isOnTargetRange = currentPage >= targetStart && currentPage <= targetEnd;
   const currentLocation = parsedScanResult?.source_locations?.find((item) => Number(item.index) === currentPage);
-  const currentLocationLabel = isBiologyFrontMatter
-    ? `PDF ${sourcePageLabel(currentPage)}`
-    : typeof currentLocation?.label === "string"
-      ? currentLocation.label
-      : sourceUnit === "page"
-        ? `PDF ${sourcePageLabel(currentPage)}`
-        : `${unitName} ${currentPage}`;
+  const currentLocationLabel = typeof currentLocation?.label === "string" && currentLocation.label.trim()
+    ? currentLocation.label
+    : sourceUnit === "page"
+      ? `PDF ${sourcePageLabel(currentPage)}`
+      : `${unitName} ${currentPage}`;
 
   if (!bookId) {
     return (
@@ -94,7 +105,7 @@ export function SourceReaderScreen() {
         <Pill tone={isOnTargetRange ? "mint" : "sky"}>{isOnTargetRange ? "已定位引用页" : "正在浏览原文"}</Pill>
         <h2>{displayTitle}</h2>
         <p>
-          当前位置：{currentLocationLabel}{pageCount ? ` · 共 ${pageCount} 个${unitName}` : ""}
+          当前位置：{currentLocationLabel}{hasInlineCitationText ? " · 已加载该引用的本地教材原文片段" : pageCount ? ` · 共 ${pageCount} 个${unitName}` : ""}
           {!isOnTargetRange ? ` · 原引用：${displayRange}` : ""}
         </p>
       </section>
@@ -121,54 +132,68 @@ export function SourceReaderScreen() {
       </aside>
 
       <figure {...pageMotion.attributes} className="source-page-frame" key={pageMotion.motionKey}>
-        <div className="source-page-media">
-          <SkeletonReveal
-            className="source-page-skeleton-reveal"
-            state={sourceLoadState}
-            readyKind="content"
-            skeleton={(
-              <div className="source-page-skeleton" aria-hidden="true">
-                <span className="source-page-skeleton-heading" />
-                <span className="source-page-skeleton-line is-wide" />
-                <span className="source-page-skeleton-line" />
-                <span className="source-page-skeleton-line is-short" />
-              </div>
-            )}
-            error={(
-              <div
-                className="source-page-fallback"
-                data-motion-image-source={imageUrl}
-                data-motion-image-state="failed"
-                role="status"
-              >
-                <FileText size={34} aria-hidden="true" />
-                <strong>原文页暂不可用</strong>
-                <span>{unitName} {currentPage}</span>
-              </div>
-            )}
+        {hasInlineCitationText ? (
+          <article
+            className="source-page-text-document citation-quote"
+            aria-label={`${displayRange} 本地教材原文片段`}
+            tabIndex={0}
           >
-            <img
-              key={imageKey}
-              className="source-page-image"
-              data-motion-image-state={imageMotion.state}
-              ref={imageMotion.imageRef}
-              src={imageUrl}
-              alt={`${displayTitle} ${unitName} ${currentPage}`}
-              onLoad={imageMotion.onLoad}
-              onAnimationEnd={(event) => {
-                if (event.animationName === "motion-stage3-image-in") imageMotion.settleAnimation();
-              }}
-              onError={() => {
-                imageMotion.onError();
-                setFailedImageKey(imageKey);
-                showToast("原文页加载失败，请检查页码范围或后端页图接口", "warning");
-              }}
-            />
-          </SkeletonReveal>
-        </div>
+            {inlineCitationText.split(/\n{2,}/u).map((paragraph, index) => (
+              <p key={`${index}:${paragraph.slice(0, 32)}`}>{paragraph.trim()}</p>
+            ))}
+          </article>
+        ) : (
+          <div className="source-page-media">
+            <SkeletonReveal
+              className="source-page-skeleton-reveal"
+              state={sourceLoadState}
+              readyKind="content"
+              skeleton={(
+                <div className="source-page-skeleton" aria-hidden="true">
+                  <span className="source-page-skeleton-heading" />
+                  <span className="source-page-skeleton-line is-wide" />
+                  <span className="source-page-skeleton-line" />
+                  <span className="source-page-skeleton-line is-short" />
+                </div>
+              )}
+              error={(
+                <div
+                  className="source-page-fallback"
+                  data-motion-image-source={imageUrl}
+                  data-motion-image-state="failed"
+                  role="status"
+                >
+                  <FileText size={34} aria-hidden="true" />
+                  <strong>原文页暂不可用</strong>
+                  <span>{unitName} {currentPage}</span>
+                </div>
+              )}
+            >
+              <img
+                key={imageKey}
+                className="source-page-image"
+                data-motion-image-state={imageMotion.state}
+                ref={imageMotion.imageRef}
+                src={imageUrl}
+                alt={`${displayTitle} ${unitName} ${currentPage}`}
+                onLoad={imageMotion.onLoad}
+                onAnimationEnd={(event) => {
+                  if (event.animationName === "motion-stage3-image-in") imageMotion.settleAnimation();
+                }}
+                onError={() => {
+                  imageMotion.onError();
+                  setFailedImageKey(imageKey);
+                  showToast("原文页加载失败，请检查页码范围或后端页图接口", "warning");
+                }}
+              />
+            </SkeletonReveal>
+          </div>
+        )}
         <figcaption>
           <BookOpen size={14} aria-hidden="true" />
-          原文件安全预览 · {unitName} {currentPage}
+          {hasInlineCitationText
+            ? `本地教材原文片段 · ${displayRange}`
+            : `原文件安全预览 · ${unitName} ${currentPage}`}
         </figcaption>
       </figure>
 
