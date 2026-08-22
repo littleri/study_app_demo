@@ -1,3 +1,7 @@
+# RAG release artifacts are validated by exact byte size and SHA-256. Disable
+# checkout-time newline conversion so they stay identical on Windows.
+public/rag/** -text
+
 # Keep the verified upstream ONNX Runtime loader byte-for-byte identical to
 # the checksum recorded in the bundled model manifest.
 public/rag/runtime/wasm/*.mjs whitespace=-trailing-space
