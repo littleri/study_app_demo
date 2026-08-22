@@ -632,7 +632,6 @@ type AiAssistantContent = {
   contextTitle: string;
   modes: string[];
   suggestions: string[];
-  topics: string[];
 };
 
 const defaultDemoRagBookId = "book_biology_2";
@@ -773,8 +772,7 @@ function GlobalAIAssistant({
         suggestions: [
           `概括《${courseTitle}》的核心知识`,
           "请根据教材原文给我出一道复习题"
-        ],
-        topics: ["教材原文", "学习方法"]
+        ]
       };
     }
     const title = activeLesson?.title ?? activeChapter?.ai_title ?? activeChapter?.source_title ?? "当前章节";
@@ -796,8 +794,7 @@ function GlobalAIAssistant({
         secondaryConcept
           ? `比较“${primaryConcept}”和“${secondaryConcept}”`
           : `围绕“${title}”给我出一道题`
-      ],
-      topics: concepts.length > 0 ? concepts.slice(0, 2) : ["本节重点", "教材原文"]
+      ]
     };
   }, [activeChapter, activeCourse, activeLesson, uploadedFile]);
   const [open, setOpen] = useState(false);
@@ -1477,13 +1474,6 @@ function AIAssistantDialog({
             </div>
             <div className="ai-current-book-body">
               <h3>{content.contextTitle}</h3>
-              <div className="ai-topic-row">
-                {content.topics.map((item) => (
-                  <button type="button" key={item} onClick={() => setInput(`请讲解“${item}”`)}>
-                    {item}
-                  </button>
-                ))}
-              </div>
             </div>
           </section>
           {showSuggestions ? (
@@ -1506,7 +1496,7 @@ function AIAssistantDialog({
                   {message.role === "ai" ? <Bot size={15} /> : <User size={15} />}
                 </span>
                 <div className={`ai-message ${message.role}`}>
-                  <span className="ai-message-author">{message.role === "ai" ? "AI 导学助手" : "我"}</span>
+                  {message.role === "ai" ? <span className="ai-message-author">AI 导学助手</span> : null}
                   <p>{message.text}</p>
                   {message.citations?.length ? (
                     <div className="ai-message-citations" aria-label="教材来源">
@@ -1549,13 +1539,15 @@ function AIAssistantDialog({
             ) : null}
             <div ref={messageEndRef} className="ai-message-end" aria-hidden="true" />
           </div>
-          <div className="ai-mode-row">
-            {content.modes.map((item) => (
-              <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
-                {item}
-              </button>
-            ))}
-          </div>
+          {!hasConversation ? (
+            <div className="ai-mode-row">
+              {content.modes.map((item) => (
+                <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
+                  {item}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
         <form className="ai-compose" onSubmit={submitMessage}>
           <input

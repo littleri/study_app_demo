@@ -7,7 +7,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * publishing or distributing the application outside this device.
  */
 const config: CapacitorConfig = {
-  appId: "com.studyappdemo.bookcourse",
+  appId: "com.littleri.bookcourseai",
   appName: "BookCourse AI",
   webDir: "dist",
   plugins: {

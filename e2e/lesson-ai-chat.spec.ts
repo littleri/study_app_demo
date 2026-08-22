@@ -123,14 +123,12 @@ test.describe("lesson AI chat entry", () => {
     const compactContext = dialog.locator(".ai-current-book");
     const compactContextBody = dialog.locator(".ai-current-book-body");
     const headerCapsule = dialog.locator(".ai-overlay-head > div");
-    const topicShortcut = dialog.locator(".ai-topic-row button").first();
+    await expect(dialog.locator(".ai-topic-row")).toHaveCount(0);
     await expect(compactContext).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(compactContext).toHaveCSS("border-top-width", "0px");
     await expect(compactContextBody).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(compactContextBody).toHaveCSS("border-top-width", "0px");
     await expect(headerCapsule).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(topicShortcut).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(topicShortcut).toHaveCSS("border-top-width", "0px");
     const compactContextBounds = await compactContext.boundingBox();
     expect(compactContextBounds).not.toBeNull();
     expect(compactContextBounds?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(132);

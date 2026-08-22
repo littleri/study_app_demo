@@ -302,6 +302,7 @@ body {
 }
 
 .ai-dialog-scroll {
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
@@ -336,7 +337,6 @@ body {
   left: auto;
 }
 
-.ai-topic-row,
 .ai-mode-row {
   flex-wrap: wrap;
 }
@@ -370,18 +370,18 @@ body {
   min-height: var(--ai-action-target-min);
 }
 
-/* The phone assistant is a bottom-anchored conversation surface. The sheet
-   itself reaches the visible viewport edge; the safe area is reserved inside
-   the surface so the composer stays clear of the home indicator. */
-@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+/* The phone assistant is a bottom-anchored conversation surface. Keep this
+   contract when the soft keyboard shortens the Android WebView below 600px;
+   visual-viewport variables move the bottom edge above the keyboard. */
+@media (max-width: 767px) {
   .ai-overlay {
-    top: auto;
+    top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--header-block-size));
     right: calc(var(--safe-area-right) + 8px);
     bottom: var(--overlay-visual-bottom);
     left: calc(var(--safe-area-left) + 8px);
     width: auto;
-    height: min(80dvh, 700px);
-    max-height: calc(var(--overlay-visual-height) - var(--safe-area-top) - 12px);
+    height: auto;
+    max-height: none;
     border-radius: 28px 28px 0 0;
     padding: 14px 14px calc(14px + var(--safe-area-bottom));
   }

@@ -182,7 +182,6 @@ textarea {
 .memory-reveal,
 .feeling-row button,
 .followups button,
-.ai-topic-row button,
 .ai-mode-row button,
 .ai-suggest-list button {
   min-block-size: var(--touch-target-min);
@@ -753,7 +752,6 @@ button:disabled {
   color: var(--color-text-secondary);
 }
 
-.ai-topic-row button,
 .ai-mode-row button,
 .ai-suggest-list button,
 .ai-current-book,
@@ -769,8 +767,7 @@ button:disabled {
 /* Keep the assistant context compact: hierarchy comes from type, not nested cards. */
 .ai-overlay-head > div,
 .ai-current-book,
-.ai-current-book-body,
-.ai-topic-row button {
+.ai-current-book-body {
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -793,18 +790,47 @@ button:disabled {
   text-align: left;
 }
 
-.ai-topic-row {
-  justify-content: flex-start;
+#ai-assistant-dialog .ai-mode-row {
+  align-items: center;
   gap: 14px;
 }
 
-.ai-topic-row button {
-  padding: 4px 0;
-  color: var(--color-primary);
-  font-size: 12px;
+#ai-assistant-dialog .ai-mode-row button {
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  padding: 0 2px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  transition: color var(--motion-duration-local-fast) var(--motion-ease-local-enter);
 }
 
-@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+#ai-assistant-dialog .ai-mode-row button::before {
+  display: none;
+  content: none;
+}
+
+#ai-assistant-dialog .ai-mode-row button:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+#ai-assistant-dialog .ai-mode-row button:active {
+  color: var(--color-primary-pressed);
+}
+
+#ai-assistant-dialog .ai-mode-row button:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
   .ai-overlay {
     border-radius: 28px 28px 0 0;
   }

@@ -179,6 +179,63 @@ test.describe("community discovery", () => {
     expect(bookCourseApi.pageErrors, "native course search emits no page errors").toEqual([]);
   });
 
+  test("keeps the phone assistant attached to the visible viewport when the keyboard reduces its height", async ({ page, bookCourseApi }) => {
+    await page.setViewportSize({ width: 402, height: 681 });
+    await openCommunity(page);
+    await page.getByRole("button", { name: "打开 AI 助手", exact: true }).click();
+
+    const dialog = page.getByRole("dialog", { name: "AI 导学助手", exact: true });
+    const input = dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(input).toBeFocused();
+    const fullHeightComposerGeometry = await dialog.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const composerBounds = element.querySelector<HTMLElement>(".ai-compose")?.getBoundingClientRect();
+      return {
+        composerBottomInset: composerBounds ? bounds.bottom - composerBounds.bottom : Number.POSITIVE_INFINITY,
+        panelBottomPadding: Number.parseFloat(getComputedStyle(element).paddingBottom)
+      };
+    });
+    expect(
+      Math.abs(fullHeightComposerGeometry.composerBottomInset - fullHeightComposerGeometry.panelBottomPadding),
+      "the phone composer rests against the dialog's padded bottom edge before the keyboard opens"
+    ).toBeLessThanOrEqual(1);
+
+    await page.setViewportSize({ width: 402, height: 430 });
+    await expect(dialog).toBeVisible();
+    await expect(input).toBeFocused();
+    const keyboardHeightGeometry = await dialog.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const composerBounds = element.querySelector<HTMLElement>(".ai-compose")?.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const viewport = window.visualViewport;
+      const visibleViewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
+      return {
+        bottom: bounds.bottom,
+        visibleViewportBottom,
+        composerInsideViewport: Boolean(composerBounds && composerBounds.top >= 0 && composerBounds.bottom <= visibleViewportBottom + 1),
+        composerBottomInset: composerBounds ? bounds.bottom - composerBounds.bottom : Number.POSITIVE_INFINITY,
+        panelBottomPadding: Number.parseFloat(style.paddingBottom),
+        bottomLeftRadius: style.borderBottomLeftRadius,
+        bottomRightRadius: style.borderBottomRightRadius
+      };
+    });
+
+    expect(
+      Math.abs(keyboardHeightGeometry.bottom - keyboardHeightGeometry.visibleViewportBottom),
+      "keyboard-height phone AI surface stays attached to the visible viewport bottom"
+    ).toBeLessThanOrEqual(1);
+    expect(keyboardHeightGeometry.composerInsideViewport, "the composer remains above the soft keyboard").toBe(true);
+    expect(
+      Math.abs(keyboardHeightGeometry.composerBottomInset - keyboardHeightGeometry.panelBottomPadding),
+      "the phone composer remains against the dialog's padded bottom edge above the keyboard"
+    ).toBeLessThanOrEqual(1);
+    expect(keyboardHeightGeometry.bottomLeftRadius, "the attached phone surface has no floating lower-left corner").toBe("0px");
+    expect(keyboardHeightGeometry.bottomRightRadius, "the attached phone surface has no floating lower-right corner").toBe("0px");
+    expect(bookCourseApi.consoleErrors, "keyboard-height assistant emits no console errors").toEqual([]);
+    expect(bookCourseApi.pageErrors, "keyboard-height assistant emits no page errors").toEqual([]);
+  });
+
   test("grounds the global assistant in offline Demo RAG and preserves conversation turns", async ({ page, bookCourseApi }) => {
     let directDeepSeekRequests = 0;
     await page.route("https://api.deepseek.com/chat/completions", async (route) => {
@@ -193,12 +250,47 @@ test.describe("community discovery", () => {
     await expect(dialog.locator(".ai-current-book-body > p")).toHaveCount(0);
     const input = dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true });
     const suggestions = dialog.locator(".ai-suggestions");
+    const modeRow = dialog.locator(".ai-mode-row");
+    const firstModeButton = modeRow.getByRole("button").first();
     await expect(suggestions).toBeVisible();
+    await expect(modeRow).toBeVisible();
+    await expect(dialog.locator(".ai-topic-row")).toHaveCount(0);
+    const modeButtonAppearance = await firstModeButton.evaluate((element) => ({
+      backgroundColor: getComputedStyle(element).backgroundColor,
+      borderTopWidth: getComputedStyle(element).borderTopWidth,
+      beforeDisplay: getComputedStyle(element, "::before").display,
+      fontSize: getComputedStyle(element).fontSize
+    }));
+    expect(modeButtonAppearance).toEqual({
+      backgroundColor: "rgba(0, 0, 0, 0)",
+      borderTopWidth: "0px",
+      beforeDisplay: "none",
+      fontSize: "14px"
+    });
+    const phoneDialogGeometry = await page.evaluate(() => {
+      const assistant = document.querySelector<HTMLElement>("#ai-assistant-dialog");
+      const header = document.querySelector<HTMLElement>(".header-bar");
+      if (!assistant || !header) throw new Error("Assistant or top navigation is missing");
+      const assistantRect = assistant.getBoundingClientRect();
+      const headerRect = header.getBoundingClientRect();
+      return {
+        isPhonePortrait: innerWidth <= 767 && innerHeight >= 600 && innerHeight > innerWidth,
+        assistantTop: assistantRect.top,
+        headerBottom: headerRect.bottom
+      };
+    });
+    if (phoneDialogGeometry.isPhonePortrait) {
+      expect(
+        Math.abs(phoneDialogGeometry.assistantTop - phoneDialogGeometry.headerBottom),
+        "the phone assistant starts at the bottom edge of the top navigation"
+      ).toBeLessThanOrEqual(2);
+    }
 
     await input.fill("减数分裂为什么只复制一次却分裂两次？");
     await expect(suggestions).toHaveCount(0);
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
     await expect(dialog).toContainText("同源染色体可以理解成一对来源不同");
+    await expect(modeRow).toHaveCount(0);
     const firstUserBubble = dialog.locator(".ai-message-row.user .ai-message.user").first();
     const firstAiBubble = dialog.locator(".ai-message-row.ai .ai-message.ai").first();
     const firstCitationLinks = firstAiBubble.locator(".ai-message-citations");
@@ -208,7 +300,8 @@ test.describe("community discovery", () => {
     await expect(firstCitationLinks).not.toContainText("Demo RAG");
     await expect(firstCitationLinks).not.toContainText("PDF");
     await expect(firstUserBubble).toContainText("减数分裂为什么只复制一次却分裂两次？");
-    await expect(firstUserBubble.locator(".ai-message-author")).toHaveText("我");
+    await expect(firstUserBubble.locator(".ai-message-author")).toHaveCount(0);
+    await expect(firstUserBubble.locator("p")).toHaveCSS("color", "rgb(255, 255, 255)");
     await expect(firstAiBubble.locator(".ai-message-author")).toHaveText("AI 导学助手");
     const bubbleLayout = await Promise.all([firstUserBubble, firstAiBubble].map(async (bubble) => ({
       backgroundColor: await bubble.evaluate((element) => getComputedStyle(element).backgroundColor),
