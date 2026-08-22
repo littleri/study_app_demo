@@ -16,8 +16,12 @@ async function expectTwoColumnCommunityGrid(page: Page, label: string) {
     const rects = elements.map((element) => {
       const rect = element.getBoundingClientRect();
       return {
-        left: Math.round(rect.left * 10) / 10,
-        top: Math.round(rect.top * 10) / 10,
+        // Grid structure must be measured before hover/active transforms;
+        // a translated card still belongs to its original row and column.
+        layoutLeft: element.offsetLeft,
+        layoutTop: element.offsetTop,
+        left: rect.left,
+        right: rect.right,
         width: Math.round(rect.width * 10) / 10,
         height: Math.round(rect.height * 10) / 10
       };
@@ -28,10 +32,10 @@ async function expectTwoColumnCommunityGrid(page: Page, label: string) {
     const gridRect = grid.getBoundingClientRect();
     return {
       rects,
-      columnCount: new Set(rects.map((rect) => rect.left)).size,
-      rowCount: new Set(rects.map((rect) => rect.top)).size,
+      columnCount: new Set(rects.map((rect) => rect.layoutLeft)).size,
+      rowCount: new Set(rects.map((rect) => rect.layoutTop)).size,
       contentOverflow: content.scrollWidth > content.clientWidth,
-      cardsInsideGrid: rects.every((rect) => rect.left >= gridRect.left - 1 && rect.left + rect.width <= gridRect.right + 1)
+      cardsInsideGrid: rects.every((rect) => rect.left >= gridRect.left - 1 && rect.right <= gridRect.right + 1)
     };
   });
 

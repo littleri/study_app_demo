@@ -27,7 +27,10 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       VITE_BOOKCOURSE_API_BASE_URL: `http://127.0.0.1:${e2ePort}`,
-      VITE_BOOKCOURSE_USER_ID: "responsive_fixture_user"
+      VITE_BOOKCOURSE_USER_ID: "responsive_fixture_user",
+      // Keep E2E on the deterministic offline path even when a developer has
+      // a personal BYOK value in the gitignored .env.local file.
+      VITE_DEEPSEEK_API_KEY: " "
     }
   },
   projects: [
