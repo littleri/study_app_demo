@@ -1,4 +1,6 @@
 import demoStateJson from "../data/generated/demo-state.json";
+import { hasDirectDeepSeekKey } from "../config/deepseek";
+import { askDeepSeekWithLocalRag } from "./DeepSeekRag";
 import {
   demoMathAssets,
   demoMathBookId,
@@ -126,6 +128,26 @@ function asCitation(chapterId: string, chunkId: string, quote: string) {
     location_label: printedPage ? `教材第 ${printedPage} 页（PDF 第 ${page} 页）` : `PDF 第 ${page} 页`,
     source_metadata: { ...metadata, parser: seed.provenance.parser, parser_version: seed.provenance.parser_version, retrieval_quote: quote }
   };
+}
+
+function isSimpleGreeting(question: string) {
+  const normalized = question
+    .trim()
+    .toLocaleLowerCase("zh-CN")
+    .replace(/[\s!！。？?，,～~]/gu, "");
+  return new Set([
+    "你好",
+    "您好",
+    "嗨",
+    "哈喽",
+    "hello",
+    "hi",
+    "hey",
+    "早上好",
+    "早安",
+    "下午好",
+    "晚上好"
+  ]).has(normalized);
 }
 
 export class DemoRepository {
@@ -418,7 +440,24 @@ export class DemoRepository {
   }
 
   async queryRag(payload: RagQuery): Promise<RagResponse> {
+    if (hasDirectDeepSeekKey()) {
+      const [chunks, chapters, assets] = await Promise.all([
+        this.getChunks(payload.book_id),
+        this.getChapters(payload.book_id),
+        this.getAssets(payload.book_id)
+      ]);
+      return askDeepSeekWithLocalRag(payload, { assets, chapters, chunks });
+    }
+
     await wait();
+    if (isSimpleGreeting(payload.question)) {
+      return {
+        answer: "你好！我是你的学习助手。想随便聊聊，还是一起复习生物教材？",
+        citations: [],
+        related_assets: [],
+        confidence: "low"
+      };
+    }
     const key = payload.question.includes("第二次") ? "quiz" : payload.question.includes("例") ? "example" : "default";
     const chunkId = key === "quiz" ? "chunk_c2s1_13" : key === "example" ? "chunk_c2s1_19" : "chunk_c2s1_11";
     const quote = key === "quiz"

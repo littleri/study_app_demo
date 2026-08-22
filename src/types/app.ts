@@ -30,7 +30,7 @@ export type SheetState =
   | {
       type: "source";
       title: string;
-      image: string;
+      image?: string;
       page: string;
       text?: string;
       source?: SourcePageTarget;

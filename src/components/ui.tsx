@@ -17,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
+import type { Citation } from "../types/api";
 import { globalMotionFallbackMs, localSlowMotionDurationSeconds, localStateGsapEase, StateSwapText, useImageMotion, useMotionPresence, useReducedMotion, type MotionAnimationEvent, type MotionState } from "../motion";
 import { PadChrome } from "../layouts/PadChrome";
 import { PhoneChrome } from "../layouts/PhoneChrome";
@@ -610,13 +611,12 @@ type OpenGlobalAiAssistantDetail = {
 };
 
 type AiAssistantMessage = {
+  citations?: Citation[];
   role: "ai" | "user";
-  source?: string;
   text: string;
 };
 
 type AiAssistantContent = {
-  contextBody: string;
   contextLabel: string;
   contextMeta: string;
   contextTitle: string;
@@ -625,15 +625,29 @@ type AiAssistantContent = {
   topics: string[];
 };
 
-const defaultAiAssistantContent: AiAssistantContent = {
-  contextBody: "学习相关的问题，都可以问我。",
-  contextLabel: "当前书籍",
-  contextMeta: "09 / 九月学习",
-  contextTitle: "期末复习效率如何提升？",
-  modes: ["知识点讲解", "作业解析", "错题复盘"],
-  suggestions: ["长时间学习如何避免疲惫", "如何规划复习节奏？"],
-  topics: ["科普", "学习方法"]
-};
+const defaultDemoRagBookId = "book_biology_2";
+
+function getCitationPrintedPage(citation: Citation) {
+  const printedPages = citation.source_metadata.printed_pages;
+  if (Array.isArray(printedPages)) {
+    const firstPage = Number(printedPages[0]);
+    if (Number.isFinite(firstPage) && firstPage > 0) return firstPage;
+  }
+  const labelMatch = citation.location_label?.match(/教材第\s*(\d+)\s*页/);
+  const labelPage = Number(labelMatch?.[1]);
+  return Number.isFinite(labelPage) && labelPage > 0 ? labelPage : null;
+}
+
+function getUniqueCitationPages(citations: Citation[]) {
+  const seen = new Set<string>();
+  return citations.filter((citation) => {
+    const printedPage = getCitationPrintedPage(citation);
+    const key = printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function getAiDialogKey(view: AiDialogView) {
   return view.key;
@@ -717,10 +731,21 @@ function GlobalAIAssistant({
   const bookcourseRepository = useBookCourseRepository();
   const {
     activeChapterId,
+    courseSummaries,
     generatedLessons,
+    loadedBookId,
     parsedChapters,
+    openSourcePage,
     uploadedFile
   } = useAppContext();
+  const ragBookId = loadedBookId
+    ?? uploadedFile?.bookId
+    ?? courseSummaries.find((course) => course.rag_index_status === "ready")?.book_id
+    ?? courseSummaries[0]?.book_id
+    ?? defaultDemoRagBookId;
+  const activeCourse = courseSummaries.find((course) => course.book_id === ragBookId)
+    ?? courseSummaries[0]
+    ?? null;
   const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId)
     ?? parsedChapters?.[0]
     ?? null;
@@ -728,7 +753,20 @@ function GlobalAIAssistant({
     ? generatedLessons?.find((lesson) => lesson.chapter_id === activeChapter.chapter_id) ?? null
     : generatedLessons?.[0] ?? null;
   const assistantContent = useMemo<AiAssistantContent>(() => {
-    if (active !== "lesson") return defaultAiAssistantContent;
+    if (!activeChapter && !activeLesson) {
+      const courseTitle = activeCourse?.title ?? "生物 必修 2《遗传与进化》";
+      return {
+        contextLabel: "当前教材",
+        contextMeta: activeCourse ? `${activeCourse.chunk_count} 个本地片段` : "Demo RAG 已就绪",
+        contextTitle: courseTitle,
+        modes: ["知识点讲解", "原文问答", "复习计划"],
+        suggestions: [
+          `概括《${courseTitle}》的核心知识`,
+          "请根据教材原文给我出一道复习题"
+        ],
+        topics: ["教材原文", "学习方法"]
+      };
+    }
     const title = activeLesson?.title ?? activeChapter?.ai_title ?? activeChapter?.source_title ?? "当前章节";
     const concepts = activeLesson?.key_concepts.filter(Boolean) ?? [];
     const primaryConcept = concepts[0] ?? title;
@@ -739,7 +777,6 @@ function GlobalAIAssistant({
       ? `原书 ${pageStart}${pageEnd && pageEnd !== pageStart ? `–${pageEnd}` : ""} 页`
       : uploadedFile?.name ?? "当前课程";
     return {
-      contextBody: "依据当前章节原文回答，并标注教材位置。",
       contextLabel: "当前课程",
       contextMeta: pageLabel,
       contextTitle: title,
@@ -752,7 +789,7 @@ function GlobalAIAssistant({
       ],
       topics: concepts.length > 0 ? concepts.slice(0, 2) : ["本节重点", "教材原文"]
     };
-  }, [active, activeChapter, activeLesson, uploadedFile]);
+  }, [activeChapter, activeCourse, activeLesson, uploadedFile]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -811,6 +848,30 @@ function GlobalAIAssistant({
     setOpen(false);
   }, []);
 
+  const openCitationSource = useCallback((citation: Citation) => {
+    const printedPage = getCitationPrintedPage(citation);
+    requestDialogClose();
+    openSourcePage({
+      bookId: ragBookId,
+      title: citation.chapter_title || "教材原文",
+      pageStart: citation.page,
+      pageEnd: citation.page,
+      printedPageStart: printedPage,
+      printedPageEnd: printedPage,
+      from: active
+    });
+  }, [active, openSourcePage, ragBookId, requestDialogClose]);
+
+  useEffect(() => {
+    const closeForNativeBack: EventListener = (event) => {
+      if (!open) return;
+      event.preventDefault();
+      requestDialogClose();
+    };
+    window.addEventListener("bookcourse:native-back", closeForNativeBack);
+    return () => window.removeEventListener("bookcourse:native-back", closeForNativeBack);
+  }, [open, requestDialogClose]);
+
   useEffect(() => {
     const shell = containerElement;
     if (!shell) return;
@@ -827,7 +888,7 @@ function GlobalAIAssistant({
     setInput("");
     setMessages([]);
     setLoading(false);
-  }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, uploadedFile?.bookId]);
+  }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId]);
 
   useEffect(() => {
     [
@@ -958,35 +1019,17 @@ function GlobalAIAssistant({
     }));
     setMessages((items) => [...items, { role: "user", text }]);
     setInput("");
-    if (active !== "lesson" || !uploadedFile) {
-      setMessages((items) => [
-        ...items,
-        {
-          role: "ai",
-          text: "我会先结合当前课程上下文定位知识点，再给你一个可以直接复习的短答案，并附上教材页码和错题记录。"
-        }
-      ]);
-      return;
-    }
-
     setLoading(true);
     try {
       const result = await bookcourseRepository.queryRag({
-        book_id: uploadedFile.bookId,
+        book_id: ragBookId,
         chapter_id: activeChapter?.chapter_id ?? null,
         history,
         question: text
       });
-      const citation = result.citations[0];
-      const source = citation
-        ? [
-            citation.chapter_title,
-            citation.location_label || `第 ${citation.page} 页`
-          ].filter(Boolean).join(" · ")
-        : undefined;
       setMessages((items) => [
         ...items,
-        { role: "ai", source, text: result.answer }
+        { citations: result.citations, role: "ai", text: result.answer }
       ]);
     } catch (error) {
       setMessages((items) => [
@@ -994,8 +1037,8 @@ function GlobalAIAssistant({
         {
           role: "ai",
           text: error instanceof Error
-            ? `这次没有完成教材检索：${error.message}`
-            : "这次没有完成教材检索，请稍后再试。"
+            ? `这次没有完成回答：${error.message}`
+            : "这次没有完成回答，请稍后再试。"
         }
       ]);
     } finally {
@@ -1184,6 +1227,8 @@ function GlobalAIAssistant({
           input={input}
           loading={loading}
           messages={messages}
+          reducedMotion={reducedMotion}
+          onOpenCitation={openCitationSource}
           onClose={requestDialogClose}
           onAnimationEnd={dialogPresence.onAnimationEnd}
           onAnimationCancel={dialogPresence.onAnimationCancel}
@@ -1203,6 +1248,8 @@ function AIAssistantDialog({
   input,
   loading,
   messages,
+  reducedMotion,
+  onOpenCitation,
   onClose,
   onAnimationEnd,
   onAnimationCancel,
@@ -1217,6 +1264,8 @@ function AIAssistantDialog({
   input: string;
   loading: boolean;
   messages: AiAssistantMessage[];
+  reducedMotion: boolean;
+  onOpenCitation: (citation: Citation) => void;
   onClose: () => void;
   onAnimationEnd: (event: MotionAnimationEvent) => void;
   onAnimationCancel: (event: MotionAnimationEvent) => void;
@@ -1228,7 +1277,10 @@ function AIAssistantDialog({
   const sharedIconRef = useRef<HTMLSpanElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const messageEndRef = useRef<HTMLDivElement | null>(null);
   const titleId = useId();
+  const hasConversation = messages.length > 0 || loading;
+  const showSuggestions = !hasConversation && input.trim().length === 0;
   const focusPresenceRef = useRef(presenceId);
   if (visible && state !== "closing") focusPresenceRef.current = presenceId;
   const panelKey = `ai-assistant:${focusPresenceRef.current}`;
@@ -1268,6 +1320,14 @@ function AIAssistantDialog({
     dialog.addEventListener("animationcancel", handleAnimationCancel);
     return () => dialog.removeEventListener("animationcancel", handleAnimationCancel);
   }, [onAnimationCancel, state, visible]);
+
+  useEffect(() => {
+    if (!visible || !hasConversation) return;
+    messageEndRef.current?.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "end"
+    });
+  }, [hasConversation, loading, messages, reducedMotion, visible]);
 
   useLayoutEffect(() => {
     const layer = layerRef.current;
@@ -1401,7 +1461,6 @@ function AIAssistantDialog({
             </div>
             <div className="ai-current-book-body">
               <h3>{content.contextTitle}</h3>
-              <p>{content.contextBody}</p>
               <div className="ai-topic-row">
                 {content.topics.map((item) => (
                   <button type="button" key={item} onClick={() => setInput(`请讲解“${item}”`)}>
@@ -1411,23 +1470,68 @@ function AIAssistantDialog({
               </div>
             </div>
           </section>
-          <p className="ai-suggest-title">你可能感兴趣</p>
-          <div className="ai-suggest-list">
-            {content.suggestions.map((item) => (
-              <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
-                <MessageCircle size={15} aria-hidden="true" />
-                {item}
-              </button>
-            ))}
-          </div>
+          {showSuggestions ? (
+            <section className="ai-suggestions" aria-labelledby="ai-suggest-title">
+              <p className="ai-suggest-title" id="ai-suggest-title">你可能感兴趣</p>
+              <div className="ai-suggest-list">
+                {content.suggestions.map((item) => (
+                  <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
+                    <MessageCircle size={15} aria-hidden="true" />
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
           <div className="ai-message-list" aria-live="polite" aria-busy={loading}>
             {messages.map((message, index) => (
-              <div className={`ai-message ${message.role}`} key={`${message.role}-${index}`}>
-                <p>{message.text}</p>
-                {message.source ? <small>{message.source}</small> : null}
+              <div className={`ai-message-row ${message.role}`} key={`${message.role}-${index}`}>
+                <span className="ai-message-avatar" aria-hidden="true">
+                  {message.role === "ai" ? <Bot size={15} /> : <User size={15} />}
+                </span>
+                <div className={`ai-message ${message.role}`}>
+                  <span className="ai-message-author">{message.role === "ai" ? "AI 导学助手" : "我"}</span>
+                  <p>{message.text}</p>
+                  {message.citations?.length ? (
+                    <div className="ai-message-citations" aria-label="教材来源">
+                      <span>来源于</span>
+                      {getUniqueCitationPages(message.citations).map((citation) => {
+                        const printedPage = getCitationPrintedPage(citation);
+                        const label = printedPage ? `教材第 ${printedPage} 页` : `PDF 第 ${citation.page} 页`;
+                        return (
+                          <span
+                            className="ai-message-citation-item"
+                            key={printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`}
+                          >
+                            <span>{label}</span>
+                            <button
+                              type="button"
+                              aria-label={`查看${label}`}
+                              onClick={() => onOpenCitation(citation)}
+                            >
+                              <BookOpenCheck size={14} aria-hidden="true" />
+                              <span>查看</span>
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             ))}
-            {loading ? <p className="ai-message ai">正在检索当前章节的教材片段…</p> : null}
+            {loading ? (
+              <div className="ai-message-row ai ai-message-row-loading" role="status">
+                <span className="ai-message-avatar" aria-hidden="true">
+                  <Bot size={15} />
+                </span>
+                <div className="ai-message ai">
+                  <span className="ai-message-author">AI 导学助手</span>
+                  <p>正在准备回答…</p>
+                </div>
+              </div>
+            ) : null}
+            <div ref={messageEndRef} className="ai-message-end" aria-hidden="true" />
           </div>
           <div className="ai-mode-row">
             {content.modes.map((item) => (

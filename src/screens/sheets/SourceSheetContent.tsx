@@ -12,7 +12,7 @@ export function SourceSheetContent({
 }: {
   title: string;
   page: string;
-  image: string;
+  image?: string;
   text?: string;
   onCreateNote: (quote: string) => void;
   onOpenFullSource?: () => void;
@@ -20,7 +20,7 @@ export function SourceSheetContent({
   const [selectedText, setSelectedText] = useState("");
   const selectableTextRef = useRef<HTMLDivElement | null>(null);
   const hasSelectableText = Boolean(text?.trim());
-  const paragraphs = text?.split(/\n{2,}/).filter(Boolean) ?? [];
+  const paragraphs = text?.split(/\n{2,}/).map((paragraph) => paragraph.trim()).filter(Boolean) ?? [];
 
   const captureSelection = useCallback(() => {
     const selection = window.getSelection();
@@ -39,39 +39,54 @@ export function SourceSheetContent({
     return () => document.removeEventListener("selectionchange", captureSelection);
   }, [captureSelection]);
 
+  const selectableExcerpt = hasSelectableText ? (
+    <div
+      ref={selectableTextRef}
+      className={image ? "source-page-text-layer" : "citation-quote"}
+      tabIndex={0}
+      role="region"
+      aria-label={image ? `${page}教材原页可选择文字` : `${page}教材引用摘录，可选择文字`}
+      onPointerUp={captureSelection}
+      onKeyUp={captureSelection}
+    >
+      {paragraphs.map((paragraph, index) => (
+        <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
+      ))}
+    </div>
+  ) : null;
+
   return (
     <div className="sheet-body source-reference-sheet">
       <Pill tone="purple">{page}</Pill>
 
       <div className="source-unified-reader">
         <div className="source-page-panel">
-          <figure className="textbook-preview source-page-preview">
-            <div className="source-page-selection-surface">
-              <img src={image} alt={`${title} ${page}`} />
-              {hasSelectableText ? (
-                <div
-                  ref={selectableTextRef}
-                  className="source-page-text-layer"
-                  tabIndex={0}
-                  aria-label={`${page}教材原页可选择文字`}
-                  onPointerUp={captureSelection}
-                  onKeyUp={captureSelection}
-                >
-                  {paragraphs.map((paragraph, index) => (
-                    <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
-                  ))}
+          {image ? (
+            <>
+              <figure className="textbook-preview source-page-preview">
+                <div className="source-page-selection-surface">
+                  <img src={image} alt={`${title} ${page}`} />
+                  {selectableExcerpt}
                 </div>
-              ) : null}
-            </div>
-            <figcaption>
-              <FileText size={15} aria-hidden="true" />
-              {title} {page}
-            </figcaption>
-          </figure>
-          {hasSelectableText ? (
-            <p className="source-selection-hint">在教材原页上长按或拖动选中文字，即可直接做笔记。</p>
+                <figcaption>
+                  <FileText size={15} aria-hidden="true" />
+                  {title} {page}
+                </figcaption>
+              </figure>
+              {hasSelectableText ? (
+                <p className="source-selection-hint">在教材原页上长按或拖动选中文字，即可直接做笔记。</p>
+              ) : (
+                <p className="helper-text">当前教材页暂无可选择文字，可通过原页核对内容。</p>
+              )}
+            </>
           ) : (
-            <p className="helper-text">当前教材页暂无可选择文字，可通过原页核对内容。</p>
+            <>
+              <p className="helper-text">当前引用没有可验证的教材原页图。请按 {page} 在完整教材中查看原文。</p>
+              {selectableExcerpt}
+              {hasSelectableText ? (
+                <p className="source-selection-hint">长按、拖动或使用键盘选择摘录文字，即可直接做笔记。</p>
+              ) : null}
+            </>
           )}
         </div>
       </div>

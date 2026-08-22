@@ -4,6 +4,11 @@ test.describe("lesson AI chat entry", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", timezoneId: "Asia/Hong_Kong" });
 
   test("switches mascot states, docks across edges, and opens the shared course-aware AI dialog", async ({ page }) => {
+    let directDeepSeekRequests = 0;
+    await page.route("https://api.deepseek.com/chat/completions", async (route) => {
+      directDeepSeekRequests += 1;
+      await route.abort("blockedbyclient");
+    });
     await page.goto("/?embedded=device-preview");
     const globalEntry = page.locator(".ai-orb");
     await expect(globalEntry).toBeVisible();
@@ -100,7 +105,7 @@ test.describe("lesson AI chat entry", () => {
     await expect(dialog).toHaveClass(/ai-overlay/);
     await expect(dialog.getByRole("heading", { name: "AI 导学助手", exact: true })).toBeVisible();
     await expect(dialog).toContainText("当前课程");
-    await expect(dialog).toContainText("当前章节原文回答，并标注教材位置");
+    await expect(dialog.locator(".ai-current-book-body > p")).toHaveCount(0);
     await expect(dialog.locator(".ai-suggest-list button").first()).not.toContainText("长时间学习如何避免疲惫");
 
     const compactContext = dialog.locator(".ai-current-book");
@@ -122,7 +127,9 @@ test.describe("lesson AI chat entry", () => {
     await question.fill("请结合原文举一个受精作用的例子");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
     await expect(dialog).toContainText("如果体细胞里有一对 1 号同源染色体");
-    await expect(dialog.locator(".ai-message.ai small")).toBeVisible();
+    await expect(dialog.locator(".ai-message-citations")).toContainText("来源于教材第");
+    await expect(dialog.locator(".ai-message-citations").getByRole("button").first()).toBeVisible();
+    expect(directDeepSeekRequests).toBe(0);
 
     await dialog.locator(".ai-close").click();
     await expect(dialog).toHaveCount(0);
