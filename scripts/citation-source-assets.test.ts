@@ -27,7 +27,11 @@ async function fixture() {
     sourceText,
     manifest: {
       schema_version: 1,
+      book_id: "book-fixture",
+      page_count: 1,
       assets: [{
+        book_id: "book-fixture",
+        pdf_page: 1,
         url: "/assets/textbook/pages/page-015.jpeg",
         sha256: sha256(sourceText)
       }]
@@ -92,7 +96,7 @@ describe("published citation source assets", () => {
 
   it("requires an empty page directory when the publication manifest is empty", async () => {
     const data = await fixture();
-    const emptyManifest = { schema_version: 1, assets: [] };
+    const emptyManifest = { schema_version: 1, book_id: "book-fixture", page_count: 0, assets: [] };
 
     expect(() => assertPublishedCitationSourcePageAssets({
       assetManifest: emptyManifest,
@@ -107,7 +111,7 @@ describe("published citation source assets", () => {
     await mkdir(join(directory, "assets", "textbook", "pages"), { recursive: true });
 
     expect(assertPublishedCitationSourcePageAssets({
-      assetManifest: { schema_version: 1, assets: [] },
+      assetManifest: { schema_version: 1, book_id: "book-fixture", page_count: 0, assets: [] },
       publicDirectory: directory,
       isTracked: () => false
     })).toEqual({ published_asset_count: 0, discovered_page_asset_count: 0 });

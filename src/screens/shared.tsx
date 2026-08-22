@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { textbookAssets } from "../data/mockBook";
+import { getPublishedSourcePageImageUrl } from "../data/publishedSourcePages";
 import { CollapsibleRegion, MotionIconSwap, useStageThreeImageMotion } from "../motion";
 import type { ApiChapter, ApiChunk, ChapterEvidence, ScanResult } from "../types/api";
 import type { Chapter, UploadedCourseFile } from "../types/app";
@@ -16,9 +17,8 @@ export function backendAssetUrl(url?: string | null, fallback = textbookAssets.i
 }
 
 
-export function sourcePageImageUrl(_bookId: string, page: number) {
-  const safePage = Math.max(1, Math.trunc(page));
-  return `/assets/textbook/pages/page_${String(safePage).padStart(3, "0")}.jpeg`;
+export function sourcePageImageUrl(bookId: string, page: number) {
+  return getPublishedSourcePageImageUrl(bookId, page);
 }
 
 const courseCoverUrls: Readonly<Record<string, string>> = {

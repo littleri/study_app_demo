@@ -1,31 +1,14 @@
-import publishedCitationSourcePageAssets from "../../data/published-citation-source-page-assets.json";
+import { isPublishedSourcePageImage } from "../../data/publishedSourcePages";
 import type { ApiAsset, Citation } from "../../types/api";
-
-type PublishedSourcePageAsset = {
-  url?: unknown;
-  sha256?: unknown;
-};
 
 /**
  * Raw MinerU metadata can mention a page image that exists only on an author's
  * workstation. Treat it as unsafe until this explicit registry says that the
- * file is a tracked, hash-verified static release asset. The registry is empty
- * for the current copyright-conscious release, so citations use their bundled
- * chunk text in the source reader rather than producing a clean-clone 404.
+ * file is a tracked, hash-verified static release asset. A missing registry
+ * entry remains unavailable even if raw fixture metadata guesses a URL.
  */
-const publishedSourcePageUrls = new Set(
-  (publishedCitationSourcePageAssets.assets as PublishedSourcePageAsset[])
-    .filter((asset) => (
-      typeof asset.url === "string"
-      && asset.url.trim().startsWith("/")
-      && typeof asset.sha256 === "string"
-      && /^[a-f0-9]{64}$/iu.test(asset.sha256)
-    ))
-    .map((asset) => (asset.url as string).trim())
-);
-
 export function isPublishedCitationSourcePageImage(value: unknown): value is string {
-  return typeof value === "string" && publishedSourcePageUrls.has(value.trim());
+  return isPublishedSourcePageImage(value);
 }
 
 /**

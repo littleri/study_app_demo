@@ -329,8 +329,8 @@ test.describe("community discovery", () => {
     await citationPageButton.click();
     await expect(page.locator(".source-reader-screen")).toBeVisible();
     await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);
-    await expect(page.locator(".source-page-text-document")).toBeVisible();
-    await expect(page.locator(".source-page-text-document")).toContainText("噬菌体");
+    await expect(page.locator(".source-page-image")).toBeVisible();
+    await expect(page.locator(".source-page-image")).toHaveAttribute("src", /\/assets\/textbook\/pages\/page_\d{3}\.jpeg/);
     expect(bookCourseApi.externalRequests, "the offline Demo RAG needs no external request").toEqual([]);
     expect(bookCourseApi.consoleErrors, "grounded global assistant emits no console errors").toEqual([]);
     expect(bookCourseApi.pageErrors, "grounded global assistant emits no page errors").toEqual([]);

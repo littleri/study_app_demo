@@ -224,9 +224,9 @@ export function createOfflineTextbookRagResponse(
   return {
     answer: `教材原文：${primaryCitation.quote}`,
     citations,
-    // The complete static corpus does not publish source-page images. Do not
-    // return fixture figures here: the UI provides the cited local text page
-    // instead, and only a separately verified published page asset may appear.
+    // Full-page scans are resolved independently through the tracked release
+    // manifest. Do not return unrelated fixture figures as citation evidence;
+    // the source reader uses the verified page and keeps this chunk as fallback.
     related_assets: [],
     confidence: "high"
   };

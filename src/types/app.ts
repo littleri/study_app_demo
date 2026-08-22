@@ -79,9 +79,9 @@ export type SourcePageTarget = {
   printedPageStart?: number | null;
   printedPageEnd?: number | null;
   /**
-   * Locally bundled citation-chunk text. When present, the source reader
-   * renders this controlled text instead of guessing an unpublished page-image
-   * URL, while retaining the citation's actual page mapping.
+   * Locally bundled citation-chunk text. A verified published page image is the
+   * primary source-reader view; this controlled text remains the offline
+   * fallback if that image is unavailable.
    */
   sourceText?: string | null;
   from?: Screen | null;

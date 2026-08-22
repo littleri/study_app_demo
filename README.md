@@ -74,7 +74,7 @@ source 校验与重新构建需要本机原 PDF 和经过确认的 MinerU 产物
 npm run demo:refresh
 ```
 
-其中 `demo:pages` 仅把 125 张原始页扫描写入 gitignored 的 `.cache/unpublished-textbook-pages`，不会写入 `public`、`dist`、Android assets 或 APK。本轮已将此前误落在 public 的 125 张 JPEG（38,740,082 bytes）完整迁移到该可恢复缓存；发布清单为 0，且 public、dist、Android assets 与 APK 中的页图均为 0。要发布任何教材页位图，必须先登记到 `src/data/published-citation-source-page-assets.json`，并同时满足受 Git 跟踪与 SHA-256 校验；空清单要求发布目录没有任何支持格式的页图。`demo:assets` 会复制正式配图与缩略图、按已核验的 PDF 页范围映射 demo 章节，并把对应资产写入课程和课程讲解块。复制出的二进制图片只保留在本机并由 Git 忽略；生成的资产清单继续版本化，方便核验来源和数量。
+其中 `demo:pages` 只把 125 张原始页扫描写入 gitignored 的 `.cache/unpublished-textbook-pages`，不会隐式发布。确认可以随 demo 分发后，运行 `npm run demo:publish-pages`：脚本会把严格编号的 125 张 JPEG（38,740,082 bytes）复制到 `public/assets/textbook/pages`，逐张计算 SHA-256，并重建 `src/data/published-citation-source-page-assets.json`。正式页图受 Git 跟踪；`npm run build` 会在 Vite 复制前后分别校验 `public` 与 `dist`，`npm run android:sync` 还会校验 Android assets。阅读器只解析清单中与 book_id、pdf_page 精确匹配的 URL，不会为未登记页面猜测路径；页图是主视图，同一 citation chunk 的本地文字是加载失败时的回退。`demo:assets` 继续复制正式配图与缩略图、按已核验的 PDF 页范围映射 demo 章节，并把对应资产写入课程和课程讲解块。
 
 内容重建需要本机 PDF 路径和 MinerU 环境，详见 [docs/CONTENT_PROVENANCE.md](./docs/CONTENT_PROVENANCE.md)。视觉素材来源见 [docs/ASSET_PROVENANCE.md](./docs/ASSET_PROVENANCE.md)，源仓库基线见 [docs/SOURCE_BASELINE.md](./docs/SOURCE_BASELINE.md)。
 

@@ -1392,9 +1392,9 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     expect((await readAnimation(image)).name).toBe("none");
   });
 
-  test("keeps a failed SourceReader image fallback stable and retries on a new page DOM without geometry motion", async ({ page, audit }, testInfo) => {
+  test("falls back to citation text when a published SourceReader page fails and recovers on the next page", async ({ page, audit }, testInfo) => {
     const failedResource = "Failed to load resource: the server responded with a status of 404 (Not Found)";
-    const failedSourceAsset = "**/assets/textbook/biology-lesson-meiosis-1.webp";
+    const failedSourceAsset = "**/assets/textbook/pages/page_011.jpeg";
     await page.route(failedSourceAsset, (route) => route.fulfill({ status: 404, body: "missing source page" }));
     await openStudy(page);
     const chapterToggle = page.locator("#study-chapter-c2-toggle");
@@ -1402,10 +1402,10 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     const sectionToggle = page.locator("#study-section-c2s1-toggle");
     if (await sectionToggle.getAttribute("aria-expanded") !== "true") await sectionToggle.click();
     await openSourceFromStudy(page);
-    const fallback = page.locator(".source-page-fallback");
+    const fallback = page.locator(".source-page-text-document");
     await expect(fallback).toBeVisible();
+    await expect(fallback).not.toBeEmpty();
     await expect.poll(() => audit.consoleErrors.length, { message: "SourceReader failure emits explicit 404 evidence" }).toBeGreaterThan(0);
-    await expect(fallback).toHaveAttribute("data-motion-image-state", "failed");
     expect((await readAnimation(fallback)).name, "failed source page has no image animation residue").toBe("none");
     const before = await fallback.boundingBox();
     if (!before) throw new Error("failed SourceReader fallback has no geometry");
@@ -1427,8 +1427,8 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
     expect(audit.consoleErrors.every((message) => message === failedResource), "only explicitly routed image failures are acknowledged").toBe(true);
     testInfo.annotations.push({
-      type: "acknowledged-source-reader-404",
-      description: `${audit.consoleErrors.length} routed source/cover requests intentionally failed before SourceReader retry`
+      type: "acknowledged-source-reader-text-fallback",
+      description: `${audit.consoleErrors.length} routed page requests intentionally failed before SourceReader text fallback and retry`
     });
     audit.consoleErrors.splice(0);
   });

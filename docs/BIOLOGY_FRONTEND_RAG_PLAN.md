@@ -288,7 +288,7 @@ BM25-only 降级另有独立验收，不复用 hybrid 分数：50 条集中只�
 3. 第二阶段保留原 assistant.tool_calls，并按每个 tool_call_id 追加 role=tool 结果。
 4. citations 与 related_assets 仅来自实际注入 chunk 的并集，绝不接受模型生成的页码。
 
-来源图片必须同样真实：只有 source_type 为 extracted、source_chunk_ids 精确包含 citation chunk_id、具有 source_page_image_url，并且该 URL 位于 `src/data/published-citation-source-page-assets.json` 的 tracked + SHA-256 发布清单中的资产才可作为教材原页。ai_generated、裁剪 image_url、示意图、固定 fallback 图和未提交的 MinerU 页图均不得冒充教材页面。当前清单为空，因此无图来源路径是默认：来源面板仍显示真实页码、可选择摘录和做笔记；“查看该页”打开同一 citation chunk 的内置本地原文片段，而不是请求 `/assets/textbook/pages/*`。该内置原文视图在 citation 有 sourceText 时优先显示 citation 自带的实际 `chapter_title`；PDF 第 1–9 页的受控 title 是实际发布 descriptor “教材封面、前言与目录”，而非靠页码猜测第 1 章。`rag:validate:source-assets` 与 `rag:validate` 双向验证未来页图：每个清单项都必须存在、被 Git 跟踪并匹配 SHA-256；`public/assets/textbook/pages` 中每个支持格式的文件也都必须已登记。`npm run build` 在 Vite 复制前校验 `public`、复制后校验 `dist`，`android:sync` 还会校验 Android 的复制目标，因此空清单要求 public、dist、Android assets 和 APK 都没有任何此类页图，防止 clean clone/APK 中出现 404。原始页扫描若需要本机保留，只能位于 gitignored 的 `.cache/unpublished-textbook-pages`，不能由 demo 刷新流程写回 public。
+来源图片必须同样真实：只有 source_type 为 extracted、source_chunk_ids 精确包含 citation chunk_id、具有 source_page_image_url，并且该 URL 位于 `src/data/published-citation-source-page-assets.json` 的 tracked + SHA-256 发布清单中的资产才可作为教材原页。ai_generated、裁剪 image_url、示意图、固定 fallback 图和未提交的 MinerU 页图均不得冒充教材页面。当前清单登记示范教材全部 125 张整页图；“查看该页”按 bookId + pdfPage 精确解析清单并优先显示整页图，同一 citation chunk 的本地文字只在页图缺失或加载失败时回退。该视图在 citation 目标范围内显示 citation 自带的实际 `chapter_title`；PDF 第 1–9 页的受控 title 是实际发布 descriptor “教材封面、前言与目录”，而非靠页码猜测第 1 章。`rag:validate:source-assets` 与 `rag:validate` 双向验证页图：清单必须覆盖 1–125 页，每项都必须存在、被 Git 跟踪并匹配 SHA-256，`public/assets/textbook/pages` 中每个支持格式的文件也必须已登记。`npm run build` 在 Vite 复制前校验 `public`、复制后校验 `dist`，`android:sync` 还会校验 Android 复制目标；未知书籍、越界页码和未登记页面不会生成 URL。原始页扫描的缓存仍只位于 gitignored 的 `.cache/unpublished-textbook-pages`，必须通过 `demo:publish-pages` 显式发布。
 
 ## 失败与降级
 
@@ -323,7 +323,7 @@ BM25-only 降级另有独立验收，不复用 hybrid 分数：50 条集中只�
 | 索引构建 | 已完成 | chunks、BM25、512D vectors、manifest |
 | 前端 Worker | 已完成 | textbookRag.worker.ts、TextbookRetriever |
 | 对话接入 | 已完成 | DeepSeekRag、DemoRepository 的按需接入 |
-| 教材页跳转与来源真实性 | 已完成 | citation 页码、内置无图原文视图、发布页图 tracked/hash 守卫 |
+| 教材页跳转与来源真实性 | 已完成 | citation 页码、125 张整页图优先、文字回退、发布页图 tracked/hash 守卫 |
 | 性能与降级 | 已完成 | Worker/索引时限、BM25 回退、缓存重试 |
 | 发布验证 | 自动化已完成 | scoped lint、完整 Vitest、build、E2E、Android sync/APK 检查 |
 
@@ -345,13 +345,13 @@ playwright test e2e/lesson-ai-chat.spec.ts
 已确认的结果：
 
 - 源校验通过，PDF 和 MinerU 都为 125 页，第 6 页恢复状态已记录。
-- rag:validate 与 rag:validate:source-assets 通过：171 chunks、125 页、54,112,227 bytes、hybrid 阈值 0.6037、BM25 降级阈值 58.6248；当前受发布清单认可的 citation 页图为 0 个，故所有 citation 使用可用的内置原文片段路径。本轮将 public 下遗留的 125 张 JPEG / 38,740,082 bytes 安全移动到可恢复、gitignored 的 `.cache/unpublished-textbook-pages`；清单为空时 public、dist、Android assets 和 APK 页图均为 0。新增双向 validator 回归覆盖未登记页图、空清单目录与已登记 tracked/hash 一致的 build-copy 情形。
+- rag:validate 与 rag:validate:source-assets 通过：171 chunks、125 页、54,112,227 bytes、hybrid 阈值 0.6037、BM25 降级阈值 58.6248；当前发布清单覆盖 125 张 JPEG / 38,740,082 bytes。发布脚本从 gitignored 缓存显式复制页图并生成 SHA-256，双向 validator 覆盖缺页、重复页、未登记页图、未跟踪文件、哈希错误以及 public/dist/Android build-copy 一致性。
 - 50 条 hybrid 评测达到发布门槛；独立 BM25 降级扫描也达到 1.0000 精确率、0 假 citation。固定哈希 helper 的 mutation 单测证明 content_list 或 middle 内容任意变化都会在解析前失败；校准 mutation 单测还证明降低 manifest lexical/hybrid 阈值、修改 evaluator 阈值或改写 evaluation-report 文件都会 fail-closed。另有 frontmatter mutation 回归：在 `missing_chapter_one_body=true` 时，seed、generated directory、corpus chunk 或 build-report 将 PDF 第 1–9 页映射为第 1 章均会失败；真实集成测试直接读取 generated chapters 与公开 PDF 第 1 页 chunk，确认查询“普通高中课程标准实验教科书遗传与进化”的覆盖证据生成标题“教材封面、前言与目录”，同时第 2 章命中仍保留真实章名。
-- scoped ESLint 通过；完整 Vitest 为 33 个文件、271 个测试通过，覆盖 Worker 不可创建、永久无响应软/硬超时、error、messageerror、默认浏览器 fetch receiver、BM25 回退/词法救援、索引失效和无可靠命中不伪造 citation；其中“你好”即使有非零 BM25 共现分数，也在 Worker 失败、超时和 hybrid 空命中的三个路径上返回空命中。新增回归还覆盖 manifest/evaluation 阈值篡改、evaluation artifact 重写、未跟踪/哈希错误或未登记的 citation 页资源、清单与 dist copy 的双向页图校验、复合/否定/概念夹带问题、数学/未知书与 biology 的 book/section 隔离、配置 Key 时非 biology 不直连 provider，以及离线回答与 citation quote 的一致性；还以服务端渲染验证前言/目录 citation 使用传入的真实 title 和实际 PDF 位置，并验证抽取摘录会跳过 OCR 问句提示、始终保持原文连续子串。
+- scoped ESLint 通过；完整 Vitest 为 34 个文件、280 个测试通过，覆盖 Worker 不可创建、永久无响应软/硬超时、error、messageerror、默认浏览器 fetch receiver、BM25 回退/词法救援、索引失效和无可靠命中不伪造 citation；其中“你好”即使有非零 BM25 共现分数，也在 Worker 失败、超时和 hybrid 空命中的三个路径上返回空命中。新增回归还覆盖 manifest/evaluation 阈值篡改、evaluation artifact 重写、未跟踪/哈希错误或未登记的 citation 页资源、清单与 dist copy 的双向页图校验、PDF 第 1、11、125 页清单解析、上一页/下一页边界、未知书籍不猜 URL、复合/否定/概念夹带问题、数学/未知书与 biology 的 book/section 隔离、配置 Key 时非 biology 不直连 provider，以及离线回答与 citation quote 的一致性；还以服务端渲染验证前言/目录 citation 使用传入的真实 title 和实际 PDF 位置，并验证抽取摘录会跳过 OCR 问句提示、始终保持原文连续子串。
 - DeepSeekRag 单测覆盖 Tool 协议、工具异常和 citation 边界；所有 provider 测试均 mock，未发送真实 DeepSeek 请求。
 - Headless Chromium 已用本地模型完成 on-device-hybrid-rag，返回 512 维语义命中；拦截记录中 Hugging Face、CDN 和 DeepSeek 外网请求均为 0。
-- lesson-ai-chat E2E 阻断 DeepSeek、Hugging Face、jsDelivr 和未发布的 `/assets/textbook/pages/*`；默认无 Key 的复合/概念夹带问题不产生 citation，可靠本地命中仍显示页码且“查看该页”打开内置原文片段。它还断言噬菌体问题的离线回答含实质教材原文、不会退化为“这一结果说明了什么”式的提问提示，并且跳转后仍显示同一 citation 页码。
-- npm run android:sync 和 JBR 21 的 assembleDebug 均成功。APK 位于 android/app/build/outputs/apk/debug/app-debug.apk，大小 111,708,874 bytes，SHA-256 为 cba9310956e1095b8ea708d044b22ec5b868e522f788e61f3d519f4fbc3d2b13；解包后 17/17 个 RAG asset 与 public/rag 哈希全部一致，核心 corpus（manifest、chunks、BM25、vectors、页映射、两份报告、评测集）、模型、tokenizer 和 WASM 均存在。citation 页图发布清单为 0，public、dist、Android assets 与 APK 的 `assets/public/assets/textbook/pages/` 都为 0；最终审计未发现 PDF、`.cache`、local.properties、.env、MinerU 原始 `content_list`/`middle` 或 RAG tmp 条目（正式发布的 `mineru_*.jpg/png` 教材插图不被误判为原始缓存）。
+- lesson-ai-chat E2E 阻断 DeepSeek、Hugging Face 和 jsDelivr；默认无 Key 的复合/概念夹带问题不产生 citation，可靠本地命中仍显示页码且“查看该页”打开已发布的本地整页图。它还断言噬菌体问题的离线回答含实质教材原文、不会退化为“这一结果说明了什么”式的提问提示，并且跳转后仍显示同一 citation 页码。
+- npm run android:sync 和 JBR 21 的 assembleDebug 均成功。APK 位于 android/app/build/outputs/apk/debug/app-debug.apk，大小 111,383,943 bytes，SHA-256 为 ffd205cc3ae0727aa4f040abf79273f1bd5237786d1b2e300ca32291d9318c53；APK 内 `assets/public/assets/textbook/pages/` 含 125 张、38,740,082 bytes 的教材整页图，与 public 逐张 SHA-256 比较为 0 个差异。解包后 17/17 个 RAG asset 与 public/rag 哈希全部一致，核心 corpus（manifest、chunks、BM25、vectors、页映射、两份报告、评测集）、模型、tokenizer 和 WASM 均存在；最终审计未发现 PDF、`.cache`、local.properties、.env、MinerU 原始 `content_list`/`middle` 或 RAG tmp 条目（正式发布的 `mineru_*.jpg/png` 教材插图不被误判为原始缓存）。
 
 已完成自动化验证；发布前仍需人工保留以下真机证据：
 

@@ -77,16 +77,27 @@ export function assertPublishedCitationSourcePageAssets({
 }) {
   assert(assetManifest?.schema_version === 1, "Published citation source asset manifest schema is unsupported.");
   assert(Array.isArray(assetManifest.assets), "Published citation source asset manifest must contain an assets array.");
+  assert(typeof assetManifest.book_id === "string" && assetManifest.book_id.trim(), "Published citation source asset manifest must identify its book.");
+  assert(Number.isInteger(assetManifest.page_count) && assetManifest.page_count >= 0, "Published citation source asset manifest page count is invalid.");
+  assert(assetManifest.assets.length === assetManifest.page_count, "Published citation source asset manifest page count does not match its assets.");
   const seenUrls = new Set();
+  const seenPages = new Set();
 
   assetManifest.assets.forEach((asset, index) => {
     assert(asset && typeof asset === "object", `Published citation source asset ${index} is invalid.`);
     const url = asset.url;
     const expectedHash = asset.sha256;
+    assert(asset.book_id === assetManifest.book_id, `Published citation source asset ${index} belongs to the wrong book.`);
+    assert(
+      Number.isInteger(asset.pdf_page) && asset.pdf_page >= 1 && asset.pdf_page <= assetManifest.page_count,
+      `Published citation source asset ${index} has an invalid PDF page.`
+    );
     assert(typeof url === "string" && url.trim().length > 1, `Published citation source asset ${index} has no URL.`);
     assert(typeof expectedHash === "string" && /^[a-f0-9]{64}$/iu.test(expectedHash), `Published citation source asset ${url} has no SHA-256.`);
     assert(!seenUrls.has(url), `Published citation source asset URL is duplicated: ${url}`);
+    assert(!seenPages.has(asset.pdf_page), `Published citation source asset PDF page is duplicated: ${asset.pdf_page}`);
     seenUrls.add(url);
+    seenPages.add(asset.pdf_page);
 
     const absolutePath = publishedAssetPath(publicDirectory, url);
     const trackedAbsolutePath = publishedAssetPath(trackedPublicDirectory, url);
@@ -96,6 +107,10 @@ export function assertPublishedCitationSourcePageAssets({
     assert(sha256(readFileSync(trackedAbsolutePath)) === expectedHash, `Published citation source asset SHA-256 mismatch: ${url}`);
     assert(sha256(readFileSync(absolutePath)) === expectedHash, `Published citation source asset SHA-256 mismatch: ${url}`);
   });
+
+  for (let page = 1; page <= assetManifest.page_count; page += 1) {
+    assert(seenPages.has(page), `Published citation source asset manifest is missing PDF page ${page}.`);
+  }
 
   const publishedPageDirectory = resolve(publicDirectory, ".", PUBLISHED_SOURCE_PAGE_URL_PREFIX.slice(1));
   const discoveredPageAssets = supportedPageImages(publishedPageDirectory);

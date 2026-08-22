@@ -208,6 +208,8 @@ export function LessonScreen() {
   const activeLiveChapter = liveChapter;
 
   function openCitationSource(blockTitle: string, citation: LessonCitation) {
+    const sourceChunk = liveChunks.find((chunk) => chunk.chunk_id === citation.chunk_id);
+    const sourceText = sourceChunk?.text.trim() || citation.quote?.trim() || "";
     const source = {
       bookId: activeUploadedFile.bookId,
       title: blockTitle,
@@ -215,15 +217,15 @@ export function LessonScreen() {
       pageEnd: citation.page_end,
       printedPageStart: citation.printed_page_start,
       printedPageEnd: citation.printed_page_end,
+      sourceText: sourceText || undefined,
       from: "lesson"
     } as const;
-    const sourceChunk = liveChunks.find((chunk) => chunk.chunk_id === citation.chunk_id);
     openSheet({
       type: "source",
       title: blockTitle,
       page: detailedCitationPageLabel(citation),
       image: sourcePageImageUrl(activeUploadedFile.bookId, citation.page_start),
-      text: sourceChunk?.text.trim() || citation.quote?.trim() || undefined,
+      text: sourceText || undefined,
       source
     });
   }
@@ -235,6 +237,11 @@ export function LessonScreen() {
     }
     if (asset.source_type !== "extracted") return;
     const printedPage = assetPrintedPage(asset);
+    const sourceText = liveChunks
+      .filter((chunk) => chunk.page_start <= asset.page && asset.page <= chunk.page_end)
+      .map((chunk) => chunk.text.trim())
+      .filter(Boolean)
+      .join("\n\n");
     const source = {
       bookId: activeUploadedFile.bookId,
       title: asset.caption,
@@ -242,13 +249,9 @@ export function LessonScreen() {
       pageEnd: asset.page,
       printedPageStart: printedPage ?? undefined,
       printedPageEnd: printedPage ?? undefined,
+      sourceText: sourceText || undefined,
       from: "lesson"
     } as const;
-    const sourceText = liveChunks
-      .filter((chunk) => chunk.page_start <= asset.page && asset.page <= chunk.page_end)
-      .map((chunk) => chunk.text.trim())
-      .filter(Boolean)
-      .join("\n\n");
     const page = typeof printedPage === "number"
       ? `教材${sourcePageLabel(printedPage)}（PDF ${sourcePageLabel(asset.page)}）`
       : `教材${sourcePageLabel(asset.page)}`;

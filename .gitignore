@@ -14,7 +14,6 @@ source-pdfs/
 .npm-cache/
 tmp/
 .venv-mineru/
-public/assets/textbook/pages/
 public/assets/textbook/figures/
 public/rag/**/*.tmp
 

@@ -22,7 +22,7 @@
 5. 客户端 BYOK 仅是个人短期调试能力，绝不是可安全分发的生产密钥方案。
 6. 最终学生界面不展示模型名、Tool Call、检索评分、Demo RAG 等内部实现词；仅在有可靠来源时显示教材页码和查看入口。
 
-ai_generated 资产、教材裁剪图或示意图均不能被当作“教材原页”。当前发布清单为空：本轮不发布原始教材页位图；125 张、38,740,082 bytes 的本机原始页扫描仅保存在 gitignored 的 `.cache/unpublished-textbook-pages`，因此任何 MinerU 本机路径都不会被选择。当 citation 没有合格的发布页图时，CitationCard 不展示任意固定教材插图；用户点击“查看该页”会打开内置的、由同一 citation chunk 生成的本地教材原文片段视图，保留真实教材/PDF 页码、可选择文字和做笔记入口，且绝不请求可能在 clean clone 中 404 的 `/assets/textbook/pages/*` 路径。发布检查双向验证清单和 `public/assets/textbook/pages`：未登记页图会在 build 前失败，输出到 dist/Android assets 后还会再校验；当前 public、dist、Android assets 与 APK 的页图计数均为 0。
+ai_generated 资产、教材裁剪图或示意图均不能被当作“教材原页”。当前发布清单登记了示范教材全部 125 张、38,740,082 bytes 的整页扫描；`demo:publish-pages` 从 gitignored 的 `.cache/unpublished-textbook-pages` 显式复制正式文件并逐张计算 SHA-256。阅读器只接受与 citation 的 bookId、pdfPage 精确匹配的清单项，页图优先显示，同一 citation chunk 的本地教材文字仅在页图缺失或加载失败时回退；未知书籍、越界页码和未登记页面绝不生成猜测 URL。发布检查双向验证清单和 `public/assets/textbook/pages`：未登记、未跟踪、缺页或哈希不一致会在 build 前失败，输出到 dist/Android assets 后还会再次校验。
 
 ## 两阶段数据流
 
@@ -147,11 +147,11 @@ type RagResponse = {
 | Tool 调用且可靠命中 | 2 | 仅本地注入 chunks | 仅 source_chunk_ids 关联到这些 chunks 的资产 | medium 或 high |
 | Tool 调用但无可靠命中 | 2 | 空数组 | 空数组 | low |
 | 无 Key 的离线问候 | 0 | 空数组 | 空数组 | low |
-| 无 Key 的 biology 教材问题 | 0 | 仅完整静态语料的可靠命中 | 当前无发布页图；为本地 chunk 原文视图 | high 或 low |
+| 无 Key 的 biology 教材问题 | 0 | 仅完整静态语料的可靠命中 | 已发布整页图优先；本地 chunk 原文回退 | high 或 low |
 
 Citation 的 page、location_label、quote、chunk_id 和 source_metadata 由 createLocalCitation 通过 ApiChunk 和 ApiChapter 生成。模型没有任何输入字段可直接控制这些值。
 
-ChatSheetContent 为 citation 保存真实的 bookId 与 pdfPage，以及由 `createLocalCitation` 保存的 `retrieved_chunk_text`。它只会采用 source_type=extracted、与 citation.chunk_id 精确关联、存在 source_page_image_url、并且通过 `published-citation-source-page-assets.json` 的 tracked/hash 校验的资产。若没有这样的已发布资产，卡片缩略图保持为空，来源面板不渲染图片，而是显示受控摘录、可选择文字和“做笔记”流程；“查看该页”使用同一受控 chunk 的内置原文片段视图，并按 citation 的 bookId 和 pdfPage 显示真实位置，不使用 image_url 裁剪图、AI 图、固定示意图或本机页图路径。该视图有 sourceText 时以 citation 传入的实际 `chapter_title` 为标题，而不是按 PDF 页码猜章节；并且方案二的权威 seed/generated directory/manifest 明确把 PDF 1–9 页标为 `frontmatter` / “教材封面、前言与目录”，所以真实 citation 链路也不会把它们误标成缺失正文的第 1 章。
+ChatSheetContent 为 citation 保存真实的 bookId、pdfPage，以及由 `createLocalCitation` 保存的 `retrieved_chunk_text`。来源入口只采用 source_type=extracted、与 citation.chunk_id 精确关联并通过 `published-citation-source-page-assets.json` tracked/hash 校验的资产；全屏阅读器再以 citation 的 bookId 与 pdfPage 精确解析发布清单。匹配成功时显示真正的整页图；页图缺失或加载失败时才显示同一 chunk 的受控原文片段，并保留可选择文字和“做笔记”流程。它不使用 image_url 裁剪图、AI 图、固定示意图、本机路径或未登记页面的猜测 URL。该视图在 citation 目标范围内沿用传入的实际 `chapter_title`；方案二的权威 seed/generated directory/manifest 明确把 PDF 1–9 页标为 `frontmatter` / “教材封面、前言与目录”，所以真实 citation 链路不会把它们误标成缺失正文的第 1 章。
 
 ## 系统规则
 
@@ -206,8 +206,8 @@ ChatSheetContent 为 citation 保存真实的 bookId 与 pdfPage，以及由 `cr
 - search_textbook 的本地全候选排序、当前章节轻量加权、阈值、Top-K 限制和 Tool 回传。
 - 第二阶段的 assistant.tool_calls 与 role=tool/tool_call_id 协议消息。
 - 从实际注入 chunks 重建 citations，并将资产限制为 source_chunk_ids 精确关联。
-- ChatSheet 的“教材原页”只接受与 citation.chunk_id 精确关联、source_type=extracted 且位于受跟踪/哈希校验发布清单中的 source_page_image_url；AI 生成图、资产 image_url 裁剪图、本机 MinerU 页图和任何固定回退图均不会进入来源面板。
-- 没有合格原页图时，来源面板与全屏“查看该页”仍显示 citation 页码、可选择的受控摘录、做笔记动作和同一 chunk 的内置本地原文片段；入口不依赖未发布的 PDF 页图。
+- ChatSheet 的“教材原页”只接受与 citation.chunk_id 精确关联、source_type=extracted 且位于受跟踪/哈希校验发布清单中的 source_page_image_url；AI 生成图、资产 image_url 裁剪图、本机 MinerU 路径和任何固定回退图均不会进入来源面板。
+- 全屏“查看该页”按 bookId + pdfPage 从发布清单解析整页图；页图是主视图，同一 chunk 的内置文字是故障回退。未知书籍或未登记页不会请求猜测路径。
 - 无效 Tool 参数、未知 Tool、低相关命中、空内容、无 Key 和网络错误的受控处理。
 - 无 Key 的离线问候、完整静态语料的可靠命中，以及无命中时无引用的保守回退；不再存在固定教材 evidence-card。
 - 读取 .env.local 的配置与 README 安全说明。
@@ -232,11 +232,11 @@ Vitest 覆盖应至少验证：
 6. 缺少 Key 时在任何 fetch 前失败为受控配置错误。
 7. 离线 Demo 的“你好”“嗨”“早上好”都返回正常聊天与空引用；浏览器中的明确 biology 教材问题只使用方案二静态索引或其安全降级。数学书、未知书、复合问题、否定问题和概念夹带都不能触发 biology 固定 citation；可靠离线答案必须逐字由实际命中、book_id/section_id 对应当前书本的 chunk citation quote 支持。
 8. Citation 的教材页和 PDF 页与 fixture 的 source_metadata 一致，而非模型输出。
-9. Playwright 默认无 Key 场景阻断 DeepSeek、Hugging Face、CDN 和未发布教材页图请求；它断言零外联，并验证无可靠复合问题无 citation、可靠完整语料命中显示真实页码且“查看该页”打开内置本地原文片段。
+9. Playwright 默认无 Key 场景阻断 DeepSeek、Hugging Face 和 CDN；它断言零外联，并验证无可靠复合问题无 citation、可靠完整语料命中显示真实页码且“查看该页”加载已发布的本地整页图。
 10. 第一阶段缺少 choices、第一阶段没有 content 且没有 tool_calls、以及第二阶段空 content 都抛出受控 DeepSeekDirectError，不返回半成品 citations。
 11. 多个 Tool Call 都有相同数量的 role=tool/tool_call_id 回传消息；可靠片段按稳定 ID 去重并受 Top-K 限制，最终 citation 与 related_assets 仅来自实际 Tool sources 的并集。
 12. HTTP 401/429 与 fetch 网络异常映射为受控用户错误，错误内容不得包含 Key、请求体或 provider 原始诊断。
-13. related_assets 为空时，CitationCard 不得显示固定教材插图；“查看该页”必须由 citation 的真实 PDF 页定位，并显示可选择摘录及做笔记入口，不得尝试加载未发布页图。
+13. related_assets 为空时，CitationCard 不得显示固定教材插图；“查看该页”仍必须由 citation 的真实 PDF 页定位，从独立发布清单加载整页图，并保留可选择摘录及做笔记入口作为回退。
 14. 纯函数测试验证 ai_generated 资产和只有裁剪 image_url 的资产均不能作为教材原页；只有与 citation.chunk_id 精确关联、且经发布清单验证的 extracted.source_page_image_url 才可被采用。clean-tree 资源校验必须同时验证文件存在、Git tracked 和 SHA-256。
 15. book/section 隔离测试验证数学书、未知书和 biology 书中包含“第二次”“例”“受精作用”的输入不会触发固定 biology citation；只有当前 book_id、有效 chapter/section 层级和实际检索命中同时成立时才可生成 citation。
 16. SourceReader 服务端渲染测试验证 PDF 1–9 的前言/目录 citation 不显示“第 1 章 遗传因子的发现”，实际 chapter citation 显示传入的 citation title 和实际 PDF 位置；同时真实链回归直接读取 generated chapters 与公开 PDF 第 1 页 frontmatter chunk，再由 createLocalCitation 生成来源，断言标题为“教材封面、前言与目录”，并确认实际第 2 章 chunk 仍显示真实章名。摘录测试验证问句开头 chunk 会选择实质原文、普通陈述保持原文、全短片段受控回退，并且离线答案严格等于 citation quote。
