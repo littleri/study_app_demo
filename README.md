@@ -14,6 +14,43 @@ npm run demo:validate
 npm run dev
 ```
 
+## Android debug APK（Capacitor）
+
+仓库已经包含 Capacitor 的 `android/` 原生工程。根路径 `/` 现在始终打开真实 App；仅在需要设计验收时，使用 `/?preview=device-preview` 打开设备预览工作台。
+
+在第一次打开 Android Studio 前，先在本仓库运行：
+
+```powershell
+npm ci
+npm run android:sync
+npx cap doctor
+```
+
+这会构建 Web 应用并把它同步到 `android/`。之后用 Android Studio 打开 [android](./android) 文件夹，等待 Gradle 同步完成，再通过 **Run** 安装到真机；也可以在 SDK、JDK 和 `adb` 配置完成后使用：
+
+```powershell
+npm run android:run
+# 或构建 debug APK
+npm run android:apk
+```
+
+每次修改前端代码后，都先执行一次 `npm run android:sync`，再从 Android Studio 运行或重新构建 APK。
+真机验收项目见 [docs/ANDROID_DEBUG_CHECKLIST.md](./docs/ANDROID_DEBUG_CHECKLIST.md)。
+
+### 临时 DeepSeek 直连（个人 BYOK）
+
+默认是完全离线的演示回答：未配置 Key 时，聊天界面和 Android debug APK 都不会访问网络。简单问候会得到普通聊天回复且不显示教材引用；明确的教材问题仍使用固定演示答案与本地页码。
+
+如需本人短期调试直连，在 gitignored 的 `.env.local` 中创建以下内容后重新执行 `npm run android:sync`：
+
+```text
+VITE_DEEPSEEK_API_KEY=your_short_lived_personal_key
+```
+
+直连模式采用两阶段调用：第一请求只发送系统规则、有限对话历史、用户问题和 `search_textbook` 工具定义；模型对闲聊可直接回答。只有模型请求教材工具时，前端才在本地片段中全书检索，并在结果达到可靠性阈值后把有限片段作为工具结果回传。教材页码和引用始终由本地元数据生成，不由模型生成。
+
+`VITE_DEEPSEEK_API_KEY` 会在 Vite 构建时进入浏览器或 APK 客户端产物，任何拿到产物的人都可能提取它。因此 BYOK 仅适合本人短期调试：不要提交 `.env.local`、不要分发包含该 Key 的构建，测试结束后立即撤销 Key。面向其他用户的版本必须改为服务端或 Serverless 代理。
+
 从相邻 `study_app` 后端正式包刷新目录、125 张原文页图和全部 MinerU 配图：
 
 ```powershell
@@ -33,7 +70,7 @@ npm run demo:refresh
 
 ## 仓库原则
 
-- 运行时不依赖真实后端、账号、网络或在线 AI。
+- 默认运行时不依赖真实后端、账号、网络或在线 AI；只有开发者在 gitignored 的 `.env.local` 设置短期个人 Key 时，课程内问答才会直连 DeepSeek。
 - PDF 只在构建内容时作为本地输入，不提交原始教材到 Git。
 - 演示数据、解析进度、交互路径和动画节奏均可复现；上传时间和聊天消息 ID 仅用于 UI 展示，不作为课程结果的一部分。
 - 不改动源仓库；迁移只读取经确认的源文件快照。

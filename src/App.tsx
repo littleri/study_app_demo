@@ -12,6 +12,11 @@ import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./conte
 import { communityBooks } from "./data/mockBook";
 import { useBookCourseRepository } from "./context/BookCourseRepositoryContext";
 import { demoRepository } from "./services/DemoRepository";
+import {
+  dismissNativeKeyboardIfFocused,
+  minimizeNativeAndroidApp,
+  registerAndroidBackButton
+} from "./platform/nativeApp";
 import { globalMotionFallbackMs, ScreenTransition, useMotionPresence } from "./motion";
 import {
   createInitialNavigation,
@@ -336,6 +341,25 @@ export default function App() {
   const closeSheet = useCallback(() => {
     requestSheetClose(true);
   }, [requestSheetClose]);
+
+  useEffect(() => registerAndroidBackButton(() => {
+    // Give local dialogs (the global AI assistant, for example) the first
+    // chance to consume Android's hardware/system back event.
+    const dialogEvent = new CustomEvent("bookcourse:native-back", { cancelable: true });
+    window.dispatchEvent(dialogEvent);
+    if (dialogEvent.defaultPrevented) return;
+
+    if (dismissNativeKeyboardIfFocused()) return;
+    if (sheetRequestedRef.current || sheet) {
+      closeSheet();
+      return;
+    }
+    if (navigationRef.current.history.length > 0) {
+      back();
+      return;
+    }
+    minimizeNativeAndroidApp();
+  }), [back, closeSheet, sheet]);
 
   const captureSheetTrigger = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     // A closing sheet deliberately clears the requested value while its frozen

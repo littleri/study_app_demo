@@ -26,6 +26,7 @@ import { useMouseDragScroll } from "../hooks/useMouseDragScroll";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { IosStatusBar } from "./IosStatusBar";
+import { getRuntimePlatform } from "../platform/nativeApp";
 
 gsap.registerPlugin(useGSAP);
 
@@ -398,6 +399,8 @@ export function AppShell({
   hideNav?: boolean;
 }) {
   const deviceLayout = useDeviceLayout();
+  const runtimePlatform = getRuntimePlatform();
+  const isNativeAndroid = runtimePlatform === "android";
   const mouseDragScroll = useMouseDragScroll();
   const appShellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -466,8 +469,12 @@ export function AppShell({
     <PadChrome />
   ) : (
     <PhoneChrome>
-      <IosStatusBar />
-      <HomeIndicator />
+      {isNativeAndroid ? null : (
+        <>
+          <IosStatusBar />
+          <HomeIndicator />
+        </>
+      )}
     </PhoneChrome>
   );
 
@@ -480,6 +487,7 @@ export function AppShell({
         aria-label="BookCourse AI 应用"
         data-active-screen={active}
         data-device-layout={deviceLayout}
+        data-runtime-platform={runtimePlatform}
         data-motion-reduced={motionReduced ? "true" : "false"}
         data-mouse-dragging={mouseDragScroll.dragging ? "true" : "false"}
         onClickCapture={(event) => {

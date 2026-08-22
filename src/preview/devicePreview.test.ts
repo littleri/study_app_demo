@@ -83,14 +83,14 @@ describe("device preview geometry", () => {
     });
   });
 
-  it("builds a canonical workbench link without legacy entry parameters", () => {
+  it("builds an explicit workbench link while retaining unrelated parameters", () => {
     expect(buildPreviewSearch({
       device: "ipad-pro-11",
       orientation: "landscape",
       quality: "4k",
       chrome: false
     }, "?preview=devices&source=lesson-2")).toBe(
-      "?source=lesson-2&device=ipad-pro-11&orientation=landscape&quality=4k&chrome=0"
+      "?source=lesson-2&device=ipad-pro-11&orientation=landscape&quality=4k&chrome=0&preview=device-preview"
     );
   });
 });

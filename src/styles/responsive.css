@@ -226,6 +226,18 @@ body {
   min-height: var(--touch-target-min);
 }
 
+/* The browser preview deliberately retains its iPhone frame. A real Android
+   Capacitor build uses the operating system's status/navigation bars instead,
+   so it must not reserve the fixed iPhone chrome dimensions. */
+.app-shell[data-runtime-platform="android"] {
+  --status-bar-height: env(safe-area-inset-top, 0px);
+  --home-indicator-height: 0px;
+  --safe-area-top: var(--status-bar-height);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
 .ai-overlay-layer {
   position: absolute;
   z-index: 45;
@@ -309,6 +321,12 @@ body {
 .ai-message-list {
   max-height: none;
   margin-top: 0;
+}
+
+@media (max-width: 420px) {
+  #ai-assistant-dialog .ai-message {
+    max-width: calc(100% - 44px);
+  }
 }
 
 .ai-mode-row {

@@ -187,6 +187,9 @@ export function buildPreviewSearch(settings: PreviewSettings, currentSearch = ""
   params.set("orientation", settings.orientation);
   params.set("quality", settings.quality);
   params.set("chrome", settings.chrome ? "1" : "0");
+  // The production root renders the actual app. Keep the preview route
+  // explicit whenever the workbench updates its recording parameters.
+  params.set("preview", "device-preview");
   params.delete("embedded");
   return `?${params.toString()}`;
 }

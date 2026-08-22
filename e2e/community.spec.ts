@@ -148,87 +148,89 @@ test.describe("community discovery", () => {
     expect(bookCourseApi.pageErrors, "community emits no page errors").toEqual([]);
   });
 
-  test("opens the Figma-style course keyboard from search and keeps its controls functional", async ({ page, bookCourseApi }) => {
+  test("uses the system search keyboard without rendering the former demo keyboard", async ({ page, bookCourseApi }) => {
     await openCommunity(page);
 
     const search = page.getByRole("searchbox", { name: "搜索课程", exact: true });
-    await expect(search).toHaveAttribute("inputmode", "none");
-    await expect(search).toHaveAttribute("aria-expanded", "false");
+    const demoKeyboard = page.getByRole("region", { name: "课程搜索键盘", exact: true });
+    await expect(search).toHaveAttribute("inputmode", "search");
+    await expect(search).toHaveAttribute("enterkeyhint", "search");
+    await expect(search).not.toHaveAttribute("aria-controls", /.+/);
+    await expect(search).not.toHaveAttribute("aria-expanded", /.+/);
+    await expect(demoKeyboard).toHaveCount(0);
+
     await search.click();
+    await expect(search).toBeFocused();
+    await expect(demoKeyboard).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "主导航", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toBeVisible();
 
-    const keyboard = page.getByRole("region", { name: "课程搜索键盘", exact: true });
-    await expect(keyboard).toBeVisible();
-    await expect(search).toHaveAttribute("aria-expanded", "true");
-    await expect(page.getByRole("navigation", { name: "主导航", exact: true })).toBeHidden();
-    await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toBeHidden();
-    await expect(keyboard.locator(".community-keyboard-row-top button")).toHaveCount(10);
-    await expect(keyboard.locator(".community-keyboard-row-middle button")).toHaveCount(9);
-    await expect(keyboard.locator(".community-keyboard-row-lower button")).toHaveCount(9);
-    await expect(keyboard.locator(".community-keyboard-row-bottom button")).toHaveCount(3);
-    await expect(page.getByRole("button", { name: "插入表情", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "语音输入暂不可用", exact: true })).toBeDisabled();
-
-    const keyboardStyles = await keyboard.evaluate((element) => {
-      const style = getComputedStyle(element);
-      const submit = element.querySelector<HTMLElement>(".community-keyboard-submit-key");
-      const buttons = Array.from(element.querySelectorAll<HTMLElement>("button"));
-      const app = element.closest<HTMLElement>(".app-shell");
-      if (!submit || !app) throw new Error("Community keyboard layout is incomplete");
-      return {
-        backgroundColor: style.backgroundColor,
-        boxShadow: style.boxShadow,
-        bottom: style.bottom,
-        position: style.position,
-        zIndex: style.zIndex,
-        submitBackgroundColor: getComputedStyle(submit).backgroundColor,
-        submitColor: getComputedStyle(submit).color,
-        minButtonHeight: Math.min(...buttons.map((button) => button.getBoundingClientRect().height)),
-        horizontalOverflow: app.scrollWidth > app.clientWidth
-      };
-    });
-    expect(keyboardStyles).toMatchObject({
-      backgroundColor: "rgb(215, 219, 225)",
-      bottom: "0px",
-      position: "absolute",
-      zIndex: "44",
-      submitBackgroundColor: "rgb(10, 132, 255)",
-      submitColor: "rgb(255, 255, 255)",
-      horizontalOverflow: false
-    });
-    expect(keyboardStyles.boxShadow).not.toBe("none");
-    const minimumKeyboardButtonHeight = (page.viewportSize()?.height ?? 501) <= 500 ? 31.5 : 43.5;
-    expect(keyboardStyles.minButtonHeight).toBeGreaterThanOrEqual(minimumKeyboardButtonHeight);
-
-    await page.getByRole("button", { name: "字母 q", exact: true }).click();
-    await expect(search).toHaveValue("q");
-    await page.getByRole("button", { name: "开启大写", exact: true }).click();
-    await page.getByRole("button", { name: "字母 w", exact: true }).click();
-    await expect(search).toHaveValue("qW");
-    await page.getByRole("button", { name: "退格", exact: true }).click();
-    await expect(search).toHaveValue("q");
-    await page.getByRole("button", { name: "空格", exact: true }).click();
-    await expect(search).toHaveValue("q ");
-    await page.getByRole("button", { name: "插入表情", exact: true }).click();
-    await expect(search).toHaveValue("q 😊");
-    await page.getByRole("button", { name: "建议：生物", exact: true }).click();
+    await search.fill("生物");
     await expect(search).toHaveValue("生物");
     const biologyResults = page.locator('.community-grid .community-book-card[data-community-subject="生物"]');
     await expect(biologyResults).toHaveCount(2);
     await expect(page.locator(".community-grid .community-book-card")).toHaveCount(2);
 
-    await page.getByRole("button", { name: "完成搜索", exact: true }).click();
-    await expect(keyboard).toHaveCount(0);
-    await expect(search).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByRole("navigation", { name: "主导航", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toBeVisible();
+    await search.press("Enter");
+    await expect(search).not.toBeFocused();
+    await expect(demoKeyboard).toHaveCount(0);
 
-    await search.click();
-    await expect(page.getByRole("region", { name: "课程搜索键盘", exact: true })).toBeVisible();
-    await search.press("Escape");
-    await expect(page.getByRole("region", { name: "课程搜索键盘", exact: true })).toHaveCount(0);
+    expect(bookCourseApi.consoleErrors, "native course search emits no console errors").toEqual([]);
+    expect(bookCourseApi.pageErrors, "native course search emits no page errors").toEqual([]);
+  });
 
-    expect(bookCourseApi.consoleErrors, "course keyboard emits no console errors").toEqual([]);
-    expect(bookCourseApi.pageErrors, "course keyboard emits no page errors").toEqual([]);
+  test("grounds the global assistant in offline Demo RAG and preserves conversation turns", async ({ page, bookCourseApi }) => {
+    let directDeepSeekRequests = 0;
+    await page.route("https://api.deepseek.com/chat/completions", async (route) => {
+      directDeepSeekRequests += 1;
+      await route.abort("blockedbyclient");
+    });
+
+    await openCommunity(page);
+    await page.getByRole("button", { name: "打开 AI 助手", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "AI 导学助手", exact: true });
+    await expect(dialog).toContainText("减数分裂和受精作用");
+    await expect(dialog.locator(".ai-current-book-body > p")).toHaveCount(0);
+    const input = dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true });
+    const suggestions = dialog.locator(".ai-suggestions");
+    await expect(suggestions).toBeVisible();
+
+    await input.fill("减数分裂为什么只复制一次却分裂两次？");
+    await expect(suggestions).toHaveCount(0);
+    await dialog.getByRole("button", { name: "发送", exact: true }).click();
+    await expect(dialog).toContainText("同源染色体可以理解成一对来源不同");
+    const firstUserBubble = dialog.locator(".ai-message-row.user .ai-message.user").first();
+    const firstAiBubble = dialog.locator(".ai-message-row.ai .ai-message.ai").first();
+    const firstCitationLinks = firstAiBubble.locator(".ai-message-citations");
+    await expect(firstCitationLinks).toContainText("来源于");
+    await expect(firstCitationLinks.getByRole("button", { name: "查看教材第 16 页", exact: true })).toBeVisible();
+    await expect(firstCitationLinks).not.toContainText("DeepSeek");
+    await expect(firstCitationLinks).not.toContainText("Demo RAG");
+    await expect(firstCitationLinks).not.toContainText("PDF");
+    await expect(firstUserBubble).toContainText("减数分裂为什么只复制一次却分裂两次？");
+    await expect(firstUserBubble.locator(".ai-message-author")).toHaveText("我");
+    await expect(firstAiBubble.locator(".ai-message-author")).toHaveText("AI 导学助手");
+    const bubbleLayout = await Promise.all([firstUserBubble, firstAiBubble].map(async (bubble) => ({
+      backgroundColor: await bubble.evaluate((element) => getComputedStyle(element).backgroundColor),
+      box: await bubble.boundingBox()
+    })));
+    expect(bubbleLayout[0]?.backgroundColor, "the user turn uses a distinct filled chat bubble")
+      .not.toBe(bubbleLayout[1]?.backgroundColor);
+    expect(bubbleLayout[0]?.box?.x ?? 0, "the user bubble is right aligned")
+      .toBeGreaterThan(bubbleLayout[1]?.box?.x ?? 0);
+
+    await input.fill("那第二次分裂具体发生什么？");
+    await dialog.getByRole("button", { name: "发送", exact: true }).click();
+    await expect(dialog).toContainText("姐妹染色单体");
+    await expect(dialog.locator(".ai-message-row.user")).toHaveCount(2);
+    await expect(dialog.locator(".ai-message-row.ai")).toHaveCount(2);
+    expect(directDeepSeekRequests, "the default offline demo never sends a DeepSeek request").toBe(0);
+    await firstCitationLinks.getByRole("button", { name: "查看教材第 16 页", exact: true }).click();
+    await expect(page.locator(".source-reader-screen")).toBeVisible();
+    await expect(page.locator(".source-reader-toolbar strong")).toHaveText("页 11");
+    expect(bookCourseApi.externalRequests, "the offline Demo RAG needs no external request").toEqual([]);
+    expect(bookCourseApi.consoleErrors, "grounded global assistant emits no console errors").toEqual([]);
+    expect(bookCourseApi.pageErrors, "grounded global assistant emits no page errors").toEqual([]);
   });
 
   test("keeps the two-column solid-surface system across paired viewports", async ({ page }, testInfo) => {
@@ -550,7 +552,9 @@ test.describe("community discovery", () => {
     await expect(overviewTab).toHaveAttribute("aria-selected", "false");
     await expect(detail.getByRole("tabpanel")).toContainText("重点整理得很清楚");
     await expect(detail.getByRole("tabpanel")).toContainText("导入后继续学习很方便");
-    await overviewTab.click();
+    await overviewTab.focus();
+    await expect(overviewTab).toBeFocused();
+    await overviewTab.press("Enter");
     await expect(overviewTab).toHaveAttribute("aria-selected", "true");
 
     const detailLayout = await detail.evaluate((element) => {

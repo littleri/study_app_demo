@@ -1,11 +1,11 @@
-import { StrictMode } from "react";
+import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { bookcourseApi } from "./api/bookcourseApi";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BookCourseRepositoryProvider } from "./context/BookCourseRepositoryContext";
 import { MotionHistoryProvider } from "./motion/MotionHistoryContext";
-import { DevicePreviewStudio } from "./preview/DevicePreviewStudio";
+import { configureNativeAppShell } from "./platform/nativeApp";
 import "./styles/tokens.css";
 import "./styles/glass.css";
 import "./styles/base.css";
@@ -24,15 +24,27 @@ import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
 
 const searchParams = new URLSearchParams(window.location.search);
-const isEmbeddedPreview = searchParams.get("embedded") === "device-preview";
-const Root = isEmbeddedPreview ? App : DevicePreviewStudio;
+const isPreviewStudio = searchParams.get("preview") === "device-preview";
+const DevicePreviewStudio = lazy(async () => {
+  const module = await import("./preview/DevicePreviewStudio");
+  return { default: module.DevicePreviewStudio };
+});
+
+// `/` is now the product entry point. The preview workbench remains available
+// to the design/recording workflow at `/?preview=device-preview`, while its
+// iframe keeps using `?embedded=device-preview` to render the inner app.
+void configureNativeAppShell();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <BookCourseRepositoryProvider repository={bookcourseApi}>
         <MotionHistoryProvider>
-          <Root />
+          {isPreviewStudio ? (
+            <Suspense fallback={<div className="device-preview-loading">正在加载设备预览…</div>}>
+              <DevicePreviewStudio />
+            </Suspense>
+          ) : <App />}
         </MotionHistoryProvider>
       </BookCourseRepositoryProvider>
     </ErrorBoundary>

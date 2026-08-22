@@ -7,9 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from "react";
-import { createPortal } from "react-dom";
 import { ChevronDown, Search, SearchX, X } from "lucide-react";
-import { CommunitySearchKeyboard } from "../components/CommunitySearchKeyboard";
 import { communityBooks } from "../data/mockBook";
 import { useAppContext } from "../context/AppContext";
 import { useLocalMotionItem } from "../motion";
@@ -25,7 +23,6 @@ export function CommunityScreen() {
   const discoveryMotion = useLocalMotionItem("community:discovery");
   const searchInputId = useId();
   const categoryMenuId = useId();
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const categoryListRef = useRef<HTMLDivElement>(null);
   const categoryDragRef = useRef<{
     pointerId: number;
@@ -37,7 +34,6 @@ export function CommunityScreen() {
   const [selectedCategory, setSelectedCategory] = useState<CommunityCategory>("推荐");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [categoryDragging, setCategoryDragging] = useState(false);
-  const [searchKeyboardOpen, setSearchKeyboardOpen] = useState(false);
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim();
   const visibleBooks = useMemo(
@@ -59,67 +55,18 @@ export function CommunityScreen() {
     setSelectedCategory("推荐");
     setQuery("");
     setCategoryMenuOpen(false);
-    setSearchKeyboardOpen(false);
   }
 
   function selectCategory(category: CommunityCategory) {
     setSelectedCategory(category);
     setQuery("");
     setCategoryMenuOpen(false);
-    setSearchKeyboardOpen(false);
-  }
-
-  function restoreSearchSelection(position: number) {
-    window.requestAnimationFrame(() => {
-      const input = searchInputRef.current;
-      if (!input) return;
-      input.focus({ preventScroll: true });
-      input.setSelectionRange(position, position);
-    });
-  }
-
-  function insertSearchText(text: string) {
-    const input = searchInputRef.current;
-    const start = input?.selectionStart ?? query.length;
-    const end = input?.selectionEnd ?? start;
-    const nextQuery = `${query.slice(0, start)}${text}${query.slice(end)}`;
-    setQuery(nextQuery);
-    restoreSearchSelection(start + text.length);
-  }
-
-  function deleteSearchText() {
-    const input = searchInputRef.current;
-    const start = input?.selectionStart ?? query.length;
-    const end = input?.selectionEnd ?? start;
-
-    if (start !== end) {
-      setQuery(`${query.slice(0, start)}${query.slice(end)}`);
-      restoreSearchSelection(start);
-      return;
-    }
-
-    if (start === 0) return;
-    const prefix = Array.from(query.slice(0, start));
-    prefix.pop();
-    const nextPrefix = prefix.join("");
-    setQuery(`${nextPrefix}${query.slice(end)}`);
-    restoreSearchSelection(nextPrefix.length);
-  }
-
-  function useSearchSuggestion(suggestion: string) {
-    setQuery(suggestion);
-    restoreSearchSelection(suggestion.length);
-  }
-
-  function closeSearchKeyboard() {
-    setSearchKeyboardOpen(false);
-    searchInputRef.current?.blur();
   }
 
   function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
     if (event.key === "Escape" || event.key === "Enter") {
       event.preventDefault();
-      closeSearchKeyboard();
+      event.currentTarget.blur();
     }
   }
 
@@ -206,29 +153,21 @@ export function CommunityScreen() {
           <div className="community-search-field">
             <Search size={19} aria-hidden="true" />
             <input
-              ref={searchInputRef}
               id={searchInputId}
               type="search"
-              inputMode="none"
+              inputMode="search"
               enterKeyHint="search"
               value={query}
               placeholder="搜索课程"
               autoComplete="off"
-              aria-controls="community-search-keyboard"
-              aria-expanded={searchKeyboardOpen}
               onChange={(event) => setQuery(event.target.value)}
-              onClick={() => setSearchKeyboardOpen(true)}
-              onFocus={() => setSearchKeyboardOpen(true)}
               onKeyDown={handleSearchKeyDown}
             />
             {query ? (
               <button
                 type="button"
                 aria-label="清除搜索内容"
-                onClick={() => {
-                  setQuery("");
-                  closeSearchKeyboard();
-                }}
+                onClick={() => setQuery("")}
               >
                 <X size={17} aria-hidden="true" />
               </button>
@@ -338,18 +277,6 @@ export function CommunityScreen() {
           </div>
         )}
       </section>
-
-      {searchKeyboardOpen && searchInputRef.current?.closest(".app-shell")
-        ? createPortal(
-            <CommunitySearchKeyboard
-              onBackspace={deleteSearchText}
-              onClose={closeSearchKeyboard}
-              onInsert={insertSearchText}
-              onSuggestion={useSearchSuggestion}
-            />,
-            searchInputRef.current.closest(".app-shell") as HTMLElement
-          )
-        : null}
     </div>
   );
 }

@@ -464,6 +464,27 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectReachable(section, `${project.name} chapter section toggle`);
     await page.setViewportSize(project.pairedViewport);
     await expectShellMode(page, project.pairedViewport, `${project.name} paired Study tools`);
+    const toolGrid = page.locator("#study-section-c2s1-content .study-tool-grid");
+    const toolGridLayout = await toolGrid.evaluate((element) => {
+      const cards = Array.from(element.querySelectorAll<HTMLElement>(".study-tool-card"));
+      const rows = cards.reduce<number[]>((rowTops, card) => {
+        const top = card.offsetTop;
+        if (!rowTops.some((rowTop) => Math.abs(rowTop - top) < 1)) rowTops.push(top);
+        return rowTops;
+      }, []);
+      return {
+        cardCount: cards.length,
+        columnCount: getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
+        itemsPerRow: rows.map((rowTop) => (
+          cards.filter((card) => Math.abs(card.offsetTop - rowTop) < 1).length
+        ))
+      };
+    });
+    expect(toolGridLayout, `${project.name} Study tools retain the desktop-style 2 x 2 arrangement`).toEqual({
+      cardCount: 4,
+      columnCount: 2,
+      itemsPerRow: [2, 2]
+    });
     const flashcardTool = page.locator('#study-section-c2s1-content .study-tool-card[data-tool="flashcards"]');
     await expectReachable(flashcardTool, `${project.name} flashcard tool`);
     await flashcardTool.focus();
@@ -529,7 +550,7 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectCurrentScreenGeometry(page, ".study-plan-screen", [
       ".plan-date-row button",
       ".study-plan-tasks",
-      ".timeline-item"
+      ".study-plan-tasks :is(.timeline-item, .study-plan-empty-state)"
     ], `${project.name} StudyPlan`);
     await page.locator(".header-bar .icon-button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
@@ -570,12 +591,18 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectCurrentScreenGeometry(page, ".lesson-screen", [
       ".lesson-layout",
       ".lesson-reading-column",
-      ".lesson-knowledge-section",
-      ".lesson-inline-figure",
-      ".lesson-source-link",
-      ".concept-card-grid button",
-      ".lesson-floating-complete .button"
+      ".lesson-knowledge-pager",
+      ".lesson-learning-page",
+      ".lesson-source-link"
     ], `${project.name} Lesson article, concepts, and fixed completion action`);
+    const lessonPager = page.locator(".lesson-knowledge-pager");
+    const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });
+    const lessonPageCount = Number(await lessonProgress.getAttribute("aria-valuemax"));
+    for (let pageIndex = 1; pageIndex < lessonPageCount; pageIndex += 1) {
+      await lessonPager.focus();
+      await lessonPager.press("ArrowRight");
+    }
+    await expect(page.locator(".lesson-floating-complete .button")).toBeVisible();
     await page.locator(".lesson-floating-complete .button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
     await expect(page.locator(".report-screen")).toHaveCount(0);

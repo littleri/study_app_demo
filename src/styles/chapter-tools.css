@@ -221,6 +221,27 @@
 
 @container (max-width: 250px) {
   .study-tool-grid {
-    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .study-tool-card-footer {
+    grid-template-columns: 24px minmax(0, 1fr) 13px;
+    gap: 3px;
+    padding-inline: 6px;
+  }
+
+  .study-tool-card-future .study-tool-card-footer {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .study-tool-card-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+  }
+
+  .study-tool-card-footer > svg {
+    width: 13px;
+    height: 13px;
   }
 }
