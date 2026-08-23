@@ -35,7 +35,7 @@ import {
 } from "./lessonReading";
 import { LessonAiChatEntry } from "./LessonAiChatEntry";
 
-const lessonIntroductionAssetId = "asset_ai_meiosis_fertilization_cycle_v1";
+const legacyLessonIntroductionAssetId = "asset_ai_meiosis_fertilization_cycle_v1";
 
 function assetPrintedPage(asset: ApiAsset) {
   if (asset.source_type !== "extracted") return null;
@@ -161,7 +161,22 @@ export function LessonScreen() {
         )
       )) ?? []
     : [];
-  const lessonIntroductionAsset = liveAssets.find((asset) => asset.asset_id === lessonIntroductionAssetId) ?? null;
+  const lessonIntroductionAsset = lesson
+    ? lesson.asset_ids
+        .map((assetId) => liveAssets.find((asset) => asset.asset_id === assetId) ?? null)
+        .find((asset) => (
+          asset?.source_type === "ai_generated"
+          && asset.metadata?.role === "lesson_overview"
+        ))
+      ?? lesson.asset_ids
+        .map((assetId) => liveAssets.find((asset) => asset.asset_id === assetId) ?? null)
+        .find((asset) => asset?.source_type === "ai_generated")
+      ?? liveAssets.find((asset) => (
+        lesson.lesson_id === "lesson_meiosis"
+        && asset.asset_id === legacyLessonIntroductionAssetId
+      ))
+      ?? null
+    : null;
   const lessonTitle = lesson?.title ?? liveChapter?.ai_title ?? "等待章节课程";
   const learnerPageStart = liveChapter?.printed_page_start ?? lesson?.page_start ?? liveChapter?.page_start;
   const learnerPageEnd = liveChapter?.printed_page_end ?? lesson?.page_end ?? liveChapter?.page_end;
@@ -348,17 +363,17 @@ export function LessonScreen() {
   const lessonPageCount = readingSections.length + 1;
   const isLastLessonPage = activeLessonPage === lessonPageCount - 1;
   const fallbackChunk = liveChunks.find((chunk) => chunk.content_type !== "ocr_pending") ?? liveChunks[0] ?? null;
-  const lessonFallbackCitation = readingSections
+  const lessonFallbackCitation: LessonCitation | null = readingSections
     .map((section) => section.block.citations[0] ?? null)
     .find((citation): citation is LessonCitation => citation !== null)
-    ?? {
-      chunk_id: fallbackChunk?.chunk_id ?? "",
-      page_start: fallbackChunk?.page_start ?? activeLiveChapter.page_start,
-      page_end: fallbackChunk?.page_end ?? activeLiveChapter.page_end,
-      printed_page_start: fallbackChunk?.printed_page_start ?? activeLiveChapter.printed_page_start,
-      printed_page_end: fallbackChunk?.printed_page_end ?? activeLiveChapter.printed_page_end,
-      quote: fallbackChunk?.text.trim() || null
-    };
+    ?? (fallbackChunk ? {
+      chunk_id: fallbackChunk.chunk_id,
+      page_start: fallbackChunk.page_start,
+      page_end: fallbackChunk.page_end,
+      printed_page_start: fallbackChunk.printed_page_start,
+      printed_page_end: fallbackChunk.printed_page_end,
+      quote: fallbackChunk.text.trim() || null
+    } : null);
 
   return (
     <>
@@ -465,10 +480,12 @@ export function LessonScreen() {
                               onOpenSource={() => openAssetSource(activeSection.block.title, asset, citation)}
                             />
                           ))}
-                          <LessonSourceEntry
-                            citation={citation}
-                            onOpen={() => openCitationSource(activeSection.block.title, citation)}
-                          />
+                          {citation ? (
+                            <LessonSourceEntry
+                              citation={citation}
+                              onOpen={() => openCitationSource(activeSection.block.title, citation)}
+                            />
+                          ) : null}
                         </section>
                       ) : (
                         <section
@@ -484,6 +501,11 @@ export function LessonScreen() {
                           </div>
                           <h3 id="lesson-introduction-title">本节导读</h3>
                           <p>{lesson.summary}</p>
+                          {lesson.warnings.length > 0 ? (
+                            <aside className="lesson-generation-panel" aria-label="内容生成与来源说明">
+                              <p>{lesson.warnings[0]}</p>
+                            </aside>
+                          ) : null}
                           {lessonIntroductionAsset ? (
                             <LessonFigure
                               asset={lessonIntroductionAsset}
@@ -496,10 +518,12 @@ export function LessonScreen() {
                               {lesson.objectives.map((objective) => <li key={objective}>{objective}</li>)}
                             </ul>
                           ) : null}
-                          <LessonSourceEntry
-                            citation={citation}
-                            onOpen={() => openCitationSource("本节导读", citation)}
-                          />
+                          {citation ? (
+                            <LessonSourceEntry
+                              citation={citation}
+                              onOpen={() => openCitationSource("本节导读", citation)}
+                            />
+                          ) : null}
                         </section>
                       )}
                     </div>

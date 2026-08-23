@@ -69,6 +69,7 @@ import type {
 } from "./types/api";
 import type { Screen, SheetState, SourcePageTarget, StudyLocation, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
 import { createCourseSelectionCoordinator } from "./screens/homeBookModel";
+import { lessonHeaderSubtitle } from "./screens/lessonHeader";
 import {
   hasCompleteLoadedCourseContext,
   resolveCourseSessionClear,
@@ -952,7 +953,12 @@ export default function App() {
     maxMotionMs: globalMotionFallbackMs
   });
 
-  const header = titles[screen];
+  const header = screen === "lesson"
+    ? {
+        ...titles.lesson,
+        subtitle: lessonHeaderSubtitle(parsedChapters, activeChapterId)
+      }
+    : titles[screen];
 
   function renderScreen() {
     switch (screen) {

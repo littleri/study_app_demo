@@ -119,6 +119,8 @@ syncedAssets.sort((left, right) => (
 ));
 
 const syncedById = new Map(syncedAssets.map((asset) => [asset.asset_id, asset]));
+const retainedAiAssets = demoState.assets.filter((asset) => asset.source_type === "ai_generated");
+const retainedAiAssetIds = new Set(retainedAiAssets.map((asset) => asset.asset_id));
 const lessons = demoState.lessons.map((lesson) => {
   const chapter = demoState.chapters.find((item) => item.chapter_id === lesson.chapter_id);
   if (!chapter) return lesson;
@@ -131,12 +133,21 @@ const lessons = demoState.lessons.map((lesson) => {
       || asset.source_chunk_ids.some((chunkId) => block.source_chunk_ids.includes(chunkId))
       || block.asset_ids.includes(asset.asset_id)
     ));
-    return { ...block, asset_ids: related.map((asset) => asset.asset_id) };
+    return {
+      ...block,
+      asset_ids: [
+        ...block.asset_ids.filter((assetId) => retainedAiAssetIds.has(assetId)),
+        ...related.map((asset) => asset.asset_id)
+      ]
+    };
   });
   return {
     ...lesson,
     blocks,
-    asset_ids: lessonAssets.map((asset) => asset.asset_id).filter((assetId) => syncedById.has(assetId))
+    asset_ids: [
+      ...lesson.asset_ids.filter((assetId) => retainedAiAssetIds.has(assetId)),
+      ...lessonAssets.map((asset) => asset.asset_id).filter((assetId) => syncedById.has(assetId))
+    ]
   };
 });
 
@@ -150,7 +161,7 @@ const nextState = {
       source: "formal assets.json + persisted MinerU image files"
     }
   },
-  assets: syncedAssets,
+  assets: [...syncedAssets, ...retainedAiAssets],
   lessons
 };
 

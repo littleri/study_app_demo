@@ -10,6 +10,9 @@ import {
 const root = resolve(import.meta.dirname, "..");
 const dir = join(root, "src", "data", "generated");
 const curatedPath = join(root, "src", "data", "seed", "curated-content.json");
+const chapterOneSupplementPath = join(root, "src", "data", "seed", "chapter-one-supplement.json");
+const expandedLessonAssetsPath = join(root, "src", "data", "seed", "expanded-lesson-assets.json");
+const ragChunksPath = join(root, "public", "rag", "biology-required-2-rag-v1", "chunks.json");
 const latestPath = join(root, ".cache", "mineru", "latest.json");
 const required = ["demo-state.json", "book.json", "chapters.json", "lessons.json", "quiz.json", "flashcards.json", "ai-responses.json"];
 
@@ -41,6 +44,10 @@ const state = read("demo-state.json");
 const book = read("book.json");
 const chapters = read("chapters.json");
 const curated = JSON.parse(readFileSync(curatedPath, "utf8"));
+const chapterOneSupplement = JSON.parse(readFileSync(chapterOneSupplementPath, "utf8"));
+const expandedLessonAssets = JSON.parse(readFileSync(expandedLessonAssetsPath, "utf8"));
+const ragChunks = JSON.parse(readFileSync(ragChunksPath, "utf8")).chunks;
+const ragChunkById = new Map(ragChunks.map((chunk) => [chunk.chunk_id, chunk]));
 const lessons = read("lessons.json");
 const quizzes = read("quiz.json");
 const flashcards = read("flashcards.json");
@@ -57,11 +64,6 @@ assertMissingChapterOneFrontmatterMetadata({
   chapters: curated.chapters,
   label: "Curated demo content seed"
 });
-assertMissingChapterOneFrontmatterMetadata({
-  missingChapterOneBody: BIOLOGY_RAG.missingChapterOneBody,
-  chapters,
-  label: "Generated demo directory"
-});
 const generatedFrontmatter = chapters.find((chapter) => chapter.chapter_id === BIOLOGY_FRONTMATTER.chapterId);
 const curatedFrontmatter = curated.chapters.find((chapter) => chapter.chapter_id === BIOLOGY_FRONTMATTER.chapterId);
 assert(
@@ -72,12 +74,54 @@ assert(
   chapters.filter((chapter) => chapter.level === 1 && chapter.chapter_id !== BIOLOGY_FRONTMATTER.chapterId).length === book.chapterCount,
   "Generated book chapter count must exclude the frontmatter node."
 );
-assert(book.chapterCount === curated.book.chapterCount, "Generated book chapter count drifted from the curated seed.");
-assert(Array.isArray(lessons) && lessons.some((lesson) => lesson.chapter_id === "c2s1"), "Core meiosis lesson is missing.");
+assert(book.chapterCount === curated.book.chapterCount + 1, "Generated book must include the explicit Chapter 1 supplement.");
+assert(book.sectionCount === curated.book.sectionCount + 2, "Generated book must include both Chapter 1 sections.");
+assert(chapterOneSupplement.every((chapter) => chapter.page_start === 0 && chapter.page_end === 0), "Chapter 1 supplement must preserve missing-source PDF semantics.");
+assert(chapterOneSupplement.every((chapter) => chapters.some((generated) => JSON.stringify(generated) === JSON.stringify(chapter))), "Generated directory is missing Chapter 1 supplement metadata.");
+const expectedLessonChapterIds = new Set(["c1s1", "c1s2", "c2s1", "c2s2", "c2s3", "c3s1", "c3s2", "c3s3", "c3s4", "c4s1", "c4s2", "c4s3", "c5s1", "c5s2", "c5s3"]);
+assert(Array.isArray(lessons) && lessons.length === expectedLessonChapterIds.size, "Chapter 1–5 lesson library must contain exactly fifteen lessons.");
+assert(lessons.every((lesson) => expectedLessonChapterIds.has(lesson.chapter_id)), "Lesson library contains an unexpected section outside the Chapter 1–5 scope.");
+assert(new Set(lessons.map((lesson) => lesson.chapter_id)).size === expectedLessonChapterIds.size, "Lesson library contains duplicate or missing section lessons.");
+assert(lessons.some((lesson) => lesson.lesson_id === "lesson_meiosis" && lesson.chapter_id === "c2s1"), "Core meiosis lesson is missing.");
+for (const lesson of lessons) {
+  assert(lesson.objectives?.length === 3 && lesson.blocks?.length === 4, `${lesson.lesson_id}: lesson must render as one introduction plus four content pages.`);
+  assert(lesson.blocks.every((block) => String(block.content).split(/\n\s*\n/u).filter(Boolean).length === 3), `${lesson.lesson_id}: each block must contain exactly three paragraphs.`);
+}
+for (const lesson of lessons.filter((item) => item.chapter_id.startsWith("c1"))) {
+  assert(lesson.page_start === 0 && lesson.page_end === 0, `${lesson.lesson_id}: source-missing PDF range must remain 0–0.`);
+  assert(lesson.source_chunk_ids.length === 0 && lesson.blocks.every((block) => block.citations.length === 0 && block.source_chunk_ids.length === 0), `${lesson.lesson_id}: Chapter 1 supplement must not fabricate textbook citations.`);
+}
+const aiAssets = state.assets.filter((asset) => asset.source_type === "ai_generated");
+assert(aiAssets.length === 9 + expandedLessonAssets.length, "Expanded ImageGen asset count is incomplete.");
+for (const assetSeed of expandedLessonAssets) {
+  const asset = aiAssets.find((candidate) => candidate.asset_id === assetSeed.asset_id);
+  assert(asset?.image_url === assetSeed.image_url && asset?.metadata?.role === "lesson_overview", `Expanded overview asset ${assetSeed.asset_id} is missing or malformed.`);
+  assert(existsSync(join(root, "public", ...assetSeed.image_url.split("/").filter(Boolean))), `Expanded overview image ${assetSeed.image_url} is missing.`);
+}
+let expandedCitationCount = 0;
+for (const lesson of lessons.filter((item) => item.lesson_id !== "lesson_meiosis" && !item.chapter_id.startsWith("c1"))) {
+  const overviewAsset = aiAssets.find((asset) => asset.metadata?.role === "lesson_overview" && asset.metadata?.lesson_id === lesson.lesson_id);
+  assert(overviewAsset && lesson.blocks.some((block) => block.asset_ids?.includes(overviewAsset.asset_id)), `${lesson.lesson_id}: ImageGen overview must be bound to a lesson block.`);
+  for (const block of lesson.blocks) {
+    assert(block.ai_generated === true, `${lesson.lesson_id}/${block.block_id}: expanded content must retain its AI-generated disclosure.`);
+    assert(block.source_chunk_ids?.length > 0 && block.citations?.length > 0, `${lesson.lesson_id}/${block.block_id}: source-backed content block is missing a RAG citation.`);
+    for (const citation of block.citations) {
+      expandedCitationCount += 1;
+      const chunk = ragChunkById.get(citation.chunk_id);
+      assert(chunk, `${lesson.lesson_id}: citation ${citation.chunk_id} is missing from the published RAG corpus.`);
+      assert(chunk.section_id === lesson.chapter_id, `${lesson.lesson_id}: citation ${citation.chunk_id} belongs to ${chunk.section_id}, not ${lesson.chapter_id}.`);
+      assert(chunk.text.includes(citation.quote), `${lesson.lesson_id}: citation quote is not present in ${citation.chunk_id}.`);
+      assert(citation.page_start === chunk.page_start && citation.page_end === chunk.page_end, `${lesson.lesson_id}: citation ${citation.chunk_id} PDF page range drifted.`);
+      assert(citation.printed_page_start === chunk.printed_page_start && citation.printed_page_end === chunk.printed_page_end, `${lesson.lesson_id}: citation ${citation.chunk_id} printed-page range drifted.`);
+      assert(JSON.stringify(citation.source_metadata) === JSON.stringify(chunk.source_metadata), `${lesson.lesson_id}: citation ${citation.chunk_id} source metadata drifted.`);
+    }
+  }
+}
+assert(expandedCitationCount >= 48, "Expanded Chapter 2–5 lessons do not contain enough published-RAG citations.");
 assert(flashcards.length >= 6 && quizzes.length >= 3, "P0 practice fixtures are incomplete.");
 assert(replies.default && replies.quiz, "AI response fixtures are incomplete.");
 if (!existsSync(latestPath)) {
-  console.log("Fixtures valid without ignored MinerU cache: " + chapters.length + " chapters, " + state.chunks.length + " chunks, " + flashcards.length + " flashcards, " + quizzes.length + " quizzes.");
+  console.log("Fixtures valid without ignored MinerU cache: " + chapters.length + " directory entries, " + lessons.length + " lessons, " + expandedCitationCount + " expanded citations, " + state.chunks.length + " core chunks, " + flashcards.length + " flashcards, " + quizzes.length + " quizzes.");
   process.exit(0);
 }
 const manifest = JSON.parse(readFileSync(latestPath, "utf8"));
@@ -226,11 +270,11 @@ for (const chunk of state.chunks) {
 }
 assert(chunkById.has("chunk_c2s1_11") && chunkById.has("chunk_c2s1_13") && chunkById.has("chunk_c2s1_19"), "Required P0 OCR chunks are missing.");
 
-let citationCount = 0;
-for (const lesson of lessons) {
+let p0CitationCount = 0;
+for (const lesson of lessons.filter((item) => item.lesson_id === "lesson_meiosis")) {
   for (const block of lesson.blocks ?? []) {
     for (const citation of block.citations ?? []) {
-      citationCount += 1;
+      p0CitationCount += 1;
       const chunk = chunkById.get(citation.chunk_id);
       assert(chunk, `Citation ${citation.chunk_id} points to a missing chunk.`);
       assert(citation.page_start === citation.page_end, `Citation ${citation.chunk_id} must identify an exact PDF page.`);
@@ -240,7 +284,7 @@ for (const lesson of lessons) {
     }
   }
 }
-assert(citationCount >= 7, "P0 lesson does not contain enough grounded citations.");
+assert(p0CitationCount >= 7, "P0 lesson does not contain enough grounded citations.");
 
 for (const card of flashcards) {
   assert(card.source_chunk_ids?.length === 1, `Flashcard ${card.card_id} must point to one source chunk.`);
@@ -287,4 +331,4 @@ for (const model of manifest.model_files) {
   assert(sha256(readFileSync(path)) === model.sha256, `MinerU model artifact hash mismatch: ${model.path}`);
 }
 
-console.log(`Fixtures valid: ${chapters.length} chapters, ${state.chunks.length} MinerU chunks, ${flashcards.length} flashcards, ${quizzes.length} quizzes, ${citationCount} grounded citations.`);
+console.log(`Fixtures valid: ${chapters.length} directory entries, ${lessons.length} lessons, ${state.chunks.length} core MinerU chunks, ${expandedCitationCount + p0CitationCount} grounded citations, ${flashcards.length} flashcards, ${quizzes.length} quizzes.`);

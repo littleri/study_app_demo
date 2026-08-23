@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import assets from "./generated/assets.json";
 import demoState from "./generated/demo-state.json";
+import expandedLessonAssets from "./seed/expanded-lesson-assets.json";
 
 describe("formal offline textbook assets", () => {
   it("syncs every formal MinerU asset into the demo fixture", () => {
     expect(assets).toHaveLength(267);
     expect(demoState.assets.filter((asset) => asset.source_type === "extracted")).toEqual(assets);
     const aiAssets = demoState.assets.filter((asset) => asset.source_type === "ai_generated");
-    expect(aiAssets).toHaveLength(9);
+    expect(aiAssets).toHaveLength(9 + expandedLessonAssets.length);
     expect(aiAssets.map((asset) => asset.asset_id)).toEqual(expect.arrayContaining([
       "asset_ai_meiosis_fertilization_cycle_v1",
       "asset_ai_meiosis_overview_v2",
@@ -17,7 +18,15 @@ describe("formal offline textbook assets", () => {
       "asset_ai_meiosis_ii_centromere_v1",
       "asset_ai_fertilization_homolog_pair_v2"
     ]));
+    expect(aiAssets.map((asset) => asset.asset_id)).toEqual(expect.arrayContaining(
+      expandedLessonAssets.map((asset) => asset.asset_id)
+    ));
     expect(aiAssets.every((asset) => asset.generation_provider === "openai-imagegen")).toBe(true);
+    expect(expandedLessonAssets.every((seed) => aiAssets.some((asset) => (
+      asset.asset_id === seed.asset_id
+      && asset.metadata?.role === "lesson_overview"
+      && asset.image_url === seed.image_url
+    )))).toBe(true);
     expect(assets.every((asset) => asset.source_type === "extracted")).toBe(true);
     expect(assets.every((asset) => asset.image_url.startsWith("/assets/textbook/figures/"))).toBe(true);
     expect(assets.every((asset) => asset.thumbnail_url.startsWith("/assets/textbook/figures/"))).toBe(true);

@@ -1,7 +1,7 @@
 {
   "provenance": {
     "content_scope": "人教版高中生物必修 2《遗传与进化》当前 PDF 可用原文目录（源文件缺第 1 章正文）",
-    "fixture_policy": "目录按当前 PDF 实际页核验：PDF 第 1–9 页为教材封面、前言与目录；源文件缺少第 1 章正文，第 2 章起使用 MinerU OCR 证据。",
+    "fixture_policy": "目录按当前 PDF 实际页核验：PDF 第 1–9 页为教材封面、前言与目录；第 1 章仅以 AI 补充节点呈现并保留 0–0 缺源页语义，第 2 章起使用 MinerU OCR 证据。",
     "source_file": "人教版高中生物必修2遗传与进化 (人民教育出版社, 课程教材研究所, 生物课程教材研究开发中心.pdf",
     "source_sha256": "d35ca6844f22e87bef5cd3deb286c7965f386ba13924a8195eddaefa41db533a",
     "parser": "mineru",
@@ -202,6 +202,18 @@
       "source_book_id": "book_2a3605650b10",
       "asset_count": 267,
       "source": "formal assets.json + persisted MinerU image files"
+    },
+    "expanded_lessons": {
+      "scope": "正式章节第 1–5 章的全部 15 个“第 X 节”节点",
+      "lesson_count": 15,
+      "preserved_lesson_ids": [
+        "lesson_meiosis"
+      ],
+      "generated_lesson_count": 14,
+      "imagegen_overview_count": 14,
+      "grounded_section_count": 13,
+      "supplemental_section_count": 2,
+      "chapter_one_source_status": "当前源 PDF 缺少第 1 章正文；仅目录页码可核验，课程为 AI 补充草稿。"
     }
   },
   "id": "book_biology_2",
@@ -211,8 +223,8 @@
   "publisher": "人民教育出版社",
   "pages": 125,
   "fileSize": "38.8 MB",
-  "chapterCount": 6,
-  "sectionCount": 17,
+  "chapterCount": 7,
+  "sectionCount": 19,
   "knowledgePointCount": 96,
   "progress": 18,
   "mastery": 68,

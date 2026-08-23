@@ -204,7 +204,7 @@ textarea {
 
 .button {
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 999px;
   color: var(--color-text);
   background: var(--color-surface-soft);
   box-shadow: none;
@@ -633,7 +633,7 @@ button:disabled {
   color: var(--color-on-primary);
   background: var(--color-primary);
   border: 1px solid var(--color-primary);
-  border-radius: 12px;
+  border-radius: 999px;
   box-shadow: none;
 }
 

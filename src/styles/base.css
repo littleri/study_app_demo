@@ -582,7 +582,7 @@ textarea:focus-visible {
 .home-screen .hero-actions .button {
   min-height: var(--touch-target-min);
   padding: 8px 6px;
-  border-radius: 19px;
+  border-radius: 999px;
   gap: 4px;
   font-size: 13px;
   line-height: 1;

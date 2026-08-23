@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import generatedChapters from "./generated/chapters.json";
+import generatedBook from "./generated/book.json";
 import curatedContent from "./seed/curated-content.json";
 
 type DirectoryEntry = {
@@ -15,6 +16,7 @@ type DirectoryEntry = {
 
 const expectedDirectoryRootTitles = [
   "教材封面、前言与目录",
+  "第 1 章 遗传因子的发现",
   "第 2 章 基因和染色体的关系",
   "第 3 章 基因的本质",
   "第 4 章 基因的表达",
@@ -27,13 +29,29 @@ describe("demo textbook directory", () => {
   const curated = curatedContent.chapters as DirectoryEntry[];
   const generated = generatedChapters as DirectoryEntry[];
 
-  it("keeps a real frontmatter node, six available textbook chapters, and seventeen formal sections", () => {
+  it("keeps the six source-backed chapters in the curated directory seed", () => {
     expect(curated.filter((entry) => entry.level === 1).map((entry) => entry.source_title))
-      .toEqual(expectedDirectoryRootTitles);
+      .toEqual(expectedDirectoryRootTitles.filter((title) => title !== "第 1 章 遗传因子的发现"));
     expect(curated.filter((entry) => entry.level === 1 && entry.chapter_id !== "frontmatter")).toHaveLength(6);
     expect(curated.filter((entry) => /^第\s*\d+\s*节/.test(entry.source_title))).toHaveLength(17);
     expect(curatedContent.book.chapterCount).toBe(6);
     expect(curatedContent.book.sectionCount).toBe(17);
+  });
+
+  it("adds the source-missing Chapter 1 as an explicit supplement in generated fixtures", () => {
+    expect(generated.filter((entry) => entry.level === 1).map((entry) => entry.source_title))
+      .toEqual(expectedDirectoryRootTitles);
+    expect(generated.filter((entry) => entry.level === 1 && entry.chapter_id !== "frontmatter")).toHaveLength(7);
+    expect(generated.filter((entry) => /^第\s*\d+\s*节/.test(entry.source_title))).toHaveLength(19);
+    expect(generatedBook.chapterCount).toBe(7);
+    expect(generatedBook.sectionCount).toBe(19);
+    expect(generated.find((entry) => entry.chapter_id === "c1s1")).toMatchObject({
+      page_start: 0,
+      page_end: 0,
+      printed_page_start: 2,
+      printed_page_end: 8,
+      status: "AI 补充·待原文核验"
+    });
   });
 
   it("preserves nested subtopics and their parent relationships", () => {
@@ -72,8 +90,9 @@ describe("demo textbook directory", () => {
     });
   });
 
-  it("regenerates every curated directory entry without relabeling the frontmatter as Chapter 1", () => {
-    expect(generated.map((entry) => entry.chapter_id)).toEqual(curated.map((entry) => entry.chapter_id));
+  it("preserves every curated entry while keeping frontmatter distinct from Chapter 1", () => {
+    expect(generated.filter((entry) => !entry.chapter_id.startsWith("c1")).map((entry) => entry.chapter_id))
+      .toEqual(curated.map((entry) => entry.chapter_id));
     expect(generated.find((entry) => entry.chapter_id === "frontmatter")).toEqual(
       curated.find((entry) => entry.chapter_id === "frontmatter")
     );
