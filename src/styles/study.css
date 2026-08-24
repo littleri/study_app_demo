@@ -163,7 +163,8 @@
   transition:
     padding-block var(--motion-duration-local-slow) var(--motion-ease-local-state),
     background-color var(--motion-duration-local-base) var(--motion-ease-local-state),
-    border-radius var(--motion-duration-local-base) var(--motion-ease-local-state);
+    border-radius var(--motion-duration-local-base) var(--motion-ease-local-state),
+    box-shadow var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
 .study-plan-details {
@@ -300,7 +301,7 @@
 .study-plan-summary.is-compact {
   padding-block: 10px;
   background-color: color-mix(in srgb, var(--color-primary-soft) 12%, var(--color-surface));
-  filter: drop-shadow(var(--glass-shadow-soft));
+  box-shadow: var(--glass-shadow-soft);
 }
 
 .study-plan-summary.is-compact .study-plan-details {
@@ -367,12 +368,6 @@
 @media (hover: hover) and (pointer: fine) {
   .study-directory-heading {
     cursor: grab;
-  }
-
-  .study-directory.is-mouse-dragging,
-  .study-directory.is-mouse-dragging * {
-    cursor: grabbing;
-    user-select: none;
   }
 }
 

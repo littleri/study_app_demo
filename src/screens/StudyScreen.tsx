@@ -2,9 +2,7 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent
+  useState
 } from "react";
 import {
   Check,
@@ -151,7 +149,7 @@ function StudySection({
         focusFallbackRef={toggleRef}
         className="study-section-region"
       >
-        <SectionLearningPanel chapter={chapter} />
+        {expanded ? <SectionLearningPanel chapter={chapter} /> : null}
       </CollapsibleRegion>
     </div>
   );
@@ -371,16 +369,8 @@ export function StudyScreen() {
   } = useAppContext();
   const [attemptedBookId, setAttemptedBookId] = useState<string | null>(null);
   const [planCompact, setPlanCompact] = useState(false);
-  const [directoryDragging, setDirectoryDragging] = useState(false);
+  const planCompactRef = useRef(false);
   const studyScreenRef = useRef<HTMLDivElement | null>(null);
-  const directoryDragRef = useRef<{
-    pointerId: number;
-    startY: number;
-    startScrollTop: number;
-    moved: boolean;
-    scroller: HTMLElement;
-  } | null>(null);
-  const suppressDirectoryClickRef = useRef(false);
   const hasLoadedCourse = hasCompleteLoadedCourseContext({
     loadedBookId,
     uploadedFile,
@@ -429,9 +419,12 @@ export function StudyScreen() {
       const planHasFocus = studyScreenRef.current
         ?.querySelector<HTMLElement>(".study-plan-summary")
         ?.contains(document.activeElement) ?? false;
-      setPlanCompact((current) => (
-        current ? scrollTop > 16 : scrollTop > 48 && !planHasFocus
-      ));
+      const nextCompact = planCompactRef.current
+        ? scrollTop > 16
+        : scrollTop > 48 && !planHasFocus;
+      if (nextCompact === planCompactRef.current) return;
+      planCompactRef.current = nextCompact;
+      setPlanCompact(nextCompact);
     };
     const schedulePlanStateUpdate = () => {
       if (updateFrame !== null) return;
@@ -495,56 +488,6 @@ export function StudyScreen() {
     const nextSectionId = location.expandedSectionId === sectionId ? null : sectionId;
     updateStudyLocation(currentBookId, { expandedSectionId: nextSectionId });
     if (nextSectionId) setActiveChapterId(nextSectionId);
-  }
-
-  function startDirectoryMouseDrag(event: ReactPointerEvent<HTMLElement>) {
-    if (event.pointerType !== "mouse" || event.button !== 0) return;
-    const scroller = event.currentTarget.closest<HTMLElement>(".screen-content");
-    if (!scroller) return;
-    directoryDragRef.current = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      startScrollTop: scroller.scrollTop,
-      moved: false,
-      scroller
-    };
-  }
-
-  function moveDirectoryWithMouse(event: ReactPointerEvent<HTMLElement>) {
-    const drag = directoryDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const distance = event.clientY - drag.startY;
-    if (!drag.moved) {
-      if (Math.abs(distance) < 5) return;
-      drag.moved = true;
-      event.currentTarget.setPointerCapture(event.pointerId);
-      setDirectoryDragging(true);
-    }
-    event.preventDefault();
-    drag.scroller.scrollTop = drag.startScrollTop - distance;
-  }
-
-  function finishDirectoryMouseDrag(event: ReactPointerEvent<HTMLElement>) {
-    const drag = directoryDragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (drag.moved) {
-      suppressDirectoryClickRef.current = true;
-      window.setTimeout(() => {
-        suppressDirectoryClickRef.current = false;
-      }, 0);
-    }
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    directoryDragRef.current = null;
-    setDirectoryDragging(false);
-  }
-
-  function suppressClickAfterDirectoryDrag(event: ReactMouseEvent<HTMLElement>) {
-    if (!suppressDirectoryClickRef.current) return;
-    event.preventDefault();
-    event.stopPropagation();
-    suppressDirectoryClickRef.current = false;
   }
 
   if (courseSummariesLoadState === "loading" || courseSelectionLoadingId) {
@@ -626,16 +569,7 @@ export function StudyScreen() {
         </section>
       </div>
 
-      <section
-        className={`study-directory ${directoryDragging ? "is-mouse-dragging" : ""}`}
-        data-mouse-drag-scroll="ignore"
-        aria-labelledby="study-directory-title"
-        onClickCapture={suppressClickAfterDirectoryDrag}
-        onPointerCancel={finishDirectoryMouseDrag}
-        onPointerDown={startDirectoryMouseDrag}
-        onPointerMove={moveDirectoryWithMouse}
-        onPointerUp={finishDirectoryMouseDrag}
-      >
+      <section className="study-directory" aria-labelledby="study-directory-title">
         <div className="study-directory-heading">
           <h2 id="study-directory-title">教材目录</h2>
           <span>{chapterTree.length} 章 · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} 节</span>

@@ -65,9 +65,11 @@ test.describe("study directory flow", () => {
     await expect.poll(async () => plan.evaluate((element) => Math.round(element.getBoundingClientRect().height))).toBeLessThanOrEqual(28);
     const compactSurface = await plan.evaluate((element) => ({
       filter: getComputedStyle(element).filter,
+      boxShadow: getComputedStyle(element).boxShadow,
       stackBackground: getComputedStyle(element.parentElement as HTMLElement).backgroundColor
     }));
-    expect(compactSurface.filter).not.toBe("none");
+    expect(compactSurface.filter).toBe("none");
+    expect(compactSurface.boxShadow).not.toBe("none");
     expect(compactSurface.stackBackground).toBe("rgba(0, 0, 0, 0)");
 
     await scroller.evaluate((element) => {
@@ -87,25 +89,36 @@ test.describe("study directory flow", () => {
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
 
     const scroller = page.locator('.screen-content[data-screen="study"]');
-    const directory = page.locator(".study-directory");
+    const shell = page.locator(".app-shell");
     const firstChapterToggle = page.locator(".study-chapter-toggle").first();
+    await expect(page.locator(".study-tools-panel")).toHaveCount(1);
     const startBox = await firstChapterToggle.boundingBox();
     expect(startBox).not.toBeNull();
     const startX = startBox!.x + startBox!.width / 2;
     const startY = startBox!.y + startBox!.height / 2;
+    const initialScrollTop = await scroller.evaluate((element) => element.scrollTop);
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    await page.mouse.move(startX, startY - 180, { steps: 8 });
+    await page.mouse.move(startX, startY - 80);
 
-    await expect(directory).toHaveClass(/is-mouse-dragging/);
+    await expect(shell).toHaveAttribute("data-mouse-dragging", "true");
+    const firstDragFrame = await scroller.evaluate((element) => ({
+      behavior: getComputedStyle(element).scrollBehavior,
+      scrollTop: element.scrollTop
+    }));
+    expect(firstDragFrame.behavior).toBe("auto");
+    expect(firstDragFrame.scrollTop - initialScrollTop).toBeGreaterThanOrEqual(70);
+
+    await page.mouse.move(startX, startY - 180, { steps: 5 });
     await expect.poll(async () => scroller.evaluate((element) => Math.round(element.scrollTop))).toBeGreaterThan(100);
     await expect(page.locator(".study-plan-summary")).toHaveAttribute("data-plan-state", "compact");
     expect(await page.locator(".study-sticky-stack").evaluate((element) => getComputedStyle(element).backgroundColor))
       .toBe("rgba(0, 0, 0, 0)");
 
     await page.mouse.up();
-    await expect(directory).not.toHaveClass(/is-mouse-dragging/);
+    await expect(shell).toHaveAttribute("data-mouse-dragging", "false");
+    await expect.poll(() => scroller.evaluate((element) => getComputedStyle(element).scrollBehavior)).toBe("smooth");
     await expect(firstChapterToggle).toHaveAttribute("aria-expanded", "true");
     const draggedScrollTop = await scroller.evaluate((element) => element.scrollTop);
 
@@ -128,6 +141,7 @@ test.describe("study directory flow", () => {
     await fifthChapterToggle.click();
     await expect(fifthChapterToggle).toHaveAttribute("aria-expanded", "true");
     await expect(fifthChapter.locator(".study-tools-panel").first()).toBeVisible();
+    await expect(page.locator(".study-tools-panel")).toHaveCount(1);
 
     await expect.poll(async () => fifthChapter.evaluate((article) => {
       const scroller = article.closest<HTMLElement>(".screen-content");
