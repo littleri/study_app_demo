@@ -6,6 +6,7 @@ test.describe("device preview studio", () => {
     await expect(page.locator(".device-preview-studio")).toHaveCount(0);
     await expect(page.locator("iframe.device-preview-iframe")).toHaveCount(0);
     await expect(page.locator(".app-shell")).toBeVisible();
+    await expect(page.getByTestId("app-startup-screen")).toHaveCount(0);
 
     await page.goto("/?preview=device-preview");
     await expect(page.locator(".device-preview-studio")).toBeVisible();
@@ -32,6 +33,7 @@ test.describe("device preview studio", () => {
     await expect(page.locator(".device-preview-studio")).toHaveCount(0);
     await expect(page.locator("iframe")).toHaveCount(0);
     await expect(page.locator(".app-shell")).toBeVisible();
+    await expect(page.getByTestId("app-startup-screen")).toHaveCount(0);
   });
 
   test("uses one iframe and preserves inner page, dialog, input, and main identity", async ({ page }) => {
@@ -42,6 +44,7 @@ test.describe("device preview studio", () => {
     const iframeHandle = await iframe.elementHandle();
     if (!iframeHandle) throw new Error("The device preview iframe did not mount");
     const embeddedFrame = page.frameLocator("iframe.device-preview-iframe");
+    await expect(embeddedFrame.getByTestId("app-startup-screen")).toHaveCount(0);
 
     await expect.poll(async () => {
       const frame = page.frames().find((candidate) => candidate.url().includes("embedded=device-preview"));

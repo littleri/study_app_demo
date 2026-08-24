@@ -44,7 +44,9 @@ createRoot(document.getElementById("root")!).render(
             <Suspense fallback={<div className="device-preview-loading">正在加载设备预览…</div>}>
               <DevicePreviewStudio />
             </Suspense>
-          ) : <App />}
+          ) : (
+            <App />
+          )}
         </MotionHistoryProvider>
       </BookCourseRepositoryProvider>
     </ErrorBoundary>

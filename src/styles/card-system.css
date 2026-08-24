@@ -58,7 +58,7 @@ body,
   --device-preview-surface: var(--color-surface);
   --device-preview-border: var(--color-border);
   color: var(--color-text);
-  background: var(--color-bg);
+  background: #000000;
 }
 
 .device-preview-toolbar {
@@ -82,6 +82,16 @@ body,
 .device-preview-output-summary,
 .device-preview-toggle {
   color: var(--color-text-secondary);
+}
+
+.device-preview-output-summary {
+  color: #d7dee8;
+  background: #000000;
+  border-color: #20263a;
+}
+
+.device-preview-canvas-area {
+  background: #000000;
 }
 
 .device-preview-toggle[aria-pressed="true"] {
