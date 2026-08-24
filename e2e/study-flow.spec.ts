@@ -234,8 +234,8 @@ test.describe("study directory flow", () => {
     if (expandedChapterId !== await secondChapter.getAttribute("id")) {
       await expect(initiallyExpandedChapter).toHaveAttribute("aria-expanded", "false");
     }
-    await expect(page.getByRole("button", { name: "一 减数分裂 教材第 16-22 页", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "科学家的故事 染色体遗传理论的奠基人——摩尔根 教材第 32 页", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "第 1 节 减数分裂和受精作用 教材第 16-26 页", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "第 3 节 伴性遗传 教材第 33-40 页", exact: true })).toBeVisible();
 
     await expect(page.getByRole("button", { name: "更多功能 预留新学习工具", exact: true })).toBeDisabled();
     await page.getByRole("button", { name: "进入学习", exact: true }).click();
@@ -335,7 +335,27 @@ test.describe("study directory flow", () => {
     await expect(selectionNoteSheet.locator(".selection-note-quote")).not.toBeEmpty();
     await selectionNoteSheet.locator(".note-textarea").fill("摘录说明：这是我对选中文字的理解。");
     await selectionNoteSheet.getByRole("button", { name: "保存摘录笔记", exact: true }).click();
-    await expect(page.getByText("摘录已保存到导学笔记", { exact: true })).toBeVisible();
+    const noteSaveCelebration = page.locator(".note-save-celebration-layer");
+    await expect(noteSaveCelebration).toBeVisible();
+    await expect(page.locator(".lesson-ai-entry")).toBeHidden();
+    await expect(noteSaveCelebration).toHaveAttribute("data-note-save-phase", "celebrating");
+    await expect(selectionNoteSheet.locator(".concept-detail-sheet")).toHaveAttribute(
+      "data-note-save-state",
+      "celebrating"
+    );
+    const noteSaveMotionNames = await noteSaveCelebration.evaluate((element) => ({
+      mascot: getComputedStyle(element.querySelector<HTMLElement>(".note-save-mascot-stage")!).animationName,
+      sprite: getComputedStyle(element.querySelector<HTMLElement>(".note-save-mascot-strip")!).animationName,
+      sheet: getComputedStyle(document.querySelector<HTMLElement>('.sheet[data-sheet-type="note"]')!).animationName
+    }));
+    expect(noteSaveMotionNames).toEqual({
+      mascot: "motion-note-save-mascot-form",
+      sprite: "motion-note-save-mascot-sprite",
+      sheet: "motion-note-save-sheet-collapse"
+    });
+    await expect(noteSaveCelebration).toHaveCount(0);
+    await expect(page.getByText("摘录已保存到导学笔记", { exact: true })).toHaveCount(0);
+    await expect(page.locator(".lesson-ai-entry")).toBeVisible();
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.saved-study-notes.v1") ?? "[]").length)).toBeGreaterThan(0);
     await expect(page.locator(".lesson-screen")).toBeVisible();
     const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });

@@ -359,6 +359,237 @@
   }
 }
 
+.sheet[data-sheet-type="note"]:has(
+  .concept-detail-sheet[data-note-save-state="celebrating"]
+) {
+  transform-origin: center center;
+  animation:
+    motion-note-save-sheet-collapse
+    var(--motion-duration-global-emphasis)
+    var(--motion-ease-local-state)
+    both !important;
+}
+
+.sheet[data-sheet-type="note"]:has(
+  .concept-detail-sheet[data-note-save-state="exiting"]
+)[data-motion-state="closing"] {
+  animation:
+    motion-note-save-sheet-out
+    var(--motion-duration-local-slow)
+    var(--motion-ease-local-exit)
+    both !important;
+}
+
+@keyframes motion-note-save-sheet-collapse {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  34% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, -4px, 0) scale(.96);
+  }
+
+  76% {
+    opacity: .9;
+    border-radius: 40%;
+    transform:
+      translate3d(var(--note-save-collapse-x), var(--note-save-collapse-y), 0)
+      scale(.17);
+  }
+
+  to {
+    opacity: 0;
+    border-radius: 50%;
+    filter: blur(2px);
+    transform:
+      translate3d(var(--note-save-collapse-x), var(--note-save-collapse-y), 0)
+      scale(.055);
+  }
+}
+
+@keyframes motion-note-save-sheet-out {
+  from,
+  to {
+    opacity: 0;
+    border-radius: 50%;
+    transform:
+      translate3d(var(--note-save-collapse-x), var(--note-save-collapse-y), 0)
+      scale(.055);
+  }
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"] {
+  animation:
+    motion-note-save-layer-in
+    var(--motion-duration-global)
+    var(--motion-ease-local-enter)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="exiting"] {
+  animation:
+    motion-note-save-layer-out
+    var(--motion-duration-local-slow)
+    var(--motion-ease-local-exit)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"]
+  .note-save-celebration-glow {
+  animation:
+    motion-note-save-glow
+    var(--motion-duration-success-sprite)
+    var(--motion-ease-local-enter)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"]
+  .note-save-celebration-ring {
+  animation:
+    motion-note-save-ring
+    var(--motion-duration-success-sprite)
+    var(--motion-ease-local-enter)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"]
+  .note-save-mascot-stage {
+  animation:
+    motion-note-save-mascot-form
+    var(--motion-duration-success-sprite)
+    var(--motion-ease-global-enter)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"]
+  .note-save-mascot-strip {
+  animation:
+    motion-note-save-mascot-sprite
+    var(--motion-duration-success-sprite)
+    var(--motion-ease-success-sprite)
+    both;
+}
+
+.note-save-celebration-layer[data-note-save-phase="celebrating"]
+  .note-save-sparks > span {
+  animation:
+    motion-note-save-spark
+    var(--motion-duration-success-sprite)
+    var(--motion-ease-local-enter)
+    both;
+}
+
+@keyframes motion-note-save-layer-in {
+  from,
+  44% {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes motion-note-save-layer-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes motion-note-save-glow {
+  from,
+  30% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(.3);
+  }
+
+  58% {
+    opacity: .86;
+  }
+
+  to {
+    opacity: .5;
+    transform: translate3d(-50%, -50%, 0) scale(1);
+  }
+}
+
+@keyframes motion-note-save-ring {
+  from,
+  38% {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(.38);
+  }
+
+  46% {
+    opacity: .72;
+    transform: translate3d(-50%, -50%, 0) scale(.38);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(-50%, -50%, 0) scale(1.48);
+  }
+}
+
+@keyframes motion-note-save-mascot-form {
+  0%,
+  22% {
+    opacity: 0;
+    transform: translate3d(-50%, calc(-50% + 10px), 0) scale(.12) rotate(-16deg);
+  }
+
+  58% {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1.1) rotate(5deg);
+  }
+
+  72% {
+    transform: translate3d(-50%, -50%, 0) scale(.96) rotate(-2deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, -50%, 0) scale(1) rotate(0);
+  }
+}
+
+@keyframes motion-note-save-mascot-sprite {
+  from,
+  32% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-87.5%, 0, 0);
+  }
+}
+
+@keyframes motion-note-save-spark {
+  0%,
+  52% {
+    opacity: 0;
+    transform: rotate(45deg) scale(.2);
+  }
+
+  70% {
+    opacity: 1;
+    transform: rotate(45deg) scale(1.18);
+  }
+
+  to {
+    opacity: 0;
+    transform: rotate(45deg) scale(.72) translateY(-8px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-duration-global: 1ms;
@@ -459,17 +690,20 @@
 }
 
 .sheet-scrim[data-motion-state="entering"],
-.ai-overlay-scrim[data-motion-state="entering"] {
+.ai-overlay-scrim[data-motion-state="entering"],
+.lesson-animation-scrim[data-motion-state="entering"] {
   animation: motion-scrim-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
 
 .sheet-scrim[data-motion-state="closing"],
-.ai-overlay-scrim[data-motion-state="closing"] {
+.ai-overlay-scrim[data-motion-state="closing"],
+.lesson-animation-scrim[data-motion-state="closing"] {
   animation: motion-scrim-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
 }
 
 .sheet-scrim[data-motion-state="idle"],
-.ai-overlay-scrim[data-motion-state="idle"] {
+.ai-overlay-scrim[data-motion-state="idle"],
+.lesson-animation-scrim[data-motion-state="idle"] {
   animation: none;
 }
 
@@ -873,6 +1107,184 @@
   68% {
     opacity: 0;
     transform: scale(.78);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lesson-animation-surface[data-motion-state="entering"] {
+  animation: motion-dialog-lesson-animation-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.lesson-animation-surface[data-motion-state="closing"] {
+  animation: motion-dialog-lesson-animation-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
+}
+
+.lesson-animation-surface[data-motion-state="idle"] {
+  animation: none;
+}
+
+@keyframes motion-dialog-lesson-animation-in {
+  0%,
+  22% {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes motion-dialog-lesson-animation-out {
+  from {
+    opacity: 1;
+  }
+
+  35%,
+  to {
+    opacity: 0;
+  }
+}
+
+.lesson-animation-shared-surface,
+.lesson-animation-shared-origin {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lesson-animation-shared-surface {
+  --lesson-animation-shared-delta-x: 0px;
+  --lesson-animation-shared-delta-y: 0px;
+  --lesson-animation-shared-scale-x: 1;
+  --lesson-animation-shared-scale-y: 1;
+  --lesson-animation-target-radius: 24px;
+  --lesson-animation-origin-radius: 9px;
+  --lesson-animation-target-background: var(--color-surface);
+  --lesson-animation-target-border: var(--color-border);
+  z-index: 2;
+  transform-origin: top left;
+  border: 1px solid transparent;
+  background-color: var(--lesson-animation-target-background);
+  box-shadow: 0 6px 18px rgba(32, 38, 58, 0.18);
+}
+
+.lesson-animation-shared-surface[data-motion-state="closing"] {
+  z-index: 2;
+}
+
+.lesson-animation-shared-surface[data-motion-ready="true"][data-motion-state="entering"] {
+  visibility: visible;
+  animation: motion-dialog-lesson-animation-shared-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.lesson-animation-shared-surface[data-motion-ready="true"][data-motion-state="closing"] {
+  visibility: visible;
+  animation: motion-dialog-lesson-animation-shared-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
+}
+
+.lesson-animation-shared-origin {
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  transform-origin: center;
+}
+
+.lesson-animation-shared-origin[data-motion-ready="true"][data-motion-state="entering"] {
+  visibility: visible;
+  animation: motion-dialog-lesson-animation-origin-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.lesson-animation-shared-origin[data-motion-ready="true"][data-motion-state="closing"] {
+  visibility: visible;
+  animation: motion-dialog-lesson-animation-origin-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
+}
+
+@keyframes motion-dialog-lesson-animation-shared-in {
+  from {
+    opacity: 1;
+    transform: translate3d(var(--lesson-animation-shared-delta-x), var(--lesson-animation-shared-delta-y), 0)
+      scale(var(--lesson-animation-shared-scale-x), var(--lesson-animation-shared-scale-y));
+    border-color: transparent;
+    border-radius: var(--lesson-animation-origin-radius);
+    background-color: var(--color-primary-soft);
+  }
+
+  30% {
+    border-color: transparent;
+    border-radius: 18px;
+    background-color: var(--color-primary-soft);
+  }
+
+  62% {
+    opacity: 1;
+    border-color: var(--lesson-animation-target-border);
+    border-radius: var(--lesson-animation-target-radius);
+    background-color: var(--lesson-animation-target-background);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(1, 1);
+    border-color: var(--lesson-animation-target-border);
+    border-radius: var(--lesson-animation-target-radius);
+    background-color: var(--lesson-animation-target-background);
+  }
+}
+
+@keyframes motion-dialog-lesson-animation-shared-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1);
+    border-color: var(--lesson-animation-target-border);
+    border-radius: var(--lesson-animation-target-radius);
+    background-color: var(--lesson-animation-target-background);
+  }
+
+  48% {
+    border-color: var(--lesson-animation-target-border);
+    border-radius: var(--lesson-animation-target-radius);
+    background-color: var(--lesson-animation-target-background);
+  }
+
+  76% {
+    border-color: transparent;
+    border-radius: 18px;
+    background-color: var(--color-primary-soft);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(var(--lesson-animation-shared-delta-x), var(--lesson-animation-shared-delta-y), 0)
+      scale(var(--lesson-animation-shared-scale-x), var(--lesson-animation-shared-scale-y));
+    border-color: transparent;
+    border-radius: var(--lesson-animation-origin-radius);
+    background-color: var(--color-primary-soft);
+  }
+}
+
+@keyframes motion-dialog-lesson-animation-origin-in {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  35%,
+  to {
+    opacity: 0;
+    transform: scale(.8);
+  }
+}
+
+@keyframes motion-dialog-lesson-animation-origin-out {
+  from,
+  68% {
+    opacity: 0;
+    transform: scale(.8);
   }
 
   to {
@@ -1640,6 +2052,16 @@
   .ai-overlay-scrim,
   .ai-shared-surface,
   .ai-shared-origin-icon,
+  .lesson-animation-scrim,
+  .lesson-animation-surface,
+  .lesson-animation-shared-surface,
+  .lesson-animation-shared-origin,
+  .note-save-celebration-layer,
+  .note-save-celebration-glow,
+  .note-save-celebration-ring,
+  .note-save-mascot-stage,
+  .note-save-mascot-strip,
+  .note-save-sparks > span,
   .toast,
   .ai-orb {
     animation: none !important;
