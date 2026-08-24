@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   BookOpen,
   CheckCircle2,
+  CirclePlay,
   Upload
 } from "lucide-react";
 import {
@@ -13,7 +14,12 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
-import { useLocalMotionItem } from "../motion";
+import {
+  globalMotionFallbackMs,
+  useLocalMotionItem,
+  useMotionPresence,
+  useReducedMotion
+} from "../motion";
 import type { ApiAsset, LessonCitation } from "../types/api";
 import {
   isLessonBuildTerminal,
@@ -34,8 +40,20 @@ import {
   buildLessonReadingSections
 } from "./lessonReading";
 import { LessonAiChatEntry } from "./LessonAiChatEntry";
+import {
+  LessonAnimationDialog,
+  lessonAnimationDialogMotionNames
+} from "./LessonAnimationDialog";
+import {
+  lessonAnimationForAsset,
+  type LessonAnimation
+} from "./lessonAnimations";
 
 const legacyLessonIntroductionAssetId = "asset_ai_meiosis_fertilization_cycle_v1";
+
+function lessonAnimationKey(animation: LessonAnimation) {
+  return animation.animationId;
+}
 
 function assetPrintedPage(asset: ApiAsset) {
   if (asset.source_type !== "extracted") return null;
@@ -46,11 +64,15 @@ function assetPrintedPage(asset: ApiAsset) {
 function LessonFigure({
   asset,
   citation,
-  onOpenSource
+  onOpenSource,
+  animation = null,
+  onOpenAnimation
 }: {
   asset: ApiAsset;
   citation: LessonCitation | null;
   onOpenSource: () => void;
+  animation?: LessonAnimation | null;
+  onOpenAnimation?: (animation: LessonAnimation, origin: HTMLButtonElement) => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const image = backendAssetUrl(asset.image_url);
@@ -85,9 +107,23 @@ function LessonFigure({
         </button>
       ) : media}
       <figcaption>
-        <span>{asset.source_type === "extracted" ? "教材原图" : "AI 辅助示意"}</span>
-        {sourceLabel ? <span aria-hidden="true"> · </span> : null}
-        {sourceLabel ? <span>{sourceLabel}</span> : null}
+        <span className="lesson-figure-caption-copy">
+          <span>{asset.source_type === "extracted" ? "教材原图" : "AI 辅助示意"}</span>
+          {sourceLabel ? <span aria-hidden="true"> · </span> : null}
+          {sourceLabel ? <span>{sourceLabel}</span> : null}
+        </span>
+        {animation && onOpenAnimation ? (
+          <button
+            className="lesson-figure-animation-button"
+            type="button"
+            aria-haspopup="dialog"
+            aria-controls="lesson-animation-dialog"
+            onClick={(event) => onOpenAnimation(animation, event.currentTarget)}
+          >
+            <CirclePlay size={15} aria-hidden="true" />
+            <span>{animation.triggerLabel}</span>
+          </button>
+        ) : null}
       </figcaption>
     </figure>
   );
@@ -137,6 +173,16 @@ export function LessonScreen() {
     uploadedFile
   } = useAppContext();
   const [buildingLesson, setBuildingLesson] = useState(false);
+  const [activeAnimation, setActiveAnimation] = useState<LessonAnimation | null>(null);
+  const animationOriginRef = useRef<HTMLButtonElement | null>(null);
+  const reducedMotion = useReducedMotion();
+  const animationPresence = useMotionPresence<LessonAnimation>({
+    requested: activeAnimation,
+    getKey: lessonAnimationKey,
+    reducedMotion,
+    motionNames: lessonAnimationDialogMotionNames,
+    maxMotionMs: globalMotionFallbackMs
+  });
   const liveChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId)
     ?? parsedChapters?.[0]
     ?? null;
@@ -286,6 +332,15 @@ export function LessonScreen() {
     setLessonPageDirection(boundedPage > activeLessonPage ? "forward" : "back");
     setActiveLessonPage(boundedPage);
   }
+
+  function openLessonAnimation(animation: LessonAnimation, origin: HTMLButtonElement) {
+    animationOriginRef.current = origin;
+    setActiveAnimation(animation);
+  }
+
+  const closeLessonAnimation = useCallback(() => {
+    setActiveAnimation(null);
+  }, []);
 
   function handleLessonKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowLeft") {
@@ -467,6 +522,8 @@ export function LessonScreen() {
                                     asset={inlineAsset}
                                     citation={citation}
                                     onOpenSource={() => openAssetSource(activeSection.block.title, inlineAsset, citation)}
+                                    animation={lessonAnimationForAsset(inlineAsset.asset_id)}
+                                    onOpenAnimation={openLessonAnimation}
                                   />
                                 ) : null}
                               </Fragment>
@@ -478,6 +535,8 @@ export function LessonScreen() {
                               asset={asset}
                               citation={citation}
                               onOpenSource={() => openAssetSource(activeSection.block.title, asset, citation)}
+                              animation={lessonAnimationForAsset(asset.asset_id)}
+                              onOpenAnimation={openLessonAnimation}
                             />
                           ))}
                           {citation ? (
@@ -511,6 +570,8 @@ export function LessonScreen() {
                               asset={lessonIntroductionAsset}
                               citation={null}
                               onOpenSource={() => {}}
+                              animation={lessonAnimationForAsset(lessonIntroductionAsset.asset_id)}
+                              onOpenAnimation={openLessonAnimation}
                             />
                           ) : null}
                           {lesson.objectives.length > 0 ? (
@@ -535,6 +596,19 @@ export function LessonScreen() {
           </article>
         </div>
       </div>
+
+      {animationPresence.rendered && appShell ? createPortal(
+        <LessonAnimationDialog
+          animation={animationPresence.rendered}
+          originRef={animationOriginRef}
+          presenceId={animationPresence.presenceId}
+          state={animationPresence.state}
+          onClose={closeLessonAnimation}
+          onAnimationEnd={animationPresence.onAnimationEnd}
+          onAnimationCancel={animationPresence.onAnimationCancel}
+        />,
+        appShell
+      ) : null}
 
       {appShell ? createPortal(
         <LessonAiChatEntry
