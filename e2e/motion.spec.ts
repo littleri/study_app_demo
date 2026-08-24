@@ -277,7 +277,7 @@ async function expectLocalEntry(locator: Locator, label: string) {
 }
 
 test.describe("1. timing tokens, physical feedback, and Presence lifecycle", () => {
-  test("locks global 350ms, local 150/180/200ms, named curves, and synchronous reduced motion", async ({ page }) => {
+  test("locks global 350ms, local 150/180/200ms, catalog 360ms, named curves, and synchronous reduced motion", async ({ page }) => {
     await gotoApp(page);
     const tokens = await page.locator(".app-shell").evaluate((root) => {
       const style = getComputedStyle(root);
@@ -286,6 +286,7 @@ test.describe("1. timing tokens, physical feedback, and Presence lifecycle", () 
         "--motion-duration-local-fast",
         "--motion-duration-local-base",
         "--motion-duration-local-slow",
+        "--motion-duration-catalog-switch",
         "--motion-duration-loading",
         "--motion-ease-global-enter",
         "--motion-ease-global-exit",
@@ -301,6 +302,7 @@ test.describe("1. timing tokens, physical feedback, and Presence lifecycle", () 
       "--motion-duration-local-fast": "150ms",
       "--motion-duration-local-base": "180ms",
       "--motion-duration-local-slow": "200ms",
+      "--motion-duration-catalog-switch": "360ms",
       "--motion-duration-loading": "1200ms",
       "--motion-ease-global-enter": "cubic-bezier(.25, 1, .5, 1)",
       "--motion-ease-global-exit": "cubic-bezier(.5, 0, .75, 0)",
@@ -975,7 +977,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await pause.evaluate((element) => element.remove());
   });
 
-  test("isolates consecutive Toast generations, stale events/timers, 3200ms dwell, and 180/150ms visual phases", async ({ page }) => {
+  test("isolates consecutive Toast generations, stale events/timers, 1000ms dwell, and 180/150ms visual phases", async ({ page }) => {
     await gotoApp(page);
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen")).toBeVisible();
@@ -983,8 +985,8 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
     await installPauseStyle(page, ".toast");
-    const reminder = page.locator(".settings-row").nth(3);
-    const preferences = page.locator(".settings-row").nth(4);
+    const reminder = page.locator(".profile-header-settings");
+    const preferences = page.locator(".profile-portrait-button");
     const toast = page.locator(".toast");
 
     await reminder.focus();
@@ -1001,8 +1003,8 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     if (!staleFirst) throw new Error("first Toast generation root is missing");
     await dispatchAnimation(toast, "animationend", "motion-toast-in");
     await expect(toast).toHaveAttribute("data-motion-state", "idle");
-    await page.clock.runFor(3199);
-    await expect(toast, "Toast A remains idle through 3199ms of business dwell").toHaveAttribute("data-motion-state", "idle");
+    await page.clock.runFor(999);
+    await expect(toast, "Toast A remains idle through 999ms of business dwell").toHaveAttribute("data-motion-state", "idle");
 
     await preferences.press("Enter");
     await expect(toast).toHaveAttribute("data-motion-state", "entering");
@@ -1010,7 +1012,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     expect(secondPresence, "Toast B receives a monotonic replacement generation").toBeGreaterThan(firstPresence);
     expect(await staleFirst.evaluate((element) => element.isConnected), "Toast A root detaches for B").toBe(false);
     await page.clock.runFor(1);
-    await expect(toast, "Toast A's old 3200ms deadline cannot close B").toHaveAttribute("data-motion-state", "entering");
+    await expect(toast, "Toast A's old 1000ms deadline cannot close B").toHaveAttribute("data-motion-state", "entering");
     for (const [type, name] of [
       ["animationend", "motion-toast-in"],
       ["animationcancel", "motion-toast-in"],
@@ -1026,10 +1028,10 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await dispatchAnimation(toast, "animationcancel", "motion-toast-in");
     await expect(toast).toHaveAttribute("data-motion-state", "idle");
 
-    await page.clock.runFor(3198);
+    await page.clock.runFor(998);
     await expect(toast, "Toast B owns its full replacement dwell").toHaveAttribute("data-motion-state", "idle");
     await page.clock.runFor(1);
-    await expect(toast, "Toast B closes at exactly its own 3200ms deadline").toHaveAttribute("data-motion-state", "closing");
+    await expect(toast, "Toast B closes at exactly its own 1000ms deadline").toHaveAttribute("data-motion-state", "closing");
     const secondExitMotion = await readAnimation(toast);
     expect(secondExitMotion).toMatchObject({ duration: "0.15s", name: "motion-toast-out", playState: "paused" });
     expect(normalizeTimingFunction(secondExitMotion.timing)).toBe(curves.localExit);
@@ -1048,7 +1050,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await expect(toast, "Toast B stale exit events cannot unmount C").toHaveAttribute("data-motion-state", "entering");
     await dispatchAnimation(toast, "animationend", "motion-toast-in");
     await expect(toast).toHaveAttribute("data-motion-state", "idle");
-    await page.clock.runFor(3199);
+    await page.clock.runFor(999);
     await expect(toast).toHaveAttribute("data-motion-state", "idle");
     await page.clock.runFor(1);
     await expect(toast).toHaveAttribute("data-motion-state", "closing");
@@ -1495,8 +1497,8 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
   test("keeps Community same-state direct while rebuilt local surfaces and covers receive one new DOM entry", async ({ page }) => {
     await gotoApp(page);
-    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-detail-overview, .community-cover-image");
-    await page.locator(".primary-nav .nav-item").nth(1).click();
+    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-results-switch, .community-detail-overview, .community-cover-image");
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
     const discovery = page.locator(".community-discovery-controls");
@@ -1505,9 +1507,74 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await expect(discovery).toHaveAttribute("data-motion-item-state", "idle");
     const sameDiscovery = await discovery.elementHandle();
     if (!sameDiscovery) throw new Error("Community discovery controls root is missing");
-    await page.locator(".primary-nav .nav-item").nth(1).click();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     expect(await sameDiscovery.evaluate((element) => element === document.querySelector(".community-discovery-controls")), "same Community navigation keeps the discovery root").toBe(true);
     await expect(discovery).toHaveAttribute("data-motion-item-state", "idle");
+
+    const categories = page.getByRole("group", { name: "按学科筛选书籍" });
+    const results = page.locator(".community-results-switch");
+    await expect(results, "initial Community catalog is direct").toHaveAttribute("data-motion-item-state", "idle");
+    expect((await readAnimation(results)).name).toBe("none");
+    const recommendedResults = await results.elementHandle();
+    if (!recommendedResults) throw new Error("Community recommendation results are missing");
+
+    await categories.getByRole("button", { name: "数学", exact: true }).click();
+    await expect(results).toHaveAttribute("data-motion-item-key", "community:category:数学");
+    await expect(results).toHaveAttribute("data-community-transition-direction", "forward");
+    await expect(results).toHaveAttribute("data-motion-item-state", "entering");
+    await expect(page.locator(".community-book-card")).toHaveCount(3);
+    let resultsMotion = await readAnimation(results);
+    expect(resultsMotion).toMatchObject({ duration: "0.36s", name: "motion-local-item-in", playState: "paused" });
+    expect(normalizeTimingFunction(resultsMotion.timing)).toBe(curves.localEnter);
+    expect(
+      await results.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41),
+      "later categories enter from the right"
+    ).toBeGreaterThan(0);
+    expect(await recommendedResults.evaluate((element) => element.isConnected), "category replacement detaches the previous catalog root").toBe(false);
+    await dispatchAnimation(results, "animationend", "motion-local-item-in");
+    await expect(results).toHaveAttribute("data-motion-item-state", "idle");
+
+    const mathResults = await results.elementHandle();
+    if (!mathResults) throw new Error("Community math results are missing");
+    await categories.getByRole("button", { name: "数学", exact: true }).click();
+    await expect(results, "selecting the active category does not replay").toHaveAttribute("data-motion-item-state", "idle");
+    expect(await mathResults.evaluate((element) => element === document.querySelector(".community-results-switch")), "same category keeps the catalog root").toBe(true);
+
+    await categories.getByRole("button", { name: "生物", exact: true }).click();
+    await expect(results).toHaveAttribute("data-motion-item-key", "community:category:生物");
+    await expect(results).toHaveAttribute("data-community-transition-direction", "back");
+    await expect(results).toHaveAttribute("data-motion-item-state", "entering");
+    await expect(page.locator(".community-book-card")).toHaveCount(2);
+    resultsMotion = await readAnimation(results);
+    expect(resultsMotion).toMatchObject({ duration: "0.36s", name: "motion-local-item-in", playState: "paused" });
+    expect(
+      await results.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41),
+      "earlier categories enter from the left"
+    ).toBeLessThan(0);
+    await dispatchAnimation(results, "animationend", "motion-local-item-in");
+    await expect(results).toHaveAttribute("data-motion-item-state", "idle");
+
+    const enterPill = page.locator(".community-book-card").first().locator(".community-book-enter");
+    const enterPillBox = await enterPill.boundingBox();
+    if (!enterPillBox) throw new Error("Community entry pill geometry is missing");
+    const enterPillTransition = await readTransition(enterPill);
+    expect(enterPillTransition).toMatchObject({
+      duration: "0.15s",
+      property: "transform"
+    });
+    expect(normalizeTimingFunction(enterPillTransition.timing)).toBe(curves.localState);
+    await page.mouse.move(enterPillBox.x + (enterPillBox.width / 2), enterPillBox.y + (enterPillBox.height / 2));
+    await page.mouse.down();
+    await expect.poll(
+      () => enterPill.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).a),
+      { message: "holding the Community card enlarges its entry pill" }
+    ).toBeCloseTo(1.2, 2);
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await expect.poll(
+      () => enterPill.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).a),
+      { message: "releasing the Community card restores its entry pill" }
+    ).toBeCloseTo(1, 2);
 
     await page.locator(".community-book-card").first().click();
     await expect(page.locator(".community-detail-screen")).toBeVisible();
@@ -1530,6 +1597,23 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await expect(rebuiltCover).toHaveAttribute("data-motion-image-state", "idle");
 
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.getByRole("group", { name: "按学科筛选书籍" }).getByRole("button", { name: "化学", exact: true }).click();
+    await expect(results).toHaveAttribute("data-motion-item-key", "community:category:化学");
+    await expect(results).toHaveAttribute("data-motion-item-state", "idle");
+    await expect(page.locator(".community-book-card")).toHaveCount(1);
+    expect((await readAnimation(results)).name).toBe("none");
+    await expect(results).toHaveCSS("transform", "none");
+    const reducedEnterPill = page.locator(".community-book-enter");
+    const reducedEnterPillBox = await reducedEnterPill.boundingBox();
+    if (!reducedEnterPillBox) throw new Error("Reduced-motion Community entry pill geometry is missing");
+    await page.mouse.move(
+      reducedEnterPillBox.x + (reducedEnterPillBox.width / 2),
+      reducedEnterPillBox.y + (reducedEnterPillBox.height / 2)
+    );
+    await page.mouse.down();
+    await expect(reducedEnterPill).toHaveCSS("transform", "none");
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
     await page.locator(".community-book-card").first().click();
     await expect(detail).toHaveAttribute("data-motion-item-state", "idle");
     expect((await readAnimation(detail)).name).toBe("none");

@@ -284,7 +284,7 @@ try {
   const task = frame.locator(".timeline-item").first(); await cueClick(frame, task, "完成第 6 天任务", clickEvents, origin); await sleep(2_000);
   // The navigation itself is a visible, cued interaction and acts as the montage cut point.
   await cueClick(frame, frame.getByRole("button", { name: "返回", exact: true }), "返回首页", clickEvents, origin); await must(frame.locator(".home-dashboard")); await sleep(900);
-  await cueClick(frame, frame.getByRole("button", { name: "社区", exact: true }), "社区", clickEvents, origin); await must(frame.locator(".community-screen")); await sleep(1_900);
+  await cueClick(frame, frame.getByRole("button", { name: "发现", exact: true }), "发现", clickEvents, origin); await must(frame.locator(".community-screen")); await sleep(1_900);
   const recommended = frame.locator(".community-book-card").first(); await cueClick(frame, recommended, "打开推荐教材", clickEvents, origin); await must(frame.locator(".community-detail-screen")); await sleep(2_500);
   await page.screenshot({ path: path.join(outputDir, `16-plan-community-${takeLabel}-key.png`), type: "png" });
   keyStills["16"] = path.join(outputDir, `16-plan-community-${takeLabel}-key.png`); endSection("16");

@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   Bot,
   CheckCircle2,
+  ChevronRight,
   FileText,
   Home,
   Loader2,
@@ -13,7 +14,6 @@ import {
   SendHorizontal,
   Upload,
   User,
-  UsersRound,
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
@@ -29,6 +29,8 @@ import { IosStatusBar } from "./IosStatusBar";
 import { getRuntimePlatform } from "../platform/nativeApp";
 import { getTextbookRetriever } from "../services/TextbookRetriever";
 import { getCitationSourceText } from "../screens/sheets/citationSource";
+import { communityBooks } from "../data/mockBook";
+import { answerCommunityCourseQuery } from "../screens/communityAssistant";
 
 gsap.registerPlugin(useGSAP);
 
@@ -233,6 +235,30 @@ export function HeaderBar({
   );
 }
 
+function DiscoveryCompassIcon({
+  size = 24,
+  ...props
+}: ComponentPropsWithoutRef<"svg"> & { size?: number | string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.6 8.4-2.2 5-5 2.2 2.2-5 5-2.2Z" />
+      <circle cx="12" cy="12" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen) => void }) {
   const navRef = useRef<HTMLElement>(null);
   const selectionRef = useRef<HTMLSpanElement>(null);
@@ -248,16 +274,16 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       active: active === "home" || active === "library"
     },
     {
-      screen: "community" as Screen,
-      label: "社区",
-      icon: UsersRound,
-      active: active === "community" || active === "communityBook" || active === "communityImport"
-    },
-    {
       screen: "study" as Screen,
       label: "学习",
       icon: BookOpenCheck,
       active: active === "study" || active === "book"
+    },
+    {
+      screen: "community" as Screen,
+      label: "发现",
+      icon: DiscoveryCompassIcon,
+      active: active === "community" || active === "communityBook" || active === "communityImport"
     },
     { screen: "profile" as Screen, label: "我的", icon: User, active: active === "profile" }
   ];
@@ -379,6 +405,7 @@ export function AppShell({
   overlays,
   title,
   subtitle,
+  rightAction,
   showBack,
   onBack,
   go,
@@ -394,6 +421,7 @@ export function AppShell({
   overlays?: ReactNode;
   title?: string;
   subtitle?: string;
+  rightAction?: ReactNode;
   showBack?: boolean;
   onBack: () => void;
   go: (screen: Screen) => void;
@@ -503,7 +531,7 @@ export function AppShell({
         onPointerUpCapture={mouseDragScroll.onPointerUpCapture}
       >
         {deviceChrome}
-        {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} /> : null}
+        {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
         {active !== "study" && active !== "book" && active !== "communityBook" ? (
           <GlobalAIAssistant
@@ -622,6 +650,7 @@ type OpenGlobalAiAssistantDetail = {
 
 type AiAssistantMessage = {
   citations?: Citation[];
+  courseIds?: string[];
   retrieval?: RagRetrievalSummary;
   role: "ai" | "user";
   text: string;
@@ -631,11 +660,40 @@ type AiAssistantContent = {
   contextLabel: string;
   contextMeta: string;
   contextTitle: string;
+  contextVisible: boolean;
+  inputPlaceholder: string;
+  introDescription: string;
+  introTitle: string;
   modes: string[];
+  suggestionTitle: string;
   suggestions: string[];
+  suggestionsVisible: boolean;
 };
 
 const defaultDemoRagBookId = "book_biology_2";
+const discoveryAssistantContent: AiAssistantContent = {
+  contextLabel: "",
+  contextMeta: "",
+  contextTitle: "",
+  contextVisible: false,
+  inputPlaceholder: "输入课程名、学科或学习目标...",
+  introDescription: "输入课程名、学科、年级或学习目标，我会从发现页课程中推荐。",
+  introTitle: "想学什么？我来帮你选课",
+  modes: ["按学科推荐", "按目标推荐", "查看全部课程"],
+  suggestionTitle: "",
+  suggestions: [],
+  suggestionsVisible: false
+};
+const learningAssistantPresentation: Pick<
+  AiAssistantContent,
+  "contextVisible" | "inputPlaceholder" | "introDescription" | "introTitle" | "suggestionsVisible"
+> = {
+  contextVisible: true,
+  inputPlaceholder: "问教材、问错题、问计划...",
+  introDescription: "学习相关的问题，都可以问我哦。",
+  introTitle: "Hi，我是你的“AI学习助手”～",
+  suggestionsVisible: true
+};
 
 function getCitationPrintedPage(citation: Citation) {
   const printedPages = citation.source_metadata.printed_pages;
@@ -743,9 +801,11 @@ function GlobalAIAssistant({
     activeChapterId,
     courseSummaries,
     generatedLessons,
+    go,
     loadedBookId,
     parsedChapters,
     openSourcePage,
+    selectCommunityBook,
     uploadedFile
   } = useAppContext();
   const ragBookId = loadedBookId
@@ -763,13 +823,16 @@ function GlobalAIAssistant({
     ? generatedLessons?.find((lesson) => lesson.chapter_id === activeChapter.chapter_id) ?? null
     : generatedLessons?.[0] ?? null;
   const assistantContent = useMemo<AiAssistantContent>(() => {
+    if (active === "community") return discoveryAssistantContent;
     if (!activeChapter && !activeLesson) {
       const courseTitle = activeCourse?.title ?? "生物 必修 2《遗传与进化》";
       return {
+        ...learningAssistantPresentation,
         contextLabel: "当前教材",
         contextMeta: activeCourse ? "教材资料已准备" : "可在有可靠来源时查看教材页码",
         contextTitle: courseTitle,
         modes: ["知识点讲解", "原文问答", "复习计划"],
+        suggestionTitle: "你可能感兴趣",
         suggestions: [
           `概括《${courseTitle}》的核心知识`,
           "请根据教材原文给我出一道复习题"
@@ -786,10 +849,12 @@ function GlobalAIAssistant({
       ? `原书 ${pageStart}${pageEnd && pageEnd !== pageStart ? `–${pageEnd}` : ""} 页`
       : uploadedFile?.name ?? "当前课程";
     return {
+      ...learningAssistantPresentation,
       contextLabel: "当前课程",
       contextMeta: pageLabel,
       contextTitle: title,
       modes: ["本节讲解", "举例理解", "随堂测验"],
+      suggestionTitle: "你可能感兴趣",
       suggestions: [
         `用一句话解释“${primaryConcept}”`,
         secondaryConcept
@@ -797,7 +862,7 @@ function GlobalAIAssistant({
           : `围绕“${title}”给我出一道题`
       ]
     };
-  }, [activeChapter, activeCourse, activeLesson, uploadedFile]);
+  }, [active, activeChapter, activeCourse, activeLesson, uploadedFile]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -900,9 +965,9 @@ function GlobalAIAssistant({
   }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId]);
 
   useEffect(() => {
-    if (!dialogVisible || ragBookId !== "book_biology_2") return;
+    if (active === "community" || !dialogVisible || ragBookId !== "book_biology_2") return;
     void getTextbookRetriever().prewarm();
-  }, [dialogVisible, ragBookId]);
+  }, [active, dialogVisible, ragBookId]);
 
   useEffect(() => {
     [
@@ -1033,6 +1098,14 @@ function GlobalAIAssistant({
     }));
     setMessages((items) => [...items, { role: "user", text }]);
     setInput("");
+    if (active === "community") {
+      const answer = answerCommunityCourseQuery(text);
+      setMessages((items) => [
+        ...items,
+        { courseIds: answer.courseIds, role: "ai", text: answer.text }
+      ]);
+      return;
+    }
     setLoading(true);
     try {
       const result = await bookcourseRepository.queryRag({
@@ -1255,6 +1328,11 @@ function GlobalAIAssistant({
           messages={messages}
           reducedMotion={reducedMotion}
           onOpenCitation={openCitationSource}
+          onOpenCourse={(courseId) => {
+            requestDialogClose();
+            selectCommunityBook(courseId);
+            go("communityBook");
+          }}
           onClose={requestDialogClose}
           onAnimationEnd={dialogPresence.onAnimationEnd}
           onAnimationCancel={dialogPresence.onAnimationCancel}
@@ -1262,6 +1340,39 @@ function GlobalAIAssistant({
           submitMessage={submitMessage}
       />
     </>
+  );
+}
+
+function AiCommunityCourseLinks({
+  courseIds,
+  onOpenCourse
+}: {
+  courseIds: string[];
+  onOpenCourse: (courseId: string) => void;
+}) {
+  const courses = courseIds
+    .map((courseId) => communityBooks.find((book) => book.id === courseId))
+    .filter((book) => book !== undefined);
+  if (courses.length === 0) return null;
+
+  return (
+    <nav className="ai-message-course-links" aria-label="发现页课程链接">
+      <span>{courses.length === 1 ? "相关课程" : `相关课程 · ${courses.length} 门`}</span>
+      {courses.map((book) => (
+        <button
+          type="button"
+          key={book.id}
+          aria-label={`查看课程：${book.catalogTitle}`}
+          onClick={() => onOpenCourse(book.id)}
+        >
+          <span>
+            <strong>{book.catalogTitle}</strong>
+            <small>{book.grade} · {book.subject} · {book.version}</small>
+          </span>
+          <ChevronRight size={16} aria-hidden="true" />
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -1276,6 +1387,7 @@ function AIAssistantDialog({
   messages,
   reducedMotion,
   onOpenCitation,
+  onOpenCourse,
   onClose,
   onAnimationEnd,
   onAnimationCancel,
@@ -1292,6 +1404,7 @@ function AIAssistantDialog({
   messages: AiAssistantMessage[];
   reducedMotion: boolean;
   onOpenCitation: (citation: Citation) => void;
+  onOpenCourse: (courseId: string) => void;
   onClose: () => void;
   onAnimationEnd: (event: MotionAnimationEvent) => void;
   onAnimationCancel: (event: MotionAnimationEvent) => void;
@@ -1477,21 +1590,23 @@ function AIAssistantDialog({
         <div className="ai-dialog-scroll">
           <div className="ai-intro">
             <p>下拉查看历史对话</p>
-            <h3>Hi，我是你的“AI学习助手”～</h3>
-            <span>学习相关的问题，都可以问我哦。</span>
+            <h3>{content.introTitle}</h3>
+            <span>{content.introDescription}</span>
           </div>
-          <section className="ai-current-book">
-            <div className="ai-current-book-head">
-              <strong>{content.contextLabel}</strong>
-              <span>{content.contextMeta}</span>
-            </div>
-            <div className="ai-current-book-body">
-              <h3>{content.contextTitle}</h3>
-            </div>
-          </section>
-          {showSuggestions ? (
+          {content.contextVisible ? (
+            <section className="ai-current-book">
+              <div className="ai-current-book-head">
+                <strong>{content.contextLabel}</strong>
+                <span>{content.contextMeta}</span>
+              </div>
+              <div className="ai-current-book-body">
+                <h3>{content.contextTitle}</h3>
+              </div>
+            </section>
+          ) : null}
+          {content.suggestionsVisible && showSuggestions ? (
             <section className="ai-suggestions" aria-labelledby="ai-suggest-title">
-              <p className="ai-suggest-title" id="ai-suggest-title">你可能感兴趣</p>
+              <p className="ai-suggest-title" id="ai-suggest-title">{content.suggestionTitle}</p>
               <div className="ai-suggest-list">
                 {content.suggestions.map((item) => (
                   <button disabled={loading} type="button" key={item} onClick={() => setInput(item)}>
@@ -1549,6 +1664,9 @@ function AIAssistantDialog({
                         : "当前教材未检索到可靠原文"}</span>
                     </div>
                   ) : null}
+                  {message.role === "ai" && message.courseIds?.length ? (
+                    <AiCommunityCourseLinks courseIds={message.courseIds} onOpenCourse={onOpenCourse} />
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -1582,7 +1700,7 @@ function AIAssistantDialog({
             aria-label="向 AI 助手提问"
             disabled={loading}
             onChange={(event) => setInput(event.target.value)}
-            placeholder="问教材、问错题、问计划..."
+            placeholder={content.inputPlaceholder}
           />
           <button type="submit" aria-label="发送" disabled={loading || !input.trim()}>
             {loading

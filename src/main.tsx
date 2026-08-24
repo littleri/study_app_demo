@@ -23,6 +23,7 @@ import "./styles/parse-ready.css";
 import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
 import "./styles/course-ready.css";
+import "./styles/profile.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isPreviewStudio = searchParams.get("preview") === "device-preview";

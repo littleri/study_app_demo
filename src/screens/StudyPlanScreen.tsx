@@ -15,6 +15,13 @@ import {
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { useReducedMotion } from "../motion";
+import {
+  hasFrontEndMockStudyPlan,
+  isFrontEndMockStudyTask,
+  mergeFrontEndMockStudyTasks,
+  studyPlanCourseTitle,
+  studyTaskStatusLabel
+} from "./studyPlanPresentation";
 
 const defaultStudyPlanDays = 14;
 const minimumStudyPlanDays = 1;
@@ -38,7 +45,6 @@ export function StudyPlanScreen() {
   const { currentStudyPlan, go, setCurrentStudyPlan, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [selectedDay, setSelectedDay] = useState(1);
-  const [planLoading, setPlanLoading] = useState(false);
   const [selectedDateMotion, setSelectedDateMotion] = useState<{ day: number | null; state: "entering" | "idle" }>({ day: null, state: "idle" });
   const [completedTaskMotionIds, setCompletedTaskMotionIds] = useState<ReadonlySet<string>>(() => new Set());
   const [emptyStateMotion, setEmptyStateMotion] = useState<{ key: string; state: "entering" | "idle" }>({
@@ -46,8 +52,17 @@ export function StudyPlanScreen() {
     state: "idle"
   });
   const emptyStateSequenceRef = useRef(0);
-  const liveTasks = currentStudyPlan?.tasks ?? [];
-  const planDayCount = normalizeStudyPlanDays(currentStudyPlan?.days);
+  const usesFrontEndMockPlan = hasFrontEndMockStudyPlan(uploadedFile);
+  const liveTasks = mergeFrontEndMockStudyTasks(
+    currentStudyPlan?.tasks ?? [],
+    uploadedFile,
+    currentStudyPlan?.user_id ?? runtimeConfig.defaultUserId
+  );
+  const planDayCount = normalizeStudyPlanDays(
+    usesFrontEndMockPlan
+      ? Math.max(defaultStudyPlanDays, currentStudyPlan?.days ?? 0)
+      : currentStudyPlan?.days
+  );
   const selectedPlanDay = selectRenderablePlanDay(selectedDay, planDayCount);
   const planDays = Array.from({ length: planDayCount }, (_, index) => index + 1);
   const selectedLiveTasks = liveTasks.filter((task) => task.day === selectedPlanDay);
@@ -62,7 +77,6 @@ export function StudyPlanScreen() {
   useEffect(() => {
     if (!uploadedFile || currentStudyPlan) return;
     let active = true;
-    setPlanLoading(true);
     bookcourseRepository
       .getStudyPlan(uploadedFile.bookId, runtimeConfig.defaultUserId)
       .then((plan) => {
@@ -70,13 +84,10 @@ export function StudyPlanScreen() {
         setCurrentStudyPlan(plan);
         const normalizedPlanDays = normalizeStudyPlanDays(plan.days);
         const firstRenderableTask = plan.tasks.find((task) => selectRenderablePlanDay(task.day, normalizedPlanDays) === task.day);
-        setSelectedDay(firstRenderableTask?.day ?? minimumStudyPlanDays);
+        setSelectedDay(hasFrontEndMockStudyPlan(uploadedFile) ? minimumStudyPlanDays : firstRenderableTask?.day ?? minimumStudyPlanDays);
       })
       .catch((err) => {
         if (active) showToast(err instanceof Error ? err.message : "学习计划加载失败", "warning");
-      })
-      .finally(() => {
-        if (active) setPlanLoading(false);
       });
     return () => {
       active = false;
@@ -84,7 +95,32 @@ export function StudyPlanScreen() {
   }, [bookcourseRepository, currentStudyPlan, setCurrentStudyPlan, showToast, uploadedFile]);
 
   async function completeTask(taskId: string) {
-    const previousTask = currentStudyPlan?.tasks.find((task) => task.task_id === taskId) ?? null;
+    const previousTask = liveTasks.find((task) => task.task_id === taskId) ?? null;
+    if (previousTask && isFrontEndMockStudyTask(taskId)) {
+      const updatedTask = { ...previousTask, status: "done", score: 88, weak_points: [] };
+      const basePlan = currentStudyPlan ?? {
+        user_id: runtimeConfig.defaultUserId,
+        book_id: uploadedFile?.bookId ?? "front-end-mock-course",
+        days: defaultStudyPlanDays,
+        daily_minutes: 30,
+        tasks: []
+      };
+      setCurrentStudyPlan({
+        ...basePlan,
+        book_id: uploadedFile?.bookId ?? basePlan.book_id,
+        days: Math.max(defaultStudyPlanDays, basePlan.days),
+        tasks: liveTasks.map((task) => task.task_id === taskId ? updatedTask : task)
+      });
+      if (previousTask.status !== "done" && !reducedMotion) {
+        setCompletedTaskMotionIds((current) => {
+          const next = new Set(current);
+          next.add(taskId);
+          return next;
+        });
+      }
+      showToast("学习任务已完成");
+      return;
+    }
     try {
       const updated = await bookcourseRepository.patchStudyTask(taskId, { status: "done", score: 88, weak_points: [] });
       setCurrentStudyPlan(currentStudyPlan ? {
@@ -142,9 +178,11 @@ export function StudyPlanScreen() {
           <CalendarDays size={30} aria-hidden="true" />
         </span>
         <div>
-          <h2>{uploadedFile.name}</h2>
+          <h2>{studyPlanCourseTitle(uploadedFile.name)}</h2>
           <p>{planDayCount} 天 · 每天 {currentStudyPlan?.daily_minutes ?? 30} 分钟</p>
-          <p>计划由后端根据解析章节、错题记录和学习状态自动生成，可同步完成状态。</p>
+          <p>{usesFrontEndMockPlan
+            ? "计划根据当前课程的章节和学习内容生成，可在本地记录完成状态。"
+            : "计划由后端根据解析章节、错题记录和学习状态自动生成，可同步完成状态。"}</p>
           <ProgressBar value={Math.round((liveTasks.filter((task) => task.status === "done").length / Math.max(1, liveTasks.length)) * 100)} label={`已完成 ${liveTasks.filter((task) => task.status === "done").length} / ${liveTasks.length} 项`} />
         </div>
       </Card>
@@ -207,7 +245,7 @@ export function StudyPlanScreen() {
             </span>
             <div>
               <h3>{task.title}</h3>
-              <p>{task.task_type} · {task.minutes} 分钟 · {task.status}</p>
+              <p>{task.task_type} · {task.minutes} 分钟 · {studyTaskStatusLabel(task.status)}</p>
             </div>
           </button>
         )) : (
@@ -230,25 +268,6 @@ export function StudyPlanScreen() {
       </div>
       </Section>
       </div>
-      <Section title="计划调整记录">
-        <div className="adjustment-list">
-          {liveTasks.filter((task) => task.adjustment_reason).map((task) => (
-            <Card className="adjustment-card" key={task.task_id}>
-              <Pill tone="orange">后端调整</Pill>
-              <h3>{task.title}</h3>
-              <p>{task.adjustment_reason}</p>
-              <Button variant="secondary" onClick={() => go("flashcards")}>查看相关闪卡</Button>
-            </Card>
-          ))}
-          {!planLoading && liveTasks.filter((task) => task.adjustment_reason).length === 0 ? (
-            <Card className="adjustment-card">
-              <Pill tone="mint">暂无调整</Pill>
-              <h3>计划稳定执行中</h3>
-              <p>完成作业诊断后，低分卡点会自动追加复习任务。</p>
-            </Card>
-          ) : null}
-        </div>
-      </Section>
       <Button icon={<CalendarDays size={18} aria-hidden="true" />} onClick={() => showToast("已加入学习日历")}>加入日历</Button>
       <Button variant="secondary" onClick={() => go("lesson")}>开始今天学习</Button>
     </div>

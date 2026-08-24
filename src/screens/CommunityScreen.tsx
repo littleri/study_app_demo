@@ -32,10 +32,16 @@ export function CommunityScreen() {
   } | null>(null);
   const suppressCategoryClickRef = useRef(false);
   const [selectedCategory, setSelectedCategory] = useState<CommunityCategory>("推荐");
+  const [categoryTransitionDirection, setCategoryTransitionDirection] = useState<"forward" | "back">("forward");
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [categoryDragging, setCategoryDragging] = useState(false);
   const [query, setQuery] = useState("");
   const normalizedQuery = query.trim();
+  const categoryResultsMotion = useLocalMotionItem(
+    `community:category:${selectedCategory}`,
+    "content",
+    { animateInitial: false }
+  );
   const visibleBooks = useMemo(
     () => filterCommunityBooks(communityBooks, normalizedQuery ? "全部" : selectedCategory, query),
     [normalizedQuery, query, selectedCategory]
@@ -52,12 +58,15 @@ export function CommunityScreen() {
   }
 
   function resetDiscovery() {
-    setSelectedCategory("推荐");
-    setQuery("");
-    setCategoryMenuOpen(false);
+    selectCategory("推荐");
   }
 
   function selectCategory(category: CommunityCategory) {
+    if (category !== selectedCategory) {
+      const currentIndex = communityCategories.indexOf(selectedCategory);
+      const nextIndex = communityCategories.indexOf(category);
+      setCategoryTransitionDirection(nextIndex >= currentIndex ? "forward" : "back");
+    }
     setSelectedCategory(category);
     setQuery("");
     setCategoryMenuOpen(false);
@@ -236,46 +245,55 @@ export function CommunityScreen() {
         aria-label="社区课程"
         aria-describedby="community-result-summary"
       >
-        <p className="community-result-summary" id="community-result-summary" aria-live="polite">
-          {resultSummary}
-        </p>
+        <div
+          {...categoryResultsMotion.attributes}
+          className="community-results-switch"
+          data-community-transition-direction={categoryTransitionDirection}
+          key={categoryResultsMotion.motionKey}
+        >
+          <p className="community-result-summary" id="community-result-summary" aria-live="polite">
+            {resultSummary}
+          </p>
 
-        {visibleBooks.length ? (
-          <div className="community-grid">
-            {visibleBooks.map((book) => (
-              <button
-                className="community-book-card"
-                type="button"
-                key={book.id}
-                aria-label={`进入课程：${book.catalogTitle}`}
-                data-community-book-id={book.id}
-                data-community-subject={book.subject}
-                onClick={() => openCommunityBook(book.id)}
-              >
-                <CommunityCover source={book.cover} title={book.title} variant="tile" />
-                <span className="community-book-copy">
-                  <strong>{book.catalogTitle}</strong>
-                  <span className="community-book-bottom">
-                    <span className="community-book-meta">
-                      <small>{book.grade} · {book.version}</small>
-                      <span>{book.learners} 人学习</span>
-                    </span>
-                    <span className="community-book-enter" aria-hidden="true">进入</span>
+          {visibleBooks.length ? (
+            <div className="community-grid">
+              {visibleBooks.map((book) => (
+                <button
+                  className="community-book-card"
+                  type="button"
+                  key={book.id}
+                  aria-label={`进入课程：${book.catalogTitle}`}
+                  data-community-book-id={book.id}
+                  data-community-subject={book.subject}
+                  onClick={() => openCommunityBook(book.id)}
+                >
+                  <span className="community-book-visual">
+                    <CommunityCover source={book.cover} title={book.title} variant="tile" />
                   </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="community-empty-state">
-            <SearchX size={24} aria-hidden="true" />
-            <div role="status">
-              <h3>没有找到匹配书籍</h3>
-              <p>换一个关键词，或返回推荐分类继续看看。</p>
+                  <span className="community-book-copy">
+                    <strong>{book.catalogTitle}</strong>
+                    <span className="community-book-bottom">
+                      <span className="community-book-meta">
+                        <small>{book.grade} · {book.version}</small>
+                        <span>{book.learners} 人学习</span>
+                      </span>
+                      <span className="community-book-enter" aria-hidden="true">进入</span>
+                    </span>
+                  </span>
+                </button>
+              ))}
             </div>
-            <button type="button" onClick={resetDiscovery}>查看推荐</button>
-          </div>
-        )}
+          ) : (
+            <div className="community-empty-state">
+              <SearchX size={24} aria-hidden="true" />
+              <div role="status">
+                <h3>没有找到匹配书籍</h3>
+                <p>换一个关键词，或返回推荐分类继续看看。</p>
+              </div>
+              <button type="button" onClick={resetDiscovery}>查看推荐</button>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

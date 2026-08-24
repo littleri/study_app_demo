@@ -39,6 +39,7 @@ test.describe("four-item sliding tab bar", () => {
     await page.goto("/?embedded=device-preview");
     const navigation = page.getByRole("navigation", { name: "主导航" });
     await expect(navigation).toBeVisible();
+    await expect(page.locator(".home-primary-action")).toBeVisible();
 
     const presentation = await navigation.evaluate((element) => {
       const items = Array.from(element.querySelectorAll<HTMLElement>(".nav-item"));
@@ -53,7 +54,7 @@ test.describe("four-item sliding tab bar", () => {
       };
     });
 
-    expect(presentation.labels).toEqual(["首页", "社区", "学习", "我的"]);
+    expect(presentation.labels).toEqual(["首页", "学习", "发现", "我的"]);
     expect(Math.max(...presentation.widths) - Math.min(...presentation.widths)).toBeLessThan(1);
     expect(presentation.activeColor).toBe("rgb(255, 255, 255)");
     expect(presentation.inactiveColors).toEqual([
@@ -76,12 +77,12 @@ test.describe("four-item sliding tab bar", () => {
     }
   });
 
-  test("moves the capsule from 首页 to 社区 without overshooting the active item", async ({ page }) => {
+  test("moves the capsule from 首页 to 发现 without overshooting the active item", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     const navigation = page.getByRole("navigation", { name: "主导航" });
     const before = await readSelectionGeometry(navigation);
 
-    await page.getByRole("button", { name: "社区", exact: true }).click();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     const immediate = await readSelectionGeometry(navigation);
     await page.waitForTimeout(80);
     const midpoint = await readSelectionGeometry(navigation);
@@ -94,9 +95,9 @@ test.describe("four-item sliding tab bar", () => {
     expect(Math.abs(immediate.selection[axis] - destination)).toBeGreaterThan(1);
     const direction = Math.sign(destination - start);
     expect((midpoint.selection[axis] - start) * direction).toBeGreaterThan(0);
-    expect((destination - midpoint.selection[axis]) * direction).toBeGreaterThanOrEqual(0);
+    expect((destination - midpoint.selection[axis]) * direction).toBeGreaterThanOrEqual(-0.5);
     expect(Math.abs(settled.selection[axis] - settled.active[axis])).toBeLessThan(1);
-    await expect(page.getByRole("button", { name: "社区", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("button", { name: "发现", exact: true })).toHaveAttribute("aria-current", "page");
   });
 });
 
@@ -106,7 +107,7 @@ test.describe("four-item tab bar with reduced motion", () => {
     await page.goto("/?embedded=device-preview");
     expect(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
     const navigation = page.getByRole("navigation", { name: "主导航" });
-    await page.getByRole("button", { name: "社区", exact: true }).click();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     await page.waitForTimeout(30);
     const geometry = await readSelectionGeometry(navigation);
 

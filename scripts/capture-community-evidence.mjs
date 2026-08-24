@@ -33,7 +33,7 @@ try {
       waitUntil: "domcontentloaded",
       timeout: 10_000
     });
-    await page.getByRole("button", { name: "社区", exact: true }).click();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     await page.getByRole("heading", { name: "热门书籍", exact: true }).waitFor();
     await page.locator(".community-cover-image").last().waitFor();
 

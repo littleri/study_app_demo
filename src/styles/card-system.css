@@ -840,6 +840,76 @@ button:disabled {
   outline-offset: 2px;
 }
 
+#ai-assistant-dialog .ai-message-course-links {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+#ai-assistant-dialog .ai-message-course-links > span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#ai-assistant-dialog .ai-message-course-links > button {
+  min-width: 0;
+  min-height: var(--touch-target-min);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+  text-align: left;
+}
+
+#ai-assistant-dialog .ai-message-course-links > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+#ai-assistant-dialog .ai-message-course-links strong,
+#ai-assistant-dialog .ai-message-course-links small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#ai-assistant-dialog .ai-message-course-links strong {
+  font-size: 12px;
+}
+
+#ai-assistant-dialog .ai-message-course-links small {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+}
+
+#ai-assistant-dialog .ai-message-course-links svg {
+  flex: 0 0 auto;
+  color: var(--color-primary);
+}
+
+#ai-assistant-dialog .ai-message-course-links > button:hover {
+  color: var(--color-primary-pressed);
+  background: var(--color-primary-soft);
+}
+
+#ai-assistant-dialog .ai-message-course-links > button:active {
+  background: var(--color-primary-light);
+}
+
+#ai-assistant-dialog .ai-message-course-links > button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
   .ai-overlay {
     border-radius: 28px 28px 0 0;

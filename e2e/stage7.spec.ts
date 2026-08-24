@@ -334,7 +334,7 @@ async function openProductionChapterConfirm(page: Page) {
   await page.addInitScript(() => {
     const nativeSetTimeout = window.setTimeout.bind(window) as (...args: unknown[]) => number;
     window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args) => (
-      nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
+      nativeSetTimeout(handler, Number(timeout) === 1000 ? 60_000 : timeout ?? 0, ...args)
     )) as typeof window.setTimeout;
   });
   await openProductionParseReady(page);
@@ -610,7 +610,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     await page.addInitScript(() => {
       const nativeSetTimeout = window.setTimeout.bind(window) as (...args: unknown[]) => number;
       window.setTimeout = ((handler: TimerHandler, timeout?: number, ...args) => (
-        nativeSetTimeout(handler, Number(timeout) === 3200 ? 60_000 : timeout ?? 0, ...args)
+        nativeSetTimeout(handler, Number(timeout) === 1000 ? 60_000 : timeout ?? 0, ...args)
       )) as typeof window.setTimeout;
     });
     void bookCourseApi;

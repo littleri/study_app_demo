@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { Settings } from "lucide-react";
 import {
   ActionSheet,
   AppShell,
+  IconButton,
   Toast,
   actionSheetAnimationNames,
   type ActionSheetView
@@ -104,7 +106,7 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
   courseReady: { hideNav: true },
   library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
-  community: { title: "社区", subtitle: "发现同学分享的优质课程" },
+  community: { title: "发现", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
   communityImport: { title: "导入成功", back: true, hideNav: true },
   study: {},
@@ -130,6 +132,8 @@ const toastQuietScreens = new Set<Screen>([
   "courseReady",
   "communityImport"
 ]);
+
+const toastDwellDurationMs = 1000;
 
 function getSheetViewKey(view: ActionSheetView) {
   return view.key;
@@ -391,7 +395,7 @@ export default function App() {
     const timer = window.setTimeout(() => {
       setToast((current) => (current?.id === id ? null : current));
       if (toastTimerRef.current === timer) toastTimerRef.current = undefined;
-    }, 3200);
+    }, toastDwellDurationMs);
     toastTimerRef.current = timer;
   }, []);
 
@@ -1046,6 +1050,15 @@ export default function App() {
         )}
         title={header.title}
         subtitle={header.subtitle}
+        rightAction={screen === "profile" ? (
+          <IconButton
+            className="profile-header-settings"
+            label="设置"
+            onClick={() => showToast("设置功能正在完善")}
+          >
+            <Settings size={21} aria-hidden="true" />
+          </IconButton>
+        ) : undefined}
         showBack={header.back}
         hideNav={header.hideNav}
         onBack={back}

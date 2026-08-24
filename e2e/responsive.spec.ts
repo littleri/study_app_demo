@@ -613,9 +613,11 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expectCurrentScreenGeometry(page, ".profile-screen", [
       ".profile-workspace",
       ".profile-card",
-      ".profile-settings-list .settings-row"
+      ".profile-today-card",
+      ".profile-courses-card",
+      ".profile-header-settings"
     ], `${project.name} Profile`);
-    await page.locator(".primary-nav .nav-item").nth(1).click();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
     await expectCurrentScreenGeometry(page, ".community-screen", [

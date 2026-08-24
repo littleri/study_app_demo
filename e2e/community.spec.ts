@@ -4,7 +4,8 @@ import { getResponsiveProject } from "./fixtures/viewports";
 
 async function openCommunity(page: Page) {
   await page.goto("/?embedded=device-preview");
-  await page.getByRole("button", { name: "社区", exact: true }).click();
+  await page.getByRole("button", { name: "发现", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "发现", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "社区课程", exact: true })).toBeVisible();
   await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
 }
@@ -145,7 +146,18 @@ test.describe("community discovery", () => {
     await expect(navigation.getByRole("button")).toHaveCount(4);
     await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "打开 AI 助手", exact: true }).click();
-    await expect(page.getByRole("dialog").getByRole("heading", { name: "AI 导学助手", exact: true })).toBeVisible();
+    const assistantDialog = page.getByRole("dialog", { name: "AI 导学助手", exact: true });
+    await expect(assistantDialog.getByRole("heading", { name: "AI 导学助手", exact: true })).toBeVisible();
+    await expect(assistantDialog.getByText("想学什么？我来帮你选课", { exact: true })).toBeVisible();
+    await expect(assistantDialog.locator(".ai-current-book")).toHaveCount(0);
+    await expect(assistantDialog.locator(".ai-suggestions")).toHaveCount(0);
+    await expect(assistantDialog.locator(".ai-mode-row button")).toHaveText([
+      "按学科推荐",
+      "按目标推荐",
+      "查看全部课程"
+    ]);
+    await expect(assistantDialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true }))
+      .toHaveAttribute("placeholder", "输入课程名、学科或学习目标...");
     await page.getByRole("button", { name: "收起 AI 助手", exact: true }).click();
 
     expect(bookCourseApi.consoleErrors, "community emits no console errors").toEqual([]);
@@ -240,100 +252,44 @@ test.describe("community discovery", () => {
     expect(bookCourseApi.pageErrors, "keyboard-height assistant emits no page errors").toEqual([]);
   });
 
-  test("grounds the global assistant in offline Demo RAG and preserves conversation turns", async ({ page, bookCourseApi }) => {
-    let directDeepSeekRequests = 0;
-    await page.route("https://api.deepseek.com/chat/completions", async (route) => {
-      directDeepSeekRequests += 1;
-      await route.abort("blockedbyclient");
-    });
-
+  test("answers from the discovery catalog without RAG and links every course", async ({ page, bookCourseApi }) => {
     await openCommunity(page);
+    const initialRagRequestCount = bookCourseApi.requests.filter(({ path }) => path === "/api/rag/query").length;
     await page.getByRole("button", { name: "打开 AI 助手", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "AI 导学助手", exact: true });
-    await expect(dialog).toContainText("减数分裂和受精作用");
-    await expect(dialog.locator(".ai-current-book-body > p")).toHaveCount(0);
+    await expect(dialog.locator(".ai-current-book")).toHaveCount(0);
+    await expect(dialog.locator(".ai-suggestions")).toHaveCount(0);
     const input = dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true });
-    const suggestions = dialog.locator(".ai-suggestions");
     const modeRow = dialog.locator(".ai-mode-row");
-    const firstModeButton = modeRow.getByRole("button").first();
-    await expect(suggestions).toBeVisible();
     await expect(modeRow).toBeVisible();
-    await expect(dialog.locator(".ai-topic-row")).toHaveCount(0);
-    const modeButtonAppearance = await firstModeButton.evaluate((element) => ({
-      backgroundColor: getComputedStyle(element).backgroundColor,
-      borderTopWidth: getComputedStyle(element).borderTopWidth,
-      beforeDisplay: getComputedStyle(element, "::before").display,
-      fontSize: getComputedStyle(element).fontSize
-    }));
-    expect(modeButtonAppearance).toEqual({
-      backgroundColor: "rgba(0, 0, 0, 0)",
-      borderTopWidth: "0px",
-      beforeDisplay: "none",
-      fontSize: "14px"
-    });
-    const phoneDialogGeometry = await page.evaluate(() => {
-      const assistant = document.querySelector<HTMLElement>("#ai-assistant-dialog");
-      const header = document.querySelector<HTMLElement>(".header-bar");
-      if (!assistant || !header) throw new Error("Assistant or top navigation is missing");
-      const assistantRect = assistant.getBoundingClientRect();
-      const headerRect = header.getBoundingClientRect();
-      return {
-        isPhonePortrait: innerWidth <= 767 && innerHeight >= 600 && innerHeight > innerWidth,
-        assistantTop: assistantRect.top,
-        headerBottom: headerRect.bottom
-      };
-    });
-    if (phoneDialogGeometry.isPhonePortrait) {
-      expect(
-        Math.abs(phoneDialogGeometry.assistantTop - phoneDialogGeometry.headerBottom),
-        "the phone assistant starts at the bottom edge of the top navigation"
-      ).toBeLessThanOrEqual(2);
-    }
 
-    const firstQuestion = "噬菌体侵染细菌实验证明了什么？";
-    await input.fill(firstQuestion);
-    await expect(suggestions).toHaveCount(0);
+    await input.fill("函数与导数课程怎么样？");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
     await expect(modeRow).toHaveCount(0);
-    const firstUserBubble = dialog.locator(".ai-message-row.user .ai-message.user").first();
     const firstAiBubble = dialog.locator(".ai-message-row.ai .ai-message.ai").first();
-    const firstCitationLinks = firstAiBubble.locator(".ai-message-citations");
-    await expect(firstAiBubble).toContainText("教材原文：");
-    await expect(firstAiBubble).toContainText(/DNA|噬菌体|遗传/);
-    await expect(firstCitationLinks).toContainText("来源于教材第");
-    const citedPageLabel = await firstCitationLinks.locator(".ai-message-citation-item > span").first().innerText();
-    const citationPageButton = firstCitationLinks.getByRole("button", { name: /查看教材第.*页/ }).first();
-    await expect(citationPageButton).toContainText("查看该页");
-    await expect(firstCitationLinks).not.toContainText("DeepSeek");
-    await expect(firstCitationLinks).not.toContainText("Demo RAG");
-    await expect(firstCitationLinks).not.toContainText("PDF");
-    await expect(firstUserBubble).toContainText(firstQuestion);
-    await expect(firstUserBubble.locator(".ai-message-author")).toHaveCount(0);
-    await expect(firstUserBubble.locator("p")).toHaveCSS("color", "rgb(255, 255, 255)");
-    await expect(firstAiBubble.locator(".ai-message-author")).toHaveText("AI 导学助手");
-    const bubbleLayout = await Promise.all([firstUserBubble, firstAiBubble].map(async (bubble) => ({
-      backgroundColor: await bubble.evaluate((element) => getComputedStyle(element).backgroundColor),
-      box: await bubble.boundingBox()
-    })));
-    expect(bubbleLayout[0]?.backgroundColor, "the user turn uses a distinct filled chat bubble")
-      .not.toBe(bubbleLayout[1]?.backgroundColor);
-    expect(bubbleLayout[0]?.box?.x ?? 0, "the user bubble is right aligned")
-      .toBeGreaterThan(bubbleLayout[1]?.box?.x ?? 0);
+    await expect(firstAiBubble).toContainText("函数与导数");
+    await expect(firstAiBubble).toContainText("北师大版");
+    await expect(firstAiBubble.locator(".ai-message-citations")).toHaveCount(0);
+    await expect(firstAiBubble.getByRole("button", { name: "查看课程：函数与导数", exact: true })).toBeVisible();
 
-    await input.fill("你好");
+    await input.fill("查看全部课程");
     await dialog.getByRole("button", { name: "发送", exact: true }).click();
-    await expect(dialog.locator(".ai-message.ai").last()).toContainText("你好！我是你的学习助手");
+    const catalogReply = dialog.locator(".ai-message-row.ai .ai-message.ai").last();
+    await expect(catalogReply).toContainText("发现页共有 10 门课程");
+    await expect(catalogReply.getByRole("button", { name: /^查看课程：/ })).toHaveCount(10);
     await expect(dialog.locator(".ai-message-row.user")).toHaveCount(2);
     await expect(dialog.locator(".ai-message-row.ai")).toHaveCount(2);
-    expect(directDeepSeekRequests, "the default offline demo never sends a DeepSeek request").toBe(0);
-    await citationPageButton.click();
-    await expect(page.locator(".source-reader-screen")).toBeVisible();
-    await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);
-    await expect(page.locator(".source-page-image")).toBeVisible();
-    await expect(page.locator(".source-page-image")).toHaveAttribute("src", /\/assets\/textbook\/pages\/page_\d{3}\.jpeg/);
-    expect(bookCourseApi.externalRequests, "the offline Demo RAG needs no external request").toEqual([]);
-    expect(bookCourseApi.consoleErrors, "grounded global assistant emits no console errors").toEqual([]);
-    expect(bookCourseApi.pageErrors, "grounded global assistant emits no page errors").toEqual([]);
+    expect(
+      bookCourseApi.requests.filter(({ path }) => path === "/api/rag/query").length,
+      "the discovery assistant never queries the textbook RAG endpoint"
+    ).toBe(initialRagRequestCount);
+
+    await catalogReply.getByRole("button", { name: "查看课程：数学必修第二册", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "AI 导学助手", exact: true })).toHaveCount(0);
+    await expect(page.locator(".community-detail-screen").getByRole("heading", { name: "数学必修第二册同步课", exact: true })).toBeVisible();
+    expect(bookCourseApi.externalRequests, "the catalog assistant needs no external request").toEqual([]);
+    expect(bookCourseApi.consoleErrors, "catalog assistant emits no console errors").toEqual([]);
+    expect(bookCourseApi.pageErrors, "catalog assistant emits no page errors").toEqual([]);
   });
 
   test("keeps the two-column solid-surface system across paired viewports", async ({ page }, testInfo) => {
@@ -347,7 +303,9 @@ test.describe("community discovery", () => {
       const discoveryControls = document.querySelector<HTMLElement>(".community-discovery-controls");
       const search = document.querySelector<HTMLElement>(".community-search-field");
       const card = document.querySelector<HTMLElement>(".community-book-card");
+      const visual = document.querySelector<HTMLElement>(".community-book-visual");
       const cover = document.querySelector<HTMLElement>(".community-book-cover, .community-book-cover-fallback");
+      const copy = document.querySelector<HTMLElement>(".community-book-copy");
       const enter = document.querySelector<HTMLElement>(".community-book-enter");
       const bookBottom = document.querySelector<HTMLElement>(".community-book-bottom");
       const bookMeta = document.querySelector<HTMLElement>(".community-book-meta");
@@ -356,7 +314,7 @@ test.describe("community discovery", () => {
       const categoryMore = document.querySelector<HTMLElement>(".community-category-more");
       const resultSummary = document.querySelector<HTMLElement>("#community-result-summary");
       const selected = document.querySelector<HTMLElement>('.community-category-button[aria-pressed="true"]');
-      if (!app || !screenContent || !headerBar || !discoveryControls || !search || !card || !cover || !enter || !bookBottom || !bookMeta || !categoryRail || !categoryList || !categoryMore || !resultSummary || !selected) {
+      if (!app || !screenContent || !headerBar || !discoveryControls || !search || !card || !visual || !cover || !copy || !enter || !bookBottom || !bookMeta || !categoryRail || !categoryList || !categoryMore || !resultSummary || !selected) {
         throw new Error("Community visual surfaces are missing");
       }
       const read = (element: HTMLElement) => {
@@ -378,6 +336,10 @@ test.describe("community discovery", () => {
       const bookBottomRect = bookBottom.getBoundingClientRect();
       const bookMetaRect = bookMeta.getBoundingClientRect();
       const enterRect = enter.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const visualRect = visual.getBoundingClientRect();
+      const copyRect = copy.getBoundingClientRect();
+      const usesHorizontalCardLayout = Math.abs(visualRect.right - copyRect.left) < 1;
       const categoryListStyle = getComputedStyle(categoryList);
       const categoryScrollbarStyle = getComputedStyle(categoryList, "::-webkit-scrollbar");
       const categoryMoreFade = getComputedStyle(categoryMore, "::before");
@@ -399,12 +361,26 @@ test.describe("community discovery", () => {
           backdropBackgroundColor: discoveryControlsBackdrop.backgroundColor,
           backdropBoxShadow: discoveryControlsBackdrop.boxShadow
         },
-        search: read(search),
+        search: {
+          ...read(search),
+          borderRadius: getComputedStyle(search).borderRadius
+        },
         card: {
           ...read(card),
           borderTopWidth: cardStyle.borderTopWidth,
           borderRadius: cardStyle.borderRadius
         },
+        visual: {
+          ...read(visual),
+          fillsCardEdge: usesHorizontalCardLayout
+            ? Math.abs(visualRect.height - cardRect.height) < 1
+            : Math.abs(visualRect.width - cardRect.width) < 1,
+          meetsCopy: usesHorizontalCardLayout
+            ? Math.abs(visualRect.right - copyRect.left) < 1
+            : Math.abs(visualRect.bottom - copyRect.top) < 1,
+          topInset: visualRect.top - cardRect.top
+        },
+        copy: read(copy),
         cover: {
           ...read(cover),
           borderTopColor: coverStyle.borderTopColor,
@@ -425,8 +401,9 @@ test.describe("community discovery", () => {
           height: selected.getBoundingClientRect().height,
           borderRadius: selectedStyle.borderRadius,
           borderTopWidth: selectedStyle.borderTopWidth,
+          color: selectedStyle.color,
           fontSize: selectedStyle.fontSize,
-          indicatorColor: selectedIndicator.backgroundColor
+          indicatorContent: selectedIndicator.content
         },
         categoryRail: {
           ...read(categoryRail),
@@ -485,7 +462,8 @@ test.describe("community discovery", () => {
       backgroundColor: "rgb(255, 255, 255)",
       backgroundImage: "none",
       backdropFilter: "none",
-      boxShadow: "none"
+      boxShadow: "none",
+      borderRadius: "999px"
     });
     expect(styles.card).toMatchObject({
       backgroundColor: "rgb(255, 255, 255)",
@@ -495,6 +473,17 @@ test.describe("community discovery", () => {
       borderRadius: "14px"
     });
     expect(styles.card.boxShadow).not.toBe("none");
+    expect(styles.visual).toMatchObject({
+      backgroundColor: "rgb(223, 245, 235)",
+      backgroundImage: "none",
+      fillsCardEdge: true,
+      meetsCopy: true,
+      topInset: 0
+    });
+    expect(styles.copy).toMatchObject({
+      backgroundColor: "rgb(255, 255, 255)",
+      backgroundImage: "none"
+    });
     expect(styles.cover.borderTopColor).toBe("rgb(255, 255, 255)");
     expect(styles.cover.borderTopWidth).toBe("3px");
     expect(styles.cover.boxSizing).toBe("border-box");
@@ -513,8 +502,9 @@ test.describe("community discovery", () => {
     expect(styles.selected.backdropFilter).toBe("none");
     expect(styles.selected.borderRadius).toBe("0px");
     expect(styles.selected.borderTopWidth).toBe("0px");
+    expect(styles.selected.color).toBe("rgb(124, 58, 237)");
     expect(styles.selected.fontSize).toBe("16.9px");
-    expect(styles.selected.indicatorColor).toBe("rgb(124, 58, 237)");
+    expect(styles.selected.indicatorContent).toBe("none");
     expect(styles.selected.height).toBeGreaterThanOrEqual(43.5);
     expect(styles.categoryRail).toMatchObject({
       backgroundColor: "rgb(215, 222, 232)",
@@ -543,7 +533,27 @@ test.describe("community discovery", () => {
     expect(styles.spacing.railToResults, "category rail and result summary use the compact vertical rhythm").toBeLessThan(32);
     expect(styles.touchViolations, "all visible community buttons meet the 44px target").toEqual([]);
 
-    await page.getByLabel("搜索课程", { exact: true }).fill("课");
+    const searchInput = page.getByLabel("搜索课程", { exact: true });
+    const searchField = page.locator(".community-search-field");
+    await searchInput.focus();
+    await expect(searchField).toHaveCSS("border-top-color", "rgb(124, 58, 237)");
+    const focusedSearchStyles = await searchField.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        borderTopColor: style.borderTopColor,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow,
+        outlineStyle: style.outlineStyle
+      };
+    });
+    expect(focusedSearchStyles).toMatchObject({
+      borderTopColor: "rgb(124, 58, 237)",
+      borderRadius: "999px",
+      outlineStyle: "none"
+    });
+    expect(focusedSearchStyles.boxShadow, "the search focus ring stays inside its sticky container").toContain("inset");
+
+    await searchInput.fill("课");
     await expectTwoColumnCommunityGrid(page, `${project.name}: initial viewport`);
 
     const screenScroller = page.locator(".screen-content");

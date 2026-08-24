@@ -1070,7 +1070,8 @@
 }
 
 /* Stage 4C keeps the remaining screens at a single, explicit local surface.
-   List rows, metric grids, and the Community grid deliberately stay static. */
+   List rows and metric grids stay static; Community only moves its explicit
+   category-replacement wrapper when the visible catalog changes. */
 .community-cover-image[data-motion-image-state="loading"] {
   opacity: 0;
 }
