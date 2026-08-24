@@ -28,19 +28,25 @@ export function normalizeStudyLocation(
   directory: readonly ChapterTreeNode[],
   location?: StudyLocation | null
 ): StudyLocation {
-  const chapter = directory.find((node) => node.chapter.chapter_id === location?.expandedChapterId)
-    ?? directory[0]
-    ?? null;
-  const sections = chapter?.children.length
-    ? chapter.children
-    : chapter
-      ? [chapter]
-      : [];
-  const section = sections.find((node) => node.chapter.chapter_id === location?.expandedSectionId)
-    ?? sections[0]
-    ?? null;
+  const hasSavedLocation = location !== null && location !== undefined;
+  const chapterWasCollapsed = hasSavedLocation && location.expandedChapterId === null;
+  const sectionWasCollapsed = hasSavedLocation && location.expandedSectionId === null;
+  const chapter = chapterWasCollapsed
+    ? null
+    : directory.find((node) => node.chapter.chapter_id === location?.expandedChapterId)
+      ?? directory[0]
+      ?? null;
+  const sections = chapter
+    ? chapter.children.length > 0
+      ? chapter.children
+      : [chapter]
+    : directory.flatMap((node) => node.children.length > 0 ? node.children : [node]);
+  const section = sectionWasCollapsed
+    ? null
+    : sections.find((node) => node.chapter.chapter_id === location?.expandedSectionId)
+      ?? (chapter ? sections[0] ?? null : null);
   return {
-    expandedChapterId: chapter?.chapter.chapter_id ?? null,
+    expandedChapterId: chapterWasCollapsed ? null : chapter?.chapter.chapter_id ?? null,
     expandedSectionId: section?.chapter.chapter_id ?? null
   };
 }

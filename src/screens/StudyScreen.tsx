@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ChapterToolCards } from "../components/study/ChapterToolCards";
 import { Button, ProgressBar } from "../components/ui";
+import { runtimeConfig } from "../config/runtime";
 import { useAppContext } from "../context/AppContext";
 import { CollapsibleRegion, MotionIconSwap } from "../motion";
 import type { ApiChapter, StudyTask } from "../types/api";
@@ -24,6 +25,7 @@ import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 import { buildStudyDirectory, normalizeStudyLocation } from "./studyDirectory";
+import { currentStudyPlanTask, mergeFrontEndMockStudyTasks } from "./studyPlanPresentation";
 
 const curatedBiologyBookId = "book_biology_2";
 
@@ -442,11 +444,16 @@ export function StudyScreen() {
     };
   }, [courseSelectionLoadingId, courseSummariesLoadState, currentBookId, parsedChapters?.length]);
 
-  const totalTasks = currentStudyPlan?.tasks.length ?? 0;
-  const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
+  const studyTasks = useMemo(() => mergeFrontEndMockStudyTasks(
+    currentStudyPlan?.tasks ?? [],
+    uploadedFile,
+    currentStudyPlan?.user_id ?? runtimeConfig.defaultUserId
+  ), [currentStudyPlan, uploadedFile]);
+  const totalTasks = studyTasks.length;
+  const completedTasks = studyTasks.filter((task) => task.status === "done").length;
   const usesCuratedBiologyProgress = currentBookId === curatedBiologyBookId;
   const chapterProgresses = chapterTree.map((node) => (
-    calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))
+    calculateChapterProgress(studyTasks, getChapterNodeIds(node))
   ));
   const planProgress = usesCuratedBiologyProgress && chapterProgresses.length > 0
     ? Math.round(chapterProgresses.reduce((sum, progress) => sum + progress, 0) / chapterProgresses.length)
@@ -457,14 +464,18 @@ export function StudyScreen() {
     () => new Set(chapterTree.flatMap((node) => getStudySections(node).map((section) => section.chapter.chapter_id))),
     [chapterTree]
   );
-  const currentSection = activeChapters?.find((chapter) => (
-    chapter.chapter_id === location.expandedSectionId && visibleSectionIds.has(chapter.chapter_id)
-  ))
-    ?? activeChapters?.find((chapter) => chapter.chapter_id === defaultLocation.expandedSectionId)
-    ?? null;
-  const currentLesson = generatedLessons?.find((lesson) => lesson.chapter_id === currentSection?.chapter_id);
+  const activePlanTask = currentStudyPlanTask(studyTasks);
+  const activePlanSection = activeChapters?.find((chapter) => (
+    chapter.chapter_id === activePlanTask?.chapter_id && visibleSectionIds.has(chapter.chapter_id)
+  )) ?? null;
+  const activePlanLesson = generatedLessons?.find((lesson) => lesson.chapter_id === activePlanSection?.chapter_id);
+  const activePlanTitle = activePlanLesson?.title
+    ?? activePlanSection?.source_title
+    ?? activePlanTask?.title
+    ?? chapterTree[0]?.chapter.source_title
+    ?? "从第一节开始";
   const bookTitle = liveBookTitle(uploadedFile, parsedScanResult);
-  const todayMinutes = currentStudyPlan?.daily_minutes ?? 25;
+  const todayMinutes = activePlanTask?.minutes ?? currentStudyPlan?.daily_minutes ?? 25;
 
   function toggleChapter(node: ChapterTreeNode) {
     if (!currentBookId) return;
@@ -553,15 +564,9 @@ export function StudyScreen() {
               <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
               <div>
                 <small>
-                  {usesCuratedBiologyProgress
-                    ? `今日建议 · ${todayMinutes} 分钟`
-                    : `今日建议 · ${todayMinutes} 分钟`}
+                  今日建议 · {todayMinutes} 分钟
                 </small>
-                <strong>
-                  {usesCuratedBiologyProgress
-                    ? currentLesson?.title ?? currentSection?.source_title ?? chapterTree[0]?.chapter.source_title ?? "从第一节开始"
-                    : currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}
-                </strong>
+                <strong>{activePlanTitle}</strong>
               </div>
             </div>
           </div>
@@ -581,7 +586,7 @@ export function StudyScreen() {
               node={node}
               chapterIndex={index}
               progress={chapterProgresses[index] ?? 0}
-              tasks={currentStudyPlan?.tasks ?? []}
+              tasks={studyTasks}
               location={location}
               onToggleChapter={() => toggleChapter(node)}
               onToggleSection={toggleSection}

@@ -8,6 +8,7 @@ type HomeBookCarouselProps = Readonly<{
   selectedBookId: string | null;
   listState: HomeBookListState;
   onSelectBook: (bookId: string) => void;
+  onOpenBook: (bookId: string) => void;
   onAddBook: () => void;
   onOpenLibrary: () => void;
 }>;
@@ -33,6 +34,7 @@ export function HomeBookCarousel({
   selectedBookId,
   listState,
   onSelectBook,
+  onOpenBook,
   onAddBook,
   onOpenLibrary
 }: HomeBookCarouselProps) {
@@ -199,6 +201,10 @@ export function HomeBookCarousel({
 
   function handleBookClick(bookId: string) {
     if (suppressClickRef.current) return;
+    if (bookId === selectedBookId) {
+      onOpenBook(bookId);
+      return;
+    }
     onSelectBook(bookId);
   }
 
@@ -268,7 +274,7 @@ export function HomeBookCarousel({
                   type="button"
                   role="option"
                   aria-selected={selected}
-                  aria-label={`${book.title}，第 ${index + 1} 本，共 ${books.length} 本，${book.statusLabel}${selected ? "，当前选中" : ""}`}
+                  aria-label={`${book.title}，第 ${index + 1} 本，共 ${books.length} 本，${book.statusLabel}${selected ? "，当前选中，点击进入课程详情" : "，点击切换到这本教材"}`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => handleBookClick(book.bookId)}
                 >

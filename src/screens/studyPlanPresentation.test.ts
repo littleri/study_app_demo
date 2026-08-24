@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { StudyTask } from "../types/api";
 import type { UploadedCourseFile } from "../types/app";
 import {
+  currentStudyPlanTask,
   hasFrontEndMockStudyPlan,
   isFrontEndMockStudyTask,
   mergeFrontEndMockStudyTasks,
@@ -44,6 +45,27 @@ describe("study plan presentation", () => {
     expect(studyTaskStatusLabel("done")).toBe("已完成");
   });
 
+  it("uses the in-progress task as the current learning-plan position", () => {
+    const tasks = [
+      task(1),
+      { ...task(5), chapter_id: "c2s1", status: "in_progress" },
+      task(6)
+    ];
+    expect(currentStudyPlanTask(tasks)).toMatchObject({
+      day: 5,
+      chapter_id: "c2s1",
+      status: "in_progress"
+    });
+  });
+
+  it("falls back to the first unfinished task when nothing is in progress", () => {
+    const tasks = [
+      { ...task(1), status: "done" },
+      { ...task(2), chapter_id: "c1s2" }
+    ];
+    expect(currentStudyPlanTask(tasks)).toMatchObject({ day: 2, chapter_id: "c1s2" });
+  });
+
   it("fills missing mock-course days without replacing backend tasks", () => {
     const backendTasks = Array.from({ length: 10 }, (_, index) => task(index + 5));
     const merged = mergeFrontEndMockStudyTasks(backendTasks, biologyFile, "learner");
@@ -52,7 +74,22 @@ describe("study plan presentation", () => {
     expect(merged.map((item) => item.day)).toEqual(Array.from({ length: 14 }, (_, index) => index + 1));
     expect(merged.find((item) => item.day === 5)?.task_id).toBe("backend-day-5");
     expect(merged.find((item) => item.day === 1)?.title).toBe("孟德尔实验导读");
+    expect(merged.filter((item) => item.day <= 4).every((item) => item.status === "done")).toBe(true);
     expect(isFrontEndMockStudyTask(merged.find((item) => item.day === 1)?.task_id ?? "")).toBe(true);
+  });
+
+  it("positions a fully mocked biology plan after chapter one", () => {
+    const merged = mergeFrontEndMockStudyTasks([], biologyFile, "learner");
+    expect(merged.filter((item) => item.day <= 4).map((item) => item.status)).toEqual([
+      "done",
+      "done",
+      "done",
+      "done"
+    ]);
+    expect(merged.find((item) => item.day === 5)).toMatchObject({
+      chapter_id: "c2s1",
+      status: "in_progress"
+    });
   });
 
   it("leaves non-mock courses unchanged", () => {

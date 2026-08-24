@@ -23,6 +23,13 @@ describe("buildStudyDirectory", () => {
     expect(chapterTwo?.children.map((node) => node.chapter.chapter_id)).not.toContain("c2s1b");
   });
 
+  it("opens the first visible chapter and section when no location has been saved", () => {
+    expect(normalizeStudyLocation(directory)).toEqual({
+      expandedChapterId: "c1",
+      expandedSectionId: "c1s1"
+    });
+  });
+
   it("migrates saved frontmatter and nested-heading locations to visible sections", () => {
     expect(normalizeStudyLocation(directory, {
       expandedChapterId: "frontmatter",
@@ -32,5 +39,19 @@ describe("buildStudyDirectory", () => {
       expandedChapterId: "c2",
       expandedSectionId: "c2s1a"
     })).toEqual({ expandedChapterId: "c2", expandedSectionId: "c2s1" });
+  });
+
+  it("preserves an explicitly collapsed chapter", () => {
+    expect(normalizeStudyLocation(directory, {
+      expandedChapterId: null,
+      expandedSectionId: "c1s1"
+    })).toEqual({ expandedChapterId: null, expandedSectionId: "c1s1" });
+  });
+
+  it("preserves an explicitly collapsed section", () => {
+    expect(normalizeStudyLocation(directory, {
+      expandedChapterId: "c1",
+      expandedSectionId: null
+    })).toEqual({ expandedChapterId: "c1", expandedSectionId: null });
   });
 });

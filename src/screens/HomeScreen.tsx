@@ -281,6 +281,22 @@ export function HomeScreen() {
     go(toolId === "assignment" ? "assignment" : "flashcards");
   }
 
+  async function openBookDetail(bookId: string) {
+    const book = books.find((candidate) => candidate.bookId === bookId);
+    if (!book) return;
+    if (book.status !== "ready") {
+      await openBookStatus(book);
+      return;
+    }
+
+    hasUserSelectedBookRef.current = true;
+    setFailedSelectionBookId(null);
+    setSelectionError(null);
+    setSelectedBookId(bookId);
+    const opened = await selectCourse(bookId);
+    if (opened) go("study");
+  }
+
   function explainPreviewAction(action: HomeBookPreviewAction) {
     if (!selectedBook || !selectedStudyPreview) return;
     const actionLabel = action === "lesson"
@@ -343,6 +359,7 @@ export function HomeScreen() {
             selectedBookId={selectedBookId}
             listState={listState}
             onSelectBook={handleSelectBook}
+            onOpenBook={(bookId) => void openBookDetail(bookId)}
             onAddBook={() => go("upload")}
             onOpenLibrary={() => go("library")}
           />

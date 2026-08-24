@@ -34,6 +34,18 @@ export function studyTaskStatusLabel(status: string) {
   return "待完成";
 }
 
+export function currentStudyPlanTask(tasks: readonly StudyTask[]): StudyTask | null {
+  const inProgressTask = tasks.find((task) => {
+    const status = task.status.trim().toLowerCase();
+    return status === "in_progress" || status === "processing";
+  });
+  if (inProgressTask) return inProgressTask;
+  return tasks.find((task) => {
+    const status = task.status.trim().toLowerCase();
+    return status !== "done" && status !== "completed";
+  }) ?? null;
+}
+
 export function hasFrontEndMockStudyPlan(uploadedFile: UploadedCourseFile | null) {
   if (!uploadedFile) return false;
   return uploadedFile.bookId === demoBook.id || studyPlanCourseTitle(uploadedFile.name).includes("遗传与进化");
@@ -56,7 +68,7 @@ function createBiologyMockTasks(userId: string): StudyTask[] {
         : day === 6
           ? "同源染色体、减数第一次分裂"
           : null,
-      status: "pending",
+      status: day < 5 ? "done" : day === 5 ? "in_progress" : "pending",
       weak_points: []
     };
   });
