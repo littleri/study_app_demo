@@ -1555,6 +1555,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await expect(results).toHaveAttribute("data-motion-item-state", "idle");
 
     const enterPill = page.locator(".community-book-card").first().locator(".community-book-enter");
+    await enterPill.scrollIntoViewIfNeeded();
     const enterPillBox = await enterPill.boundingBox();
     if (!enterPillBox) throw new Error("Community entry pill geometry is missing");
     const enterPillTransition = await readTransition(enterPill);
@@ -1622,6 +1623,94 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await expect(imported).toHaveAttribute("data-motion-course-ready-state", "idle");
     expect((await readAnimation(imported)).name).toBe("none");
     await pause.evaluate((element) => element.remove());
+  });
+
+  test("reuses the generated-course completion sequence after importing a discovery course", async ({ page }) => {
+    await gotoApp(page);
+    await page.locator(".primary-nav .nav-item").nth(2).click();
+    await expect(page.locator(".community-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".community-book-card").first().click();
+    await expect(page.locator(".community-detail-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".community-detail-actions .button").click();
+    await settleScreen(page);
+
+    const imported = page.locator(".community-import-screen.course-ready-focus");
+    const copy = imported.locator(".course-ready-focus-copy");
+    const actions = imported.locator(".course-ready-focus-actions .button");
+    const enterStudy = actions.first();
+    const viewPlan = actions.last();
+    const sprite = imported.locator(".course-ready-success-sprite-strip");
+
+    await expect(imported, "Discovery import starts with the shared centered mascot celebration").toHaveAttribute(
+      "data-course-ready-phase",
+      "celebrating"
+    );
+    await expect(page.locator(".header-bar"), "the focused completion flow does not duplicate its status heading").toHaveCount(0);
+    await expect(imported.locator(".course-ready-support"), "the legacy import metrics panel is removed").toHaveCount(0);
+    await expect(sprite).toHaveAttribute("src", "/assets/brand/success/cloud-mascot-success-strip-v1.png");
+    expect(await readAnimation(sprite)).toMatchObject({ duration: "0.9s", name: "course-ready-success-sprite" });
+    await expect(copy).toHaveAttribute("aria-hidden", "true");
+    await expect(enterStudy).toBeDisabled();
+    await expect(viewPlan).toBeDisabled();
+
+    await expect(imported, "the imported-course mascot moves into its compact position").toHaveAttribute(
+      "data-course-ready-phase",
+      "moving",
+      { timeout: 1_200 }
+    );
+    await expect(imported, "the imported-course copy follows the mascot movement").toHaveAttribute(
+      "data-course-ready-phase",
+      "revealing",
+      { timeout: 800 }
+    );
+    await expect(copy).toHaveAttribute("aria-hidden", "false");
+    await expect(enterStudy).toBeDisabled();
+    await expect(viewPlan).toBeDisabled();
+    await expect(imported, "the imported-course actions unlock after the reveal completes").toHaveAttribute(
+      "data-course-ready-phase",
+      "settled",
+      { timeout: 600 }
+    );
+    await expect(enterStudy).toBeEnabled();
+    await expect(viewPlan).toBeEnabled();
+
+    const firstCompletionKey = await imported.locator(".course-ready-success-mark").getAttribute("data-motion-course-ready-key");
+    await viewPlan.click();
+    await expect(page.locator(".study-plan-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".header-bar .icon-button").click();
+    await settleScreen(page);
+    const returnedImport = page.locator(".community-import-screen.course-ready-focus");
+    await expect(returnedImport, "returning to the same import transaction does not replay its celebration").toHaveAttribute(
+      "data-course-ready-phase",
+      "settled"
+    );
+    await expect(returnedImport.locator(".course-ready-success-mark")).toHaveAttribute(
+      "data-motion-course-ready-key",
+      firstCompletionKey ?? ""
+    );
+
+    await enterStudy.click();
+    await expect(page.locator(".book-course-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".primary-nav .nav-item").nth(2).click();
+    await expect(page.locator(".community-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".community-book-card").first().click();
+    await expect(page.locator(".community-detail-screen")).toBeVisible();
+    await settleScreen(page);
+    await page.locator(".community-detail-actions .button").click();
+    await settleScreen(page);
+
+    const repeatedImport = page.locator(".community-import-screen.course-ready-focus");
+    const repeatedCompletionKey = await repeatedImport.locator(".course-ready-success-mark").getAttribute("data-motion-course-ready-key");
+    expect(repeatedCompletionKey, "a repeated import receives a fresh completion transaction key").not.toBe(firstCompletionKey);
+    await expect(repeatedImport, "importing the same discovery course again replays the celebration").toHaveAttribute(
+      "data-course-ready-phase",
+      "celebrating"
+    );
   });
 
   test("keeps StudyPlan date and task feedback one-shot and direct for same-state or reduced updates", async ({ page }) => {
@@ -1830,6 +1919,68 @@ test.describe("5. local collapse, filter, and flashcard state motion", () => {
     await expect(root).toHaveAttribute("data-motion-flash-state", "idle");
     expect((await readAnimation(card)).name).toBe("none");
     expect(await root.evaluate((element) => getComputedStyle(element).perspective)).toBe("none");
+  });
+
+  test("switches the whole flashcard with the assignment postcard choreography", async ({ page }) => {
+    await openFlashcards(page);
+    const card = page.locator(".memory-card");
+    const reveal = page.locator(".memory-reveal");
+    const content = page.locator(".memory-card-answer-motion");
+    const progress = page.locator(".flashcard-progress");
+    const initialCardKey = await content.getAttribute("data-motion-flash-card");
+    const initialProgress = await progress.getAttribute("aria-valuenow");
+    const pause = await installPauseStyle(page, ".memory-card");
+
+    await reveal.focus();
+    await reveal.press("ArrowLeft");
+    await expect(card).toHaveAttribute("data-motion-flash-card-state", "exiting");
+    await expect(content).toHaveAttribute("data-motion-flash-card", initialCardKey ?? "");
+    await expect(progress).toHaveAttribute("aria-valuenow", initialProgress ?? "1");
+    await expect(reveal).toBeDisabled();
+    let motion = await readAnimation(card);
+    expect(motion).toMatchObject({
+      duration: "0.15s",
+      name: "motion-flashcard-postcard-out",
+      playState: "paused"
+    });
+    expect(normalizeTimingFunction(motion.timing)).toBe(curves.localExit);
+
+    await dispatchAnimation(card, "animationend", "motion-flashcard-postcard-out");
+    await expect(card).toHaveAttribute("data-motion-flash-card-state", "entering");
+    await expect(content).not.toHaveAttribute("data-motion-flash-card", initialCardKey ?? "");
+    await expect(progress).not.toHaveAttribute("aria-valuenow", initialProgress ?? "1");
+    motion = await readAnimation(card);
+    expect(motion).toMatchObject({
+      duration: "0.2s",
+      name: "motion-flashcard-postcard-in",
+      playState: "paused"
+    });
+    expect(normalizeTimingFunction(motion.timing)).toBe(curves.localEnter);
+
+    await dispatchAnimation(card, "animationend", "motion-flashcard-postcard-in");
+    await expect(card).toHaveAttribute("data-motion-flash-card-state", "idle");
+    await expect(reveal).toBeEnabled();
+    await pause.evaluate((element) => element.remove());
+
+    const beforeSwipeKey = await content.getAttribute("data-motion-flash-card");
+    const bounds = await reveal.boundingBox();
+    if (!bounds) throw new Error("Flashcard reveal bounds are missing");
+    const startX = bounds.x + bounds.width / 2;
+    const startY = bounds.y + bounds.height / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX - 120, startY, { steps: 6 });
+    await page.mouse.up();
+    await expect(card).toHaveAttribute("data-motion-flash-card-state", "idle");
+    await expect(content).not.toHaveAttribute("data-motion-flash-card", beforeSwipeKey ?? "");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const reducedMotionKey = await content.getAttribute("data-motion-flash-card");
+    await reveal.focus();
+    await reveal.press("ArrowLeft");
+    await expect(content).not.toHaveAttribute("data-motion-flash-card", reducedMotionKey ?? "");
+    await expect(card).toHaveAttribute("data-motion-flash-card-state", "idle");
+    expect((await readAnimation(card)).name).toBe("none");
   });
 
   test("uses a 200ms Local State indicator for mistake filtering and reaches the real empty state", async ({ page }) => {

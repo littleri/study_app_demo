@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -8,6 +9,12 @@ import {
 } from "react";
 
 const DRAG_THRESHOLD_PX = 6;
+const MOMENTUM_DECAY_PER_FRAME = 0.9;
+const MOMENTUM_FRAME_MS = 1000 / 60;
+const MOMENTUM_MAX_FRAME_MS = 32;
+const MOMENTUM_MAX_VELOCITY_PX_PER_MS = 2.4;
+const MOMENTUM_MIN_VELOCITY_PX_PER_MS = 0.025;
+const MOMENTUM_RELEASE_FRESHNESS_MS = 120;
 const dragScrollIgnoreSelector = [
   "input",
   "textarea",
@@ -23,6 +30,8 @@ type MouseDragState = {
   dragging: boolean;
   horizontalScroller: HTMLElement | null;
   horizontalSelfManaged: boolean;
+  lastClientY: number;
+  lastMoveTime: number;
   pointerId: number;
   previousInlineScrollBehavior: string | null;
   startScrollLeft: number;
@@ -30,7 +39,25 @@ type MouseDragState = {
   startX: number;
   startY: number;
   verticalScroller: HTMLElement | null;
+  velocityY: number;
 };
+
+type MouseMomentumState = {
+  frameId: number;
+  lastTimestamp: number | null;
+  previousInlineScrollBehavior: string;
+  scroller: HTMLElement;
+  velocity: number;
+};
+
+type MouseDragScrollOptions = {
+  enableVerticalMomentum?: boolean;
+  momentumScopeKey?: string;
+};
+
+function clampVelocity(value: number) {
+  return Math.min(Math.max(value, -MOMENTUM_MAX_VELOCITY_PX_PER_MS), MOMENTUM_MAX_VELOCITY_PX_PER_MS);
+}
 
 function isScrollable(element: HTMLElement, axis: "x" | "y") {
   const styles = window.getComputedStyle(element);
@@ -59,8 +86,12 @@ function findScroller(target: Element, root: HTMLElement, axis: "x" | "y") {
  * native. Axis locking preserves horizontal gestures, while bespoke
  * two-dimensional gestures can opt out with data-mouse-drag-scroll="ignore".
  */
-export function useMouseDragScroll() {
+export function useMouseDragScroll({
+  enableVerticalMomentum = false,
+  momentumScopeKey = "default"
+}: MouseDragScrollOptions = {}) {
   const dragRef = useRef<MouseDragState | null>(null);
+  const momentumRef = useRef<MouseMomentumState | null>(null);
   const clickResetTimerRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const [dragging, setDragging] = useState(false);
@@ -78,17 +109,97 @@ export function useMouseDragScroll() {
     }
   }, []);
 
-  const resetDrag = useCallback((event?: ReactPointerEvent<HTMLElement>, suppressClick = false) => {
+  const stopMomentum = useCallback(() => {
+    const momentum = momentumRef.current;
+    if (!momentum) return;
+
+    momentumRef.current = null;
+    window.cancelAnimationFrame(momentum.frameId);
+    momentum.scroller.style.scrollBehavior = momentum.previousInlineScrollBehavior;
+  }, []);
+
+  const startVerticalMomentum = useCallback((drag: MouseDragState, velocity: number) => {
+    const scroller = drag.verticalScroller;
+    if (!scroller) return;
+
+    stopMomentum();
+    const momentum: MouseMomentumState = {
+      frameId: 0,
+      lastTimestamp: null,
+      previousInlineScrollBehavior: drag.previousInlineScrollBehavior ?? "",
+      scroller,
+      velocity: clampVelocity(velocity)
+    };
+
+    const finish = () => {
+      if (momentumRef.current !== momentum) return;
+      momentumRef.current = null;
+      scroller.style.scrollBehavior = momentum.previousInlineScrollBehavior;
+    };
+
+    const step = (timestamp: number) => {
+      if (momentumRef.current !== momentum) return;
+      if (!scroller.isConnected) {
+        finish();
+        return;
+      }
+
+      const elapsed = momentum.lastTimestamp === null
+        ? MOMENTUM_FRAME_MS
+        : Math.min(Math.max(timestamp - momentum.lastTimestamp, 1), MOMENTUM_MAX_FRAME_MS);
+      momentum.lastTimestamp = timestamp;
+
+      const maxScrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+      const nextScrollTop = Math.min(
+        Math.max(scroller.scrollTop + (momentum.velocity * elapsed), 0),
+        maxScrollTop
+      );
+      const reachedBoundary = (nextScrollTop <= 0 && momentum.velocity < 0)
+        || (nextScrollTop >= maxScrollTop && momentum.velocity > 0);
+      scroller.scrollTop = nextScrollTop;
+      momentum.velocity *= Math.pow(MOMENTUM_DECAY_PER_FRAME, elapsed / MOMENTUM_FRAME_MS);
+
+      if (reachedBoundary || Math.abs(momentum.velocity) < MOMENTUM_MIN_VELOCITY_PX_PER_MS) {
+        finish();
+        return;
+      }
+      momentum.frameId = window.requestAnimationFrame(step);
+    };
+
+    scroller.style.scrollBehavior = "auto";
+    momentumRef.current = momentum;
+    momentum.frameId = window.requestAnimationFrame(step);
+  }, [stopMomentum]);
+
+  const resetDrag = useCallback((
+    event?: ReactPointerEvent<HTMLElement>,
+    suppressClick = false,
+    allowMomentum = false
+  ) => {
     const drag = dragRef.current;
     if (!drag || (event && drag.pointerId !== event.pointerId)) return;
 
     dragRef.current = null;
-    restoreScrollerBehavior(drag);
     setDragging(false);
 
     if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+
+    const timeSinceLastMove = event
+      ? Math.max(0, event.timeStamp - drag.lastMoveTime)
+      : MOMENTUM_RELEASE_FRESHNESS_MS;
+    const freshness = Math.max(0, 1 - (timeSinceLastMove / MOMENTUM_RELEASE_FRESHNESS_MS));
+    const releaseVelocity = drag.velocityY * freshness;
+    const shouldStartMomentum = allowMomentum
+      && enableVerticalMomentum
+      && drag.dragging
+      && drag.axis === "y"
+      && Boolean(drag.verticalScroller)
+      && Math.abs(releaseVelocity) >= MOMENTUM_MIN_VELOCITY_PX_PER_MS;
+
+    if (shouldStartMomentum) startVerticalMomentum(drag, releaseVelocity);
+    else restoreScrollerBehavior(drag);
 
     if (!suppressClick || !drag.dragging) return;
     suppressClickRef.current = true;
@@ -97,15 +208,21 @@ export function useMouseDragScroll() {
       suppressClickRef.current = false;
       clickResetTimerRef.current = null;
     }, 0);
-  }, [clearClickResetTimer, restoreScrollerBehavior]);
+  }, [clearClickResetTimer, enableVerticalMomentum, restoreScrollerBehavior, startVerticalMomentum]);
 
   useEffect(() => () => {
     clearClickResetTimer();
+    stopMomentum();
     const drag = dragRef.current;
     if (drag) restoreScrollerBehavior(drag);
-  }, [clearClickResetTimer, restoreScrollerBehavior]);
+  }, [clearClickResetTimer, restoreScrollerBehavior, stopMomentum]);
+
+  useLayoutEffect(() => {
+    stopMomentum();
+  }, [enableVerticalMomentum, momentumScopeKey, stopMomentum]);
 
   const onPointerDownCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
+    stopMomentum();
     if (
       event.pointerType !== "mouse"
       || event.button !== 0
@@ -132,15 +249,18 @@ export function useMouseDragScroll() {
       dragging: false,
       horizontalScroller,
       horizontalSelfManaged: Boolean(target.closest("[data-mouse-drag-scroll='self']")),
+      lastClientY: event.clientY,
+      lastMoveTime: event.timeStamp,
       pointerId: event.pointerId,
       previousInlineScrollBehavior: null,
       startScrollLeft: horizontalScroller?.scrollLeft ?? 0,
       startScrollTop: verticalScroller?.scrollTop ?? 0,
       startX: event.clientX,
       startY: event.clientY,
-      verticalScroller
+      verticalScroller,
+      velocityY: 0
     };
-  }, [clearClickResetTimer]);
+  }, [clearClickResetTimer, stopMomentum]);
 
   const onPointerMoveCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
@@ -177,6 +297,12 @@ export function useMouseDragScroll() {
 
     event.preventDefault();
     event.stopPropagation();
+    const elapsed = Math.max(event.timeStamp - drag.lastMoveTime, 1);
+    const sampledVelocityY = clampVelocity(-(event.clientY - drag.lastClientY) / elapsed);
+    const sampleWeight = elapsed > 40 ? 1 : 0.72;
+    drag.velocityY = (drag.velocityY * (1 - sampleWeight)) + (sampledVelocityY * sampleWeight);
+    drag.lastClientY = event.clientY;
+    drag.lastMoveTime = event.timeStamp;
     if (drag.axis === "x" && drag.horizontalScroller) {
       drag.horizontalScroller.scrollLeft = drag.startScrollLeft - deltaX;
     } else if (drag.axis === "y" && drag.verticalScroller) {
@@ -191,7 +317,7 @@ export function useMouseDragScroll() {
       event.preventDefault();
       event.stopPropagation();
     }
-    resetDrag(event, true);
+    resetDrag(event, true, true);
   }, [resetDrag]);
 
   const onPointerCancelCapture = useCallback((event: ReactPointerEvent<HTMLElement>) => {
@@ -211,6 +337,10 @@ export function useMouseDragScroll() {
     return true;
   }, [clearClickResetTimer]);
 
+  const onWheelCapture = useCallback(() => {
+    stopMomentum();
+  }, [stopMomentum]);
+
   return {
     consumeClick,
     dragging,
@@ -218,6 +348,7 @@ export function useMouseDragScroll() {
     onPointerCancelCapture,
     onPointerDownCapture,
     onPointerMoveCapture,
-    onPointerUpCapture
+    onPointerUpCapture,
+    onWheelCapture
   };
 }

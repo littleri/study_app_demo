@@ -382,6 +382,11 @@ test.describe("current DemoRepository responsive matrix", () => {
     const project = getResponsiveProject(testInfo.project.name);
     await gotoApp(page);
     await openLibrary(page);
+    await expect(page.locator(".primary-nav"), `${project.name} Library removes the primary navigation`).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "返回", exact: true }),
+      `${project.name} Library retains an in-app return path`
+    ).toBeVisible();
     const card = page.locator(".library-course-grid .course-space-card").first();
     await expect(card).toBeVisible();
     await expectHorizontallyInsideShell(card, `${project.name} library card`);

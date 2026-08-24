@@ -1,17 +1,17 @@
-import { expect, test } from "playwright/test";
+import { expect, test, type Page } from "playwright/test";
+
+async function openAssignmentFromCurrentCourse(page: Page) {
+  await page.goto("/?embedded=device-preview");
+  await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();
+  await expect(page.locator(".assignment-screen")).toBeVisible();
+  await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+}
 
 test.describe("assignment exercise sequence", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
   test("runs judgment, choice, and short answer in order without a type selector", async ({ page }) => {
-    await page.goto("/?embedded=device-preview");
-    await page.getByRole("button", { name: "作业诊断，带原文引用", exact: true }).click();
-
-    await page.getByRole("button", { name: /第 2 章 基因和染色体的关系.*3 个小节/ }).click();
-
-    const learningTools = page.getByRole("region", { name: "第 1 节 减数分裂和受精作用的学习方式", exact: true });
-    await expect(learningTools).toBeVisible();
-    await learningTools.getByRole("button", { name: /作业诊断.*提交解题过程/ }).click();
+    await openAssignmentFromCurrentCourse(page);
 
     const exerciseCard = page.locator(".assignment-exercise-card");
     const action = page.locator(".assignment-primary-action .button");
@@ -47,16 +47,23 @@ test.describe("assignment exercise sequence", () => {
         topLeftRadius: Number.parseFloat(getComputedStyle(card).borderTopLeftRadius)
       };
     });
-    expect(judgmentComposition.leftReachesEdge).toBe(true);
-    expect(judgmentComposition.rightReachesEdge).toBe(true);
-    expect(judgmentComposition.bottomReachesEdge).toBe(true);
+    const viewport = page.viewportSize();
+    const expectsPhonePortraitFullBleed = Boolean(
+      viewport && viewport.width < 768 && viewport.width <= viewport.height
+    );
+    if (expectsPhonePortraitFullBleed) {
+      expect(judgmentComposition.leftReachesEdge).toBe(true);
+      expect(judgmentComposition.rightReachesEdge).toBe(true);
+      expect(judgmentComposition.bottomReachesEdge).toBe(true);
+      expect(judgmentComposition.topLeftRadius).toBeGreaterThanOrEqual(44);
+      expect(judgmentComposition.instructionGap).toBeGreaterThanOrEqual(70);
+    }
     expect(judgmentComposition.progressRadius).toBe(999);
     expect(judgmentComposition.progressTitleFits).toBe(true);
-    expect(judgmentComposition.topLeftRadius).toBeGreaterThanOrEqual(44);
-    expect(judgmentComposition.instructionGap).toBeGreaterThanOrEqual(70);
 
     await page.locator(".assignment-judgment-options button").first().click();
     await action.click();
+    await expect(exerciseCard).toHaveAttribute("data-motion-assignment-card-state", "idle");
     await expect(exerciseCard).toHaveAttribute("data-assignment-type", "choice");
     await expect(page.locator(".assignment-progress-heading > strong")).toHaveText("2 / 3");
 
@@ -155,5 +162,68 @@ test.describe("assignment entry geometry", () => {
       }));
     });
     await expect(transition).toHaveAttribute("data-motion-state", "idle");
+  });
+
+  test("hands the next exercise across with a postcard-style card switch", async ({ page }) => {
+    await openAssignmentFromCurrentCourse(page);
+
+    const card = page.locator(".assignment-exercise-card");
+    const action = page.locator(".assignment-primary-action .button");
+    const pausedCardMotion = await page.addStyleTag({
+      content: ".assignment-exercise-card { animation-play-state: paused !important; }"
+    });
+
+    await page.locator(".assignment-judgment-options button").first().click();
+    await action.click();
+    await expect(card).toHaveAttribute("data-motion-assignment-card-state", "exiting");
+    await expect(card).toHaveAttribute("data-assignment-type", "judgment");
+    await expect(page.locator(".assignment-progress-heading > strong")).toHaveText("1 / 3");
+    let motion = await card.evaluate((element) => ({
+      duration: getComputedStyle(element).animationDuration,
+      name: getComputedStyle(element).animationName,
+      origin: getComputedStyle(element).transformOrigin,
+      playState: getComputedStyle(element).animationPlayState
+    }));
+    expect(motion).toMatchObject({
+      duration: "0.15s",
+      name: "motion-assignment-card-postcard-out",
+      playState: "paused"
+    });
+    expect(motion.origin).not.toBe("50% 50%");
+
+    await card.evaluate((element) => {
+      element.dispatchEvent(new AnimationEvent("animationend", {
+        animationName: "motion-assignment-card-postcard-out",
+        bubbles: true
+      }));
+    });
+    await expect(card).toHaveAttribute("data-motion-assignment-card-state", "entering");
+    await expect(card).toHaveAttribute("data-assignment-type", "choice");
+    await expect(page.locator(".assignment-progress-heading > strong")).toHaveText("2 / 3");
+    motion = await card.evaluate((element) => ({
+      duration: getComputedStyle(element).animationDuration,
+      name: getComputedStyle(element).animationName,
+      playState: getComputedStyle(element).animationPlayState
+    }));
+    expect(motion).toMatchObject({
+      duration: "0.2s",
+      name: "motion-assignment-card-postcard-in",
+      playState: "paused"
+    });
+
+    await card.evaluate((element) => {
+      element.dispatchEvent(new AnimationEvent("animationend", {
+        animationName: "motion-assignment-card-postcard-in",
+        bubbles: true
+      }));
+    });
+    await expect(card).toHaveAttribute("data-motion-assignment-card-state", "idle");
+    await expect(action).toBeDisabled();
+
+    await pausedCardMotion.evaluate((element) => element.remove());
+    await page.locator(".assignment-choice-options button").nth(1).click();
+    await action.click();
+    await expect(card).toHaveAttribute("data-assignment-type", "short-answer");
+    await expect(card).toHaveAttribute("data-motion-assignment-card-state", "idle");
   });
 });

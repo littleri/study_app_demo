@@ -105,10 +105,10 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
   courseReady: { hideNav: true },
-  library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
+  library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程", back: true, hideNav: true },
   community: { title: "发现", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
-  communityImport: { title: "导入成功", back: true, hideNav: true },
+  communityImport: { hideNav: true },
   study: {},
   book: {},
   plan: { title: "学习计划", subtitle: "科学规划，高效学习", back: true, hideNav: true },
@@ -188,6 +188,7 @@ export default function App() {
   const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
   const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
   const [selectedCommunityBookId, setSelectedCommunityBookId] = useState(communityBooks[0]?.id ?? "");
+  const [communityImportGeneration, setCommunityImportGeneration] = useState(0);
   const [pendingBookId, setPendingBookId] = useState<string | null>(null);
   const courseSelectionCoordinatorRef = useRef(createCourseSelectionCoordinator());
   const courseSummariesRef = useRef<CourseSummary[]>([]);
@@ -303,6 +304,11 @@ export default function App() {
   const selectCommunityBook = useCallback((bookId: string) => {
     setSelectedCommunityBookId(bookId);
   }, []);
+
+  const beginCommunityImport = useCallback(() => {
+    setCommunityImportGeneration((current) => current + 1);
+    go("communityImport");
+  }, [go]);
 
   const back = useCallback(() => {
     const current = navigationRef.current;
@@ -983,9 +989,9 @@ export default function App() {
       case "community":
         return <CommunityScreen />;
       case "communityBook":
-        return <CommunityBookScreen />;
+        return <CommunityBookScreen onImport={beginCommunityImport} />;
       case "communityImport":
-        return <CommunityImportScreen />;
+        return <CommunityImportScreen importGeneration={communityImportGeneration} />;
       case "study":
         return <StudyScreen />;
       case "book":

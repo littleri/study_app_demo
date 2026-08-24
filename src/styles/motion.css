@@ -1115,6 +1115,26 @@
   background-color: #6458f4;
 }
 
+/* The exercise sequence borrows the physical relationship of a postcard
+   stack: the completed card is lifted and sent left, then the next card
+   arrives from the right-hand layer and settles squarely into the workspace. */
+.assignment-exercise-card[data-motion-assignment-card-state] {
+  --motion-assignment-card-travel: clamp(96px, 28vw, 180px);
+  transform-origin: 50% 88%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.assignment-exercise-card[data-motion-assignment-card-state="exiting"] {
+  pointer-events: none;
+  animation: motion-assignment-card-postcard-out var(--motion-duration-local-fast) var(--motion-ease-local-exit) both;
+}
+
+.assignment-exercise-card[data-motion-assignment-card-state="entering"] {
+  pointer-events: none;
+  animation: motion-assignment-card-postcard-in var(--motion-duration-local-slow) var(--motion-ease-local-enter) both;
+}
+
 /* Flashcard geometry is intentionally isolated to the core question/answer
    region. The memory-card, source links, reveal control, and action buttons
    remain ordinary two-dimensional controls. */
@@ -1148,8 +1168,34 @@
   animation: motion-flashcard-flip-to-front var(--motion-duration-local-slow) var(--motion-ease-local-state) both;
 }
 
-.memory-card-answer-motion[data-motion-flash-next-state="entering"] {
-  animation: motion-flashcard-next-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
+.memory-card[data-motion-flash-card-state] {
+  --motion-flashcard-card-travel: clamp(96px, 28vw, 180px);
+  transform-origin: 50% 88%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.memory-card[data-motion-flash-card-state="exiting"] {
+  pointer-events: none;
+  animation: motion-flashcard-postcard-out var(--motion-duration-local-fast) var(--motion-ease-local-exit) both;
+}
+
+.memory-card[data-motion-flash-card-state="entering"] {
+  pointer-events: none;
+  animation: motion-flashcard-postcard-in var(--motion-duration-local-slow) var(--motion-ease-local-enter) both;
+}
+
+.flashcard-actions[data-motion-flash-card-state] {
+  transition:
+    opacity var(--motion-duration-local-fast) var(--motion-ease-local-exit),
+    transform var(--motion-duration-local-fast) var(--motion-ease-local-exit);
+}
+
+.flashcard-actions[data-motion-flash-card-state="exiting"],
+.flashcard-actions[data-motion-flash-card-state="entering"] {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
 }
 
 .diagnosis-knowledge-progress-fill[data-motion-diagnosis-progress-state="entering"] {
@@ -1275,6 +1321,39 @@
   }
 }
 
+@keyframes motion-assignment-card-postcard-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  28% {
+    opacity: 1;
+    transform: translate3d(-4px, -3px, 0) rotate(-1deg) scale(1.004);
+  }
+
+  100% {
+    opacity: .16;
+    transform: translate3d(calc(0px - var(--motion-assignment-card-travel)), -22px, 0) rotate(-7deg) scale(.965);
+  }
+}
+
+@keyframes motion-assignment-card-postcard-in {
+  0% {
+    opacity: .24;
+    transform: translate3d(var(--motion-assignment-card-travel), 14px, 0) rotate(5.5deg) scale(.955);
+  }
+
+  64% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+}
+
 @keyframes motion-flashcard-flip-to-front {
   from {
     transform: rotateY(180deg);
@@ -1285,39 +1364,36 @@
   }
 }
 
-@keyframes motion-flashcard-next-in {
-  from {
-    opacity: 0;
-    transform: translateX(8px);
+@keyframes motion-flashcard-postcard-out {
+  0% {
+    opacity: 1;
+    transform: translate3d(var(--flashcard-switch-start-x, 0px), 0, 0) rotate(var(--flashcard-switch-start-rotation, 0deg)) scale(1);
   }
 
-  to {
+  24% {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(var(--flashcard-switch-start-x, 0px), -3px, 0) rotate(var(--flashcard-switch-start-rotation, 0deg)) scale(1.004);
+  }
+
+  100% {
+    opacity: .16;
+    transform: translate3d(calc(0px - var(--motion-flashcard-card-travel)), -22px, 0) rotate(-7deg) scale(.965);
   }
 }
 
-@keyframes motion-flashcard-next-tablet-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
+@keyframes motion-flashcard-postcard-in {
+  0% {
+    opacity: .24;
+    transform: translate3d(var(--motion-flashcard-card-travel), 14px, 0) rotate(5.5deg) scale(.955);
   }
 
-  to {
+  64% {
     opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes motion-flashcard-next-short-in {
-  from {
-    opacity: 0;
-    transform: translateX(4px);
   }
 
-  to {
+  100% {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
   }
 }
 
@@ -1430,10 +1506,6 @@
 }
 
 @media (min-width: 768px) and (min-height: 600px) {
-  .memory-card-answer-motion[data-motion-flash-next-state="entering"] {
-    animation-name: motion-flashcard-next-tablet-in;
-  }
-
   .book-course-screen [data-motion-item="content"][data-motion-item-state="entering"],
   .lesson-screen [data-motion-item="content"][data-motion-item-state="entering"] {
     --motion-local-item-x: var(--motion-distance-small);
@@ -1539,10 +1611,6 @@
     --motion-distance-small: 4px;
   }
 
-  .memory-card-answer-motion[data-motion-flash-next-state="entering"] {
-    animation-name: motion-flashcard-next-short-in;
-  }
-
   .sheet[data-motion-state="entering"] {
     animation-name: motion-sheet-short-in;
   }
@@ -1644,6 +1712,24 @@
   .assignment-card[data-motion-assignment-selection],
   .assignment-card[data-motion-assignment-submit],
   .assignment-primary-action .button[data-motion-assignment-submit] {
+    transition: none !important;
+  }
+
+  .assignment-exercise-card[data-motion-assignment-card-state] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .memory-card[data-motion-flash-card-state] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .flashcard-actions[data-motion-flash-card-state] {
+    opacity: 1 !important;
+    transform: none !important;
     transition: none !important;
   }
 

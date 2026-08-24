@@ -102,12 +102,13 @@ type CourseCompletionScreenProps = {
 
 type FocusedCourseCompletionProps = Pick<
   CourseCompletionScreenProps,
-  "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "statusTitle"
+  "className" | "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "statusTitle"
 >;
 
 type CourseReadyPhase = "celebrating" | "moving" | "revealing" | "settled";
 
 function FocusedCourseCompletion({
+  className,
   courseTitle,
   lessonCount,
   motionKey,
@@ -161,7 +162,7 @@ function FocusedCourseCompletion({
 
   return (
     <div
-      className="screen-stack centered-flow parse-complete-screen course-ready-screen course-ready-focus"
+      className={`screen-stack centered-flow parse-complete-screen course-ready-screen course-ready-focus${className ? ` ${className}` : ""}`}
       data-course-ready-phase={phase}
     >
       <div className="course-ready-focus-stage">
@@ -217,6 +218,7 @@ export function CourseCompletionScreen({
   if (focused) {
     return (
       <FocusedCourseCompletion
+        className={className}
         courseTitle={courseTitle}
         lessonCount={lessonCount}
         motionKey={motionKey}

@@ -15,12 +15,17 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
-import { useReducedMotion } from "../motion";
+import { localMotionFallbackMs, useReducedMotion } from "../motion";
 import {
   clampFlashcardDrag,
   isHorizontalFlashcardGesture,
   shouldAdvanceFlashcardSwipe
 } from "./flashcardGestures";
+
+type FlashcardSwitchState = "idle" | "exiting" | "entering";
+
+const flashcardExitAnimationName = "motion-flashcard-postcard-out";
+const flashcardEnterAnimationName = "motion-flashcard-postcard-in";
 
 const flashcardThemes = [
   {
@@ -99,11 +104,11 @@ export function FlashcardScreen() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [buildingCards, setBuildingCards] = useState(false);
   const [flipState, setFlipState] = useState<"flipping" | "idle">("idle");
-  const [nextCardMotionState, setNextCardMotionState] = useState<"entering" | "idle">("idle");
-  const [nextCardMotionKey, setNextCardMotionKey] = useState("flashcard:next:initial");
+  const [cardSwitchState, setCardSwitchState] = useState<FlashcardSwitchState>("idle");
+  const [pendingCardIndex, setPendingCardIndex] = useState<number | null>(null);
+  const [cardExitOffset, setCardExitOffset] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const nextCardSequenceRef = useRef(0);
   const swipeStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
   const suppressCardClickRef = useRef(false);
   const liveCards = uploadedFile
@@ -148,13 +153,41 @@ export function FlashcardScreen() {
   useEffect(() => {
     if (!reducedMotion) return;
     setFlipState("idle");
-    setNextCardMotionState("idle");
-  }, [reducedMotion]);
+    if (pendingCardIndex !== null) setIndex(pendingCardIndex);
+    setShowAnswer(false);
+    setCardSwitchState("idle");
+    setPendingCardIndex(null);
+    setCardExitOffset(0);
+  }, [pendingCardIndex, reducedMotion]);
+
+  useEffect(() => {
+    if (cardSwitchState === "idle") return;
+
+    const fallback = window.setTimeout(() => {
+      if (cardSwitchState === "exiting") {
+        if (pendingCardIndex !== null) setIndex(pendingCardIndex);
+        setShowAnswer(false);
+        setCardSwitchState(pendingCardIndex === null ? "idle" : "entering");
+        return;
+      }
+      setCardSwitchState("idle");
+      setPendingCardIndex(null);
+      setCardExitOffset(0);
+    }, localMotionFallbackMs);
+
+    return () => window.clearTimeout(fallback);
+  }, [cardSwitchState, pendingCardIndex]);
 
   useEffect(() => {
     const settleInterruptedMotion = () => {
       setFlipState("idle");
-      setNextCardMotionState("idle");
+      if (pendingCardIndex !== null) setIndex(pendingCardIndex);
+      setShowAnswer(false);
+      setCardSwitchState("idle");
+      setPendingCardIndex(null);
+      setCardExitOffset(0);
+      setDragging(false);
+      setDragOffset(0);
     };
     const visualViewport = window.visualViewport;
     window.addEventListener("resize", settleInterruptedMotion);
@@ -165,33 +198,36 @@ export function FlashcardScreen() {
       window.removeEventListener("orientationchange", settleInterruptedMotion);
       visualViewport?.removeEventListener("resize", settleInterruptedMotion);
     };
-  }, []);
+  }, [pendingCardIndex]);
 
   function toggleAnswer() {
-    if (!current || flipState === "flipping") return;
-    setNextCardMotionState("idle");
+    if (!current || flipState === "flipping" || cardSwitchState !== "idle") return;
     setShowAnswer((value) => !value);
     setFlipState(reducedMotion ? "idle" : "flipping");
   }
 
-  function settleAnswerMotion(animationName: string, targetIsRoot: boolean) {
-    if (
-      targetIsRoot
-      && (
-        animationName === "motion-flashcard-next-in"
-        || animationName === "motion-flashcard-next-tablet-in"
-        || animationName === "motion-flashcard-next-short-in"
-      )
-    ) {
-      setNextCardMotionState("idle");
-      return;
-    }
+  function settleAnswerMotion(animationName: string) {
     if (
       animationName === "motion-flashcard-flip-to-back"
       || animationName === "motion-flashcard-flip-to-front"
       || animationName === "motion-flashcard-crossfade-in"
     ) {
       setFlipState("idle");
+    }
+  }
+
+  function settleCardSwitch(animationName: string) {
+    if (cardSwitchState === "exiting" && animationName === flashcardExitAnimationName) {
+      if (pendingCardIndex !== null) setIndex(pendingCardIndex);
+      setShowAnswer(false);
+      setCardSwitchState(pendingCardIndex === null ? "idle" : "entering");
+      return;
+    }
+
+    if (cardSwitchState === "entering" && animationName === flashcardEnterAnimationName) {
+      setCardSwitchState("idle");
+      setPendingCardIndex(null);
+      setCardExitOffset(0);
     }
   }
 
@@ -210,7 +246,9 @@ export function FlashcardScreen() {
       setIndex(0);
       setShowAnswer(false);
       setFlipState("idle");
-      setNextCardMotionState("idle");
+      setCardSwitchState("idle");
+      setPendingCardIndex(null);
+      setCardExitOffset(0);
       showToast("闪卡已基于结构化课程生成");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "闪卡生成失败", "warning");
@@ -219,8 +257,8 @@ export function FlashcardScreen() {
     }
   }
 
-  function advanceCard(feedback?: "again" | "known") {
-    if (!current) return;
+  function advanceCard(feedback?: "again" | "known", exitOffset = 0) {
+    if (!current || cardSwitchState !== "idle") return;
     if (feedback && generatedFlashcards) {
       setGeneratedFlashcards(generatedFlashcards.map((card) => card.card_id === current.id
         ? {
@@ -235,17 +273,17 @@ export function FlashcardScreen() {
       showToast(feedback === "known" ? "已记录为掌握" : "已加入复习队列", feedback === "known" ? "success" : "info");
     }
     setFlipState("idle");
-    setShowAnswer(false);
     setDragging(false);
     setDragOffset(0);
-    setIndex((value) => (value + 1) % Math.max(cards.length, 1));
+    const nextIndex = (index + 1) % Math.max(cards.length, 1);
     if (reducedMotion) {
-      setNextCardMotionState("idle");
+      setIndex(nextIndex);
+      setShowAnswer(false);
       return;
     }
-    nextCardSequenceRef.current += 1;
-    setNextCardMotionKey(`flashcard:next:${current.id}:${nextCardSequenceRef.current}`);
-    setNextCardMotionState("entering");
+    setPendingCardIndex(nextIndex);
+    setCardExitOffset(exitOffset);
+    setCardSwitchState("exiting");
   }
 
   function moveNext(feedback: "again" | "known") {
@@ -253,7 +291,7 @@ export function FlashcardScreen() {
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (event.button !== 0 || flipState === "flipping") return;
+    if (event.button !== 0 || flipState === "flipping" || cardSwitchState !== "idle") return;
     swipeStartRef.current = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -294,7 +332,7 @@ export function FlashcardScreen() {
     suppressCardClickRef.current = movedHorizontally;
     setDragging(false);
     setDragOffset(0);
-    if (shouldAdvance) advanceCard();
+    if (shouldAdvance) advanceCard(undefined, clampFlashcardDrag(deltaX));
   }
 
   function cancelSwipe(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -314,7 +352,7 @@ export function FlashcardScreen() {
   }
 
   function handleCardKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowLeft" || cards.length <= 1) return;
+    if (event.key !== "ArrowLeft" || cards.length <= 1 || cardSwitchState !== "idle") return;
     event.preventDefault();
     advanceCard();
   }
@@ -390,11 +428,18 @@ export function FlashcardScreen() {
           <section
             className={`memory-card ${showAnswer ? "revealed" : ""}`}
             aria-label="当前闪卡"
+            aria-busy={cardSwitchState !== "idle"}
             data-swipe-state={dragging ? "dragging" : "idle"}
+            data-motion-flash-card-state={cardSwitchState}
             style={{
               "--flashcard-drag-x": `${dragOffset}px`,
-              "--flashcard-drag-rotation": `${dragOffset / 28}deg`
+              "--flashcard-drag-rotation": `${dragOffset / 28}deg`,
+              "--flashcard-switch-start-x": `${cardExitOffset}px`,
+              "--flashcard-switch-start-rotation": `${cardExitOffset / 28}deg`
             } as CSSProperties}
+            onAnimationEnd={(event) => {
+              if (event.target === event.currentTarget) settleCardSwitch(event.animationName);
+            }}
           >
             <button
               className="memory-card-trigger memory-reveal"
@@ -402,7 +447,7 @@ export function FlashcardScreen() {
               type="button"
               aria-label={`${showAnswer ? "参考答案" : "问题"}：${showAnswer ? current.back : current.front}。${showAnswer ? "点击返回问题" : "点击查看答案"}，左滑切换下一张。`}
               aria-pressed={showAnswer}
-              disabled={flipState === "flipping"}
+              disabled={flipState === "flipping" || cardSwitchState !== "idle"}
               onClick={handleCardClick}
               onKeyDown={handleCardKeyDown}
               onPointerDown={startSwipe}
@@ -421,9 +466,7 @@ export function FlashcardScreen() {
                 data-motion-flash-card={current.id}
                 data-motion-flash-side={showAnswer ? "back" : "front"}
                 data-motion-flash-state={flipState}
-                data-motion-flash-next-key={nextCardMotionKey}
-                data-motion-flash-next-state={nextCardMotionState}
-                onAnimationEnd={(event) => settleAnswerMotion(event.animationName, event.target === event.currentTarget)}
+                onAnimationEnd={(event) => settleAnswerMotion(event.animationName)}
               >
                 <div className="memory-card-answer-3d">
                   <div className="memory-card-answer-face memory-card-answer-face-front" aria-hidden={showAnswer} inert={showAnswer}>
@@ -482,12 +525,13 @@ export function FlashcardScreen() {
           </section>
         </div>
 
-        <div className="flashcard-actions" aria-live="polite">
+        <div className="flashcard-actions" data-motion-flash-card-state={cardSwitchState} aria-live="polite">
           {showAnswer ? (
             <>
               <Button
                 variant="secondary"
                 icon={<RotateCcw size={18} aria-hidden="true" />}
+                disabled={cardSwitchState !== "idle"}
                 onClick={() => moveNext("again")}
               >
                 <span className="flashcard-rating-copy">
@@ -497,6 +541,7 @@ export function FlashcardScreen() {
               </Button>
               <Button
                 icon={<Check size={18} aria-hidden="true" />}
+                disabled={cardSwitchState !== "idle"}
                 onClick={() => moveNext("known")}
               >
                 <span className="flashcard-rating-copy">

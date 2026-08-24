@@ -431,7 +431,10 @@ export function AppShell({
   const deviceLayout = useDeviceLayout();
   const runtimePlatform = getRuntimePlatform();
   const isNativeAndroid = runtimePlatform === "android";
-  const mouseDragScroll = useMouseDragScroll();
+  const mouseDragScroll = useMouseDragScroll({
+    enableVerticalMomentum: !motionReduced && (active === "study" || active === "book" || active === "community"),
+    momentumScopeKey: active
+  });
   const appShellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const [appShellElement, setAppShellElement] = useState<HTMLDivElement | null>(null);
@@ -529,6 +532,7 @@ export function AppShell({
         onPointerDownCapture={mouseDragScroll.onPointerDownCapture}
         onPointerMoveCapture={mouseDragScroll.onPointerMoveCapture}
         onPointerUpCapture={mouseDragScroll.onPointerUpCapture}
+        onWheelCapture={mouseDragScroll.onWheelCapture}
       >
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}

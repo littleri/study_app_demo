@@ -774,6 +774,13 @@ button:disabled {
   box-shadow: none;
 }
 
+/* The composer is a single input affordance, so its visible shell and the
+   native control share the same pill geometry. */
+.ai-compose,
+.ai-compose input {
+  border-radius: 999px;
+}
+
 /* Keep the assistant context compact: hierarchy comes from type, not nested cards. */
 .ai-overlay-head > div,
 .ai-current-book,

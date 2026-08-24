@@ -118,8 +118,16 @@ test.describe("study directory flow", () => {
 
     await page.mouse.up();
     await expect(shell).toHaveAttribute("data-mouse-dragging", "false");
-    await expect.poll(() => scroller.evaluate((element) => getComputedStyle(element).scrollBehavior)).toBe("smooth");
     await expect(firstChapterToggle).toHaveAttribute("aria-expanded", "true");
+    const releasedScrollTop = await scroller.evaluate((element) => element.scrollTop);
+    await expect.poll(
+      () => scroller.evaluate((element) => Math.round(element.scrollTop)),
+      { message: "the study page keeps moving after release" }
+    ).toBeGreaterThan(Math.round(releasedScrollTop) + 20);
+    await expect.poll(
+      () => scroller.evaluate((element) => getComputedStyle(element).scrollBehavior),
+      { message: "smooth scrolling is restored after momentum settles", timeout: 2_500 }
+    ).toBe("smooth");
     const draggedScrollTop = await scroller.evaluate((element) => element.scrollTop);
 
     await page.mouse.move(210, 470);

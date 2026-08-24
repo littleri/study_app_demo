@@ -376,14 +376,18 @@ body {
 @media (max-width: 767px) {
   .ai-overlay {
     top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--header-block-size));
-    right: calc(var(--safe-area-right) + 8px);
+    right: 0;
     bottom: var(--overlay-visual-bottom);
-    left: calc(var(--safe-area-left) + 8px);
+    left: 0;
     width: auto;
     height: auto;
     max-height: none;
     border-radius: 28px 28px 0 0;
-    padding: 14px 14px calc(14px + var(--safe-area-bottom));
+    padding:
+      14px
+      calc(14px + var(--safe-area-right))
+      calc(14px + var(--safe-area-bottom))
+      calc(14px + var(--safe-area-left));
   }
 }
 

@@ -6,8 +6,8 @@ import { useLocalMotionItem } from "../motion";
 import { CommunityCover } from "./CommunityCover";
 import { resolveCommunityBook } from "./communityCatalog";
 
-export function CommunityBookScreen() {
-  const { go, selectedCommunityBookId } = useAppContext();
+export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
+  const { selectedCommunityBookId } = useAppContext();
   const book = resolveCommunityBook(selectedCommunityBookId);
   const detailMotion = useLocalMotionItem(`community-book:${book.id}:detail`);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "comments">("overview");
@@ -146,7 +146,7 @@ export function CommunityBookScreen() {
       </div>
 
       <div className="community-detail-actions">
-        <Button icon={<Download size={18} aria-hidden="true" />} onClick={() => go("communityImport")}>
+        <Button icon={<Download size={18} aria-hidden="true" />} onClick={onImport}>
           导入到我的课程
         </Button>
       </div>

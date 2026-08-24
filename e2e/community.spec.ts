@@ -206,12 +206,28 @@ test.describe("community discovery", () => {
     await expect(input).toBeFocused();
     const fullHeightComposerGeometry = await dialog.evaluate((element) => {
       const bounds = element.getBoundingClientRect();
-      const composerBounds = element.querySelector<HTMLElement>(".ai-compose")?.getBoundingClientRect();
+      const composer = element.querySelector<HTMLElement>(".ai-compose");
+      const composerBounds = composer?.getBoundingClientRect();
+      const composerStyle = composer ? getComputedStyle(composer) : null;
+      const input = composer?.querySelector<HTMLInputElement>("input");
+      const inputStyle = input ? getComputedStyle(input) : null;
       return {
+        left: bounds.left,
+        right: bounds.right,
+        viewportWidth: window.innerWidth,
         composerBottomInset: composerBounds ? bounds.bottom - composerBounds.bottom : Number.POSITIVE_INFINITY,
-        panelBottomPadding: Number.parseFloat(getComputedStyle(element).paddingBottom)
+        panelBottomPadding: Number.parseFloat(getComputedStyle(element).paddingBottom),
+        composerRadius: composerStyle?.borderTopLeftRadius ?? "",
+        inputRadius: inputStyle?.borderTopLeftRadius ?? ""
       };
     });
+    expect(Math.abs(fullHeightComposerGeometry.left), "the phone AI surface touches the viewport's left edge").toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(fullHeightComposerGeometry.right - fullHeightComposerGeometry.viewportWidth),
+      "the phone AI surface touches the viewport's right edge"
+    ).toBeLessThanOrEqual(1);
+    expect(fullHeightComposerGeometry.composerRadius, "the visible AI composer uses pill geometry").toBe("999px");
+    expect(fullHeightComposerGeometry.inputRadius, "the AI input uses the same pill geometry").toBe("999px");
     expect(
       Math.abs(fullHeightComposerGeometry.composerBottomInset - fullHeightComposerGeometry.panelBottomPadding),
       "the phone composer rests against the dialog's padded bottom edge before the keyboard opens"
@@ -227,6 +243,9 @@ test.describe("community discovery", () => {
       const viewport = window.visualViewport;
       const visibleViewportBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight);
       return {
+        left: bounds.left,
+        right: bounds.right,
+        viewportWidth: window.innerWidth,
         bottom: bounds.bottom,
         visibleViewportBottom,
         composerInsideViewport: Boolean(composerBounds && composerBounds.top >= 0 && composerBounds.bottom <= visibleViewportBottom + 1),
@@ -237,6 +256,11 @@ test.describe("community discovery", () => {
       };
     });
 
+    expect(Math.abs(keyboardHeightGeometry.left), "keyboard-height AI surface keeps touching the viewport's left edge").toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(keyboardHeightGeometry.right - keyboardHeightGeometry.viewportWidth),
+      "keyboard-height AI surface keeps touching the viewport's right edge"
+    ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(keyboardHeightGeometry.bottom - keyboardHeightGeometry.visibleViewportBottom),
       "keyboard-height phone AI surface stays attached to the visible viewport bottom"
@@ -825,18 +849,18 @@ test.describe("community discovery", () => {
 
     await page.getByRole("button", { name: "导入到我的课程", exact: true }).click();
     const imported = page.locator(".community-import-screen");
-    await expect(imported).toHaveClass(/course-ready-screen/);
+    await expect(imported).toHaveClass(/course-ready-focus/);
+    await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
     await expect(imported.locator(".success-hero-image")).toBeVisible();
     await expect(imported).toContainText("已将《函数与导数系统提升课》编排为 1 节 AI 课程。");
-    await expect(imported.locator(".course-ready-support .metric-card strong")).toHaveText([
-      "1",
-      "16",
-      "3",
-      "混合",
-    ]);
-    await expect(imported.getByRole("button", { name: "查看学习计划", exact: true })).toBeVisible();
+    await expect(imported.locator(".course-ready-support")).toHaveCount(0);
+    await expect(imported.getByRole("button", { name: "进入学习", exact: true })).toBeEnabled();
+    await expect(imported.getByRole("button", { name: "查看学习计划", exact: true })).toBeEnabled();
+    await expect(page.locator(".header-bar")).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
+    await imported.getByRole("button", { name: "查看学习计划", exact: true }).click();
+    await expect(page.locator(".study-plan-screen")).toBeVisible();
   });
 
   test("opens and imports a PDF-backed chemistry course", async ({ page }) => {
@@ -853,14 +877,12 @@ test.describe("community discovery", () => {
 
     await detail.getByRole("button", { name: "导入到我的课程", exact: true }).click();
     const imported = page.locator(".community-import-screen");
+    await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
     await expect(imported).toContainText("已将《化学必修第二册同步课》编排为 1 节 AI 课程。");
-    await expect(imported.locator(".course-ready-support .metric-card strong")).toHaveText([
-      "1",
-      "26",
-      "4",
-      "混合",
-    ]);
+    await expect(imported.locator(".course-ready-support")).toHaveCount(0);
+    await imported.getByRole("button", { name: "进入学习", exact: true }).click();
+    await expect(page.locator(".book-course-screen")).toBeVisible();
   });
 
   test("keeps card geometry stable when generated covers fail", async ({ page }) => {

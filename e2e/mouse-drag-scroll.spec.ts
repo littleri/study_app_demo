@@ -59,4 +59,54 @@ test.describe("global mouse drag scrolling", () => {
     await expect(page.locator('.screen-content[data-screen="home"]')).toBeVisible();
     await expect(page.locator(".app-shell")).toHaveAttribute("data-mouse-dragging", "false");
   });
+
+  test("adds release momentum to discovery while respecting reduced motion", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "iphone-17-pro", "The gesture is covered once at the phone viewport.");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.setViewportSize({ width: 402, height: 681 });
+    await page.goto("/?embedded=device-preview");
+    await page.getByRole("button", { name: "发现", exact: true }).click();
+    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+
+    const shell = page.locator(".app-shell");
+    const scroller = page.locator('.screen-content[data-screen="community"]');
+    const firstCard = page.locator(".community-book-card").first();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
+
+    const dragUp = async () => {
+      const cardBox = await firstCard.boundingBox();
+      expect(cardBox).not.toBeNull();
+      const startX = cardBox!.x + cardBox!.width / 2;
+      const startY = cardBox!.y + Math.min(cardBox!.height / 2, 100);
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX, startY - 120, { steps: 6 });
+      await page.mouse.up();
+    };
+
+    await dragUp();
+    await expect(shell).toHaveAttribute("data-mouse-dragging", "false");
+    const releasedScrollTop = await scroller.evaluate((element) => element.scrollTop);
+    await expect.poll(
+      () => scroller.evaluate((element) => Math.round(element.scrollTop)),
+      { message: "the discovery page keeps moving after release" }
+    ).toBeGreaterThan(Math.round(releasedScrollTop) + 20);
+    await expect.poll(
+      () => scroller.evaluate((element) => getComputedStyle(element).scrollBehavior),
+      { message: "discovery momentum settles", timeout: 2_500 }
+    ).toBe("smooth");
+    await expect(page.locator('.screen-content[data-screen="communityBook"]')).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(shell).toHaveAttribute("data-motion-reduced", "true");
+    await scroller.evaluate((element) => { element.scrollTop = 0; });
+    await dragUp();
+    const reducedReleaseScrollTop = await scroller.evaluate((element) => element.scrollTop);
+    await page.waitForTimeout(250);
+    const reducedSettledScrollTop = await scroller.evaluate((element) => element.scrollTop);
+    expect(
+      Math.abs(reducedSettledScrollTop - reducedReleaseScrollTop),
+      "reduced motion disables release momentum"
+    ).toBeLessThanOrEqual(2);
+  });
 });

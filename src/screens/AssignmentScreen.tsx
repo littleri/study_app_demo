@@ -17,13 +17,17 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
-import { MotionErrorShake, useOneShotFeedback, useReducedMotion } from "../motion";
+import { localMotionFallbackMs, MotionErrorShake, useOneShotFeedback, useReducedMotion } from "../motion";
 import {
   buildAssignmentExercises,
   getNextAssignmentExerciseIndex
 } from "./assignmentExercises";
 
 type JudgmentAnswer = "correct" | "incorrect";
+type AssignmentCardSwitchState = "idle" | "exiting" | "entering";
+
+const assignmentCardExitAnimationName = "motion-assignment-card-postcard-out";
+const assignmentCardEnterAnimationName = "motion-assignment-card-postcard-in";
 
 const exerciseIcons = {
   judgment: CheckCircle2,
@@ -42,6 +46,8 @@ export function AssignmentScreen() {
   const [answerFieldActive, setAnswerFieldActive] = useState(false);
   const [answerCheckState, setAnswerCheckState] = useState<"entering" | "idle">("idle");
   const [answerError, setAnswerError] = useState<string | null>(null);
+  const [cardSwitchState, setCardSwitchState] = useState<AssignmentCardSwitchState>("idle");
+  const [pendingExerciseIndex, setPendingExerciseIndex] = useState<number | null>(null);
   const answerFeedback = useOneShotFeedback();
   const answerRef = useRef<HTMLTextAreaElement | null>(null);
   const answerPresenceRef = useRef<boolean | null>(null);
@@ -91,10 +97,35 @@ export function AssignmentScreen() {
   }, [exerciseIndex]);
 
   useEffect(() => {
+    if (cardSwitchState === "idle") return;
+
+    const fallback = window.setTimeout(() => {
+      if (cardSwitchState === "exiting") {
+        if (pendingExerciseIndex !== null) setExerciseIndex(pendingExerciseIndex);
+        setCardSwitchState(pendingExerciseIndex === null ? "idle" : "entering");
+        return;
+      }
+      setCardSwitchState("idle");
+      setPendingExerciseIndex(null);
+    }, localMotionFallbackMs);
+
+    return () => window.clearTimeout(fallback);
+  }, [cardSwitchState, pendingExerciseIndex]);
+
+  useEffect(() => {
+    if (!reducedMotion || cardSwitchState === "idle") return;
+    if (pendingExerciseIndex !== null) setExerciseIndex(pendingExerciseIndex);
+    setCardSwitchState("idle");
+    setPendingExerciseIndex(null);
+  }, [cardSwitchState, pendingExerciseIndex, reducedMotion]);
+
+  useEffect(() => {
     setExerciseIndex(0);
     setJudgmentAnswer(null);
     setChoiceAnswer(null);
     setAnswer("");
+    setCardSwitchState("idle");
+    setPendingExerciseIndex(null);
   }, [liveChapter?.chapter_id, setAnswer]);
 
   function openAssignmentSource() {
@@ -109,8 +140,30 @@ export function AssignmentScreen() {
   }
 
   function continueToNextExercise() {
-    if (!canContinue) return;
-    setExerciseIndex((current) => getNextAssignmentExerciseIndex(current, assignmentExercises.length));
+    if (!canContinue || cardSwitchState !== "idle") return;
+    const nextExerciseIndex = getNextAssignmentExerciseIndex(exerciseIndex, assignmentExercises.length);
+    if (nextExerciseIndex === exerciseIndex) return;
+
+    if (reducedMotion) {
+      setExerciseIndex(nextExerciseIndex);
+      return;
+    }
+
+    setPendingExerciseIndex(nextExerciseIndex);
+    setCardSwitchState("exiting");
+  }
+
+  function settleCardSwitch(animationName: string) {
+    if (cardSwitchState === "exiting" && animationName === assignmentCardExitAnimationName) {
+      if (pendingExerciseIndex !== null) setExerciseIndex(pendingExerciseIndex);
+      setCardSwitchState(pendingExerciseIndex === null ? "idle" : "entering");
+      return;
+    }
+
+    if (cardSwitchState === "entering" && animationName === assignmentCardEnterAnimationName) {
+      setCardSwitchState("idle");
+      setPendingExerciseIndex(null);
+    }
   }
 
   async function submit() {
@@ -200,9 +253,15 @@ export function AssignmentScreen() {
         <Card
           className="assignment-card assignment-exercise-card"
           data-assignment-type={currentExercise.id}
+          data-motion-assignment-card-state={cardSwitchState}
+          data-motion-assignment-card-key={currentExercise.questionId}
           data-motion-assignment-selection={currentExercise.id === "short-answer" && answerFieldActive ? "selected" : "idle"}
           data-motion-assignment-submit={loading ? "submitting" : "idle"}
+          aria-busy={cardSwitchState !== "idle"}
           aria-live="polite"
+          onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget) settleCardSwitch(event.animationName);
+          }}
         >
           <div className="assignment-exercise-kicker">
             <span aria-hidden="true"><ExerciseIcon size={19} /></span>
@@ -335,7 +394,7 @@ export function AssignmentScreen() {
             <Button
               aria-label={currentExercise.id === "short-answer" ? "提交作业" : `提交${currentExercise.label}答案并进入下一题`}
               data-motion-assignment-submit={loading ? "submitting" : "idle"}
-              disabled={loading || (currentExercise.id !== "short-answer" && !canContinue)}
+              disabled={loading || cardSwitchState !== "idle" || (currentExercise.id !== "short-answer" && !canContinue)}
               loading={loading}
               onClick={currentExercise.id === "short-answer" ? submit : continueToNextExercise}
             >
