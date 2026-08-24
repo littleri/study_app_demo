@@ -102,7 +102,7 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   parseReady: { title: "解析教材", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
-  courseReady: { title: "生成成功", back: true, hideNav: true },
+  courseReady: { hideNav: true },
   library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程" },
   community: { title: "社区", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },

@@ -20,22 +20,17 @@ import { useAppContext } from "../context/AppContext";
 import { CollapsibleRegion, MotionIconSwap } from "../motion";
 import type { ApiChapter, StudyTask } from "../types/api";
 import type { StudyLocation } from "../types/app";
-import { buildChapterTree, type ChapterTreeNode } from "../utils/chapterStructure";
+import type { ChapterTreeNode } from "../utils/chapterStructure";
 import { courseCoverImageUrl, liveBookTitle, sourcePageLabel } from "./shared";
 import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
+import { buildStudyDirectory, normalizeStudyLocation } from "./studyDirectory";
 
 const curatedBiologyBookId = "book_biology_2";
-const frontmatterChapterId = "frontmatter";
 
 function getDefaultLocation(chapters: ApiChapter[]): StudyLocation {
-  const [firstRoot] = buildChapterTree(chapters);
-  const firstSection = firstRoot ? getStudySections(firstRoot)[0]?.chapter ?? firstRoot.chapter : null;
-  return {
-    expandedChapterId: firstRoot?.chapter.chapter_id ?? null,
-    expandedSectionId: firstSection?.chapter_id ?? null
-  };
+  return normalizeStudyLocation(buildStudyDirectory(chapters));
 }
 
 type StudySectionEntry = {
@@ -44,16 +39,13 @@ type StudySectionEntry = {
   depth: number;
 };
 
-function flattenStudySections(nodes: ChapterTreeNode[], depth = 0): StudySectionEntry[] {
-  return nodes.flatMap((node) => [
-    { chapter: node.chapter, chapterIds: getChapterNodeIds(node), depth },
-    ...flattenStudySections(node.children, depth + 1)
-  ]);
-}
-
 function getStudySections(node: ChapterTreeNode): StudySectionEntry[] {
   return node.children.length > 0
-    ? flattenStudySections(node.children)
+    ? node.children.map((child) => ({
+        chapter: child.chapter,
+        chapterIds: getChapterNodeIds(child),
+        depth: 0
+      }))
     : [{ chapter: node.chapter, chapterIds: [node.chapter.chapter_id], depth: 0 }];
 }
 
@@ -64,19 +56,11 @@ function chapterPageLabel(chapter: ApiChapter): string {
 }
 
 function countFormalSections(node: ChapterTreeNode): number {
-  return node.children.filter((child) => (
-    /^(?:第\s*\d+\s*节|\d+\.\d+\*?\s*)/.test(child.chapter.source_title)
-  )).length;
+  return node.children.length;
 }
 
 function getChapterNodeIds(node: ChapterTreeNode): string[] {
   return [node.chapter.chapter_id, ...node.children.flatMap((child) => getChapterNodeIds(child))];
-}
-
-function isSectionInChapter(node: ChapterTreeNode, sectionId: string | null): boolean {
-  if (!sectionId) return false;
-  return node.chapter.chapter_id === sectionId
-    || node.children.some((child) => isSectionInChapter(child, sectionId));
 }
 
 function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
@@ -309,7 +293,7 @@ function StudyChapter({
               style={{ strokeDashoffset: 100 - progress }}
             />
           </svg>
-          <span>{complete ? <Check size={19} strokeWidth={3} /> : node.chapter.chapter_id === frontmatterChapterId ? "前" : chapterIndex + 1}</span>
+          <span>{complete ? <Check size={19} strokeWidth={3} /> : chapterIndex + 1}</span>
         </span>
         <span className="study-chapter-copy">
           <strong>{node.chapter.source_title}</strong>
@@ -410,21 +394,22 @@ export function StudyScreen() {
     generatedQuizzes
   });
   const activeChapters = hasLoadedCourse ? parsedChapters : null;
-  const chapterTree = useMemo(() => buildChapterTree(activeChapters ?? []), [activeChapters]);
-  const actualChapterTree = useMemo(
-    () => chapterTree.filter((node) => node.chapter.chapter_id !== frontmatterChapterId),
-    [chapterTree]
-  );
+  const chapterTree = useMemo(() => buildStudyDirectory(activeChapters ?? []), [activeChapters]);
   const currentBookId = hasLoadedCourse ? loadedBookId : null;
   const defaultLocation = useMemo(() => getDefaultLocation(activeChapters ?? []), [activeChapters]);
   const location = currentBookId ? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
 
   useEffect(() => {
-    if (currentBookId && activeChapters?.length && !studyLocations[currentBookId]) {
-      updateStudyLocation(currentBookId, defaultLocation);
-      setActiveChapterId(defaultLocation.expandedSectionId);
-    }
-  }, [activeChapters, currentBookId, defaultLocation, setActiveChapterId, studyLocations, updateStudyLocation]);
+    if (!currentBookId || !activeChapters?.length) return;
+    const savedLocation = studyLocations[currentBookId];
+    const normalizedLocation = normalizeStudyLocation(chapterTree, savedLocation);
+    if (
+      savedLocation?.expandedChapterId === normalizedLocation.expandedChapterId
+      && savedLocation.expandedSectionId === normalizedLocation.expandedSectionId
+    ) return;
+    updateStudyLocation(currentBookId, normalizedLocation);
+    setActiveChapterId(normalizedLocation.expandedSectionId);
+  }, [activeChapters, chapterTree, currentBookId, setActiveChapterId, studyLocations, updateStudyLocation]);
 
   useEffect(() => {
     if (uploadedFile) return;
@@ -468,17 +453,21 @@ export function StudyScreen() {
   const completedTasks = currentStudyPlan?.tasks.filter((task) => task.status === "done").length ?? 0;
   const usesCuratedBiologyProgress = currentBookId === curatedBiologyBookId;
   const chapterProgresses = chapterTree.map((node) => (
-    usesCuratedBiologyProgress && node.chapter.chapter_id === frontmatterChapterId
-      ? 100
-      : calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))
+    calculateChapterProgress(currentStudyPlan?.tasks ?? [], getChapterNodeIds(node))
   ));
   const planProgress = usesCuratedBiologyProgress && chapterProgresses.length > 0
     ? Math.round(chapterProgresses.reduce((sum, progress) => sum + progress, 0) / chapterProgresses.length)
     : totalTasks > 0
       ? Math.round((completedTasks / totalTasks) * 100)
       : 0;
-  const currentSection = activeChapters?.find((chapter) => chapter.chapter_id === location.expandedSectionId)
-    ?? activeChapters?.[0]
+  const visibleSectionIds = useMemo(
+    () => new Set(chapterTree.flatMap((node) => getStudySections(node).map((section) => section.chapter.chapter_id))),
+    [chapterTree]
+  );
+  const currentSection = activeChapters?.find((chapter) => (
+    chapter.chapter_id === location.expandedSectionId && visibleSectionIds.has(chapter.chapter_id)
+  ))
+    ?? activeChapters?.find((chapter) => chapter.chapter_id === defaultLocation.expandedSectionId)
     ?? null;
   const currentLesson = generatedLessons?.find((lesson) => lesson.chapter_id === currentSection?.chapter_id);
   const bookTitle = liveBookTitle(uploadedFile, parsedScanResult);
@@ -491,7 +480,7 @@ export function StudyScreen() {
       return;
     }
     const sections = getStudySections(node);
-    const nextSectionId = isSectionInChapter(node, location.expandedSectionId)
+    const nextSectionId = sections.some((section) => section.chapter.chapter_id === location.expandedSectionId)
       ? location.expandedSectionId
       : sections[0]?.chapter.chapter_id ?? node.chapter.chapter_id;
     updateStudyLocation(currentBookId, {
@@ -622,12 +611,12 @@ export function StudyScreen() {
               <div>
                 <small>
                   {usesCuratedBiologyProgress
-                    ? "前置页已完成 · 第 2 章进行中"
+                    ? `今日建议 · ${todayMinutes} 分钟`
                     : `今日建议 · ${todayMinutes} 分钟`}
                 </small>
                 <strong>
                   {usesCuratedBiologyProgress
-                    ? actualChapterTree[0]?.chapter.source_title ?? currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"
+                    ? currentLesson?.title ?? currentSection?.source_title ?? chapterTree[0]?.chapter.source_title ?? "从第一节开始"
                     : currentLesson?.title ?? currentSection?.source_title ?? "从第一节开始"}
                 </strong>
               </div>
@@ -649,7 +638,7 @@ export function StudyScreen() {
       >
         <div className="study-directory-heading">
           <h2 id="study-directory-title">教材目录</h2>
-          <span>{actualChapterTree.length} 章 · 前置页</span>
+          <span>{chapterTree.length} 章 · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} 节</span>
         </div>
         <div className="study-chapter-list">
           {chapterTree.map((node, index) => (

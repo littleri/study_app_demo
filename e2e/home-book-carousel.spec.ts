@@ -779,23 +779,87 @@ test.describe("default homepage visual regression", () => {
     expect(layout.documentOverflow).toBeLessThanOrEqual(0);
   });
 
-  test("keeps the remaining bundled shelf books as cover-only previews until import", async ({ page }) => {
+  test("switches shelf books to real or subject-specific mock next steps and tools", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     const listbox = page.getByRole("listbox", { name: "选择教材" });
-    const previewBook = listbox.getByRole("option", { name: /物理 必修 第三册/ });
+    const mathBook = listbox.locator('[data-book-id="catalog_high_school_math_required_2"]');
+    await mathBook.click();
+    const mathWorkspace = page.locator('.home-book-workspace[data-book-id="catalog_high_school_math_required_2"]');
+    await expect(mathWorkspace).toHaveAttribute("data-loaded", "true");
+    await expect(mathWorkspace).not.toHaveAttribute("data-preview", "true");
+    await expect(mathWorkspace.locator(".home-workspace-label")).toContainText("这本书的下一步");
+    await expect(mathWorkspace.locator(".study-tool-grid")).toBeVisible();
 
-    await previewBook.click();
-    await expect(previewBook).toHaveAttribute("aria-selected", "true");
-    await expect(previewBook.locator("img")).toHaveAttribute(
-      "src",
-      "/assets/book-covers/physics-required-3.webp"
-    );
+    const previews = [
+      {
+        bookId: "catalog_physics_required_3",
+        chapter: "第 1 节 电荷",
+        assignment: "电荷守恒定律适用于哪些过程？",
+        flashcard: "电荷与库仑定律",
+        mistake: "感应起电"
+      },
+      {
+        bookId: "catalog_chemistry_required_2",
+        chapter: "第 1 节 硫及其化合物",
+        assignment: "二氧化硫为什么能够使品红溶液褪色？",
+        flashcard: "硫及其化合物",
+        mistake: "SO₂ 的性质"
+      },
+      {
+        bookId: "catalog_english_required_3",
+        chapter: "Unit 1 Festivals and Celebrations",
+        assignment: "What do festivals around the world have in common?",
+        flashcard: "Festival vocabulary",
+        mistake: "动词-ing 形式"
+      },
+      {
+        bookId: "catalog_advanced_mathematics_1",
+        chapter: "第一节 映射与函数",
+        assignment: "确定函数定义域时需要检查哪些限制？",
+        flashcard: "映射与函数",
+        mistake: "复合函数定义域"
+      },
+      {
+        bookId: "catalog_theoretical_mechanics_1",
+        chapter: "第 1 章 静力学公理和物体的受力分析",
+        assignment: "画受力图时应当先确定哪些研究对象？",
+        flashcard: "静力学公理",
+        mistake: "二力平衡"
+      },
+      {
+        bookId: "catalog_micro_psychology_set",
+        chapter: "第 1 章 表情不会说谎",
+        assignment: "哪些短暂面部变化可能是真实情绪线索？",
+        flashcard: "微表情识别",
+        mistake: "基线行为"
+      }
+    ] as const;
 
-    const workspace = page.locator('.home-book-workspace[data-book-id="catalog_physics_required_3"]');
-    await expect(workspace).toHaveAttribute("data-loaded", "false");
-    await expect(workspace.getByRole("heading", { name: "这本示范教材还未导入" })).toBeVisible();
-    await expect(workspace.getByRole("button", { name: "导入这本教材" })).toBeVisible();
-    await expect(workspace.locator(".study-tool-grid")).toHaveCount(0);
+    for (const preview of previews) {
+      const previewBook = listbox.locator(`[data-book-id="${preview.bookId}"]`);
+      await previewBook.click();
+      await expect(previewBook).toHaveAttribute("aria-selected", "true");
+
+      const workspace = page.locator(`.home-book-workspace[data-book-id="${preview.bookId}"]`);
+      await expect(workspace).toHaveAttribute("data-loaded", "true");
+      await expect(workspace).toHaveAttribute("data-preview", "true");
+      await expect(workspace.locator(".home-workspace-label")).toContainText("这本书的下一步");
+      await expect(workspace.getByRole("heading", { name: preview.chapter })).toBeVisible();
+      await expect(workspace.getByRole("button", { name: "继续学习", exact: true })).toBeEnabled();
+
+      const tools = workspace.locator(".study-tool-grid");
+      await expect(tools).toBeVisible();
+      await expect(tools.locator('[data-tool="assignment"]')).toContainText(preview.assignment);
+      await expect(tools.locator('[data-tool="flashcards"]')).toContainText(preview.flashcard);
+      await expect(tools.locator('[data-tool="mistakes"]')).toContainText(preview.mistake);
+      expect(await page.evaluate(() => (
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )), `${preview.bookId} keeps the phone viewport free of horizontal overflow`).toBe(true);
+    }
+
+    const finalWorkspace = page.locator('.home-book-workspace[data-book-id="catalog_micro_psychology_set"]');
+    await finalWorkspace.getByRole("button", { name: "继续学习", exact: true }).click();
+    await expect(page.locator(".toast")).toContainText("当前展示 Mock 学习内容");
   });
 
   test("opens source and lesson as distinct destinations for the same resolved chapter", async ({ page }) => {

@@ -279,6 +279,8 @@ export type Flashcard = {
   printed_page_start?: number | null;
   printed_page_end?: number | null;
   source_metadata?: Record<string, unknown>;
+  source_kind?: "textbook" | "ai_supplement";
+  source_quote?: string | null;
   due: string;
   mastery: number;
   reason: string;
@@ -300,6 +302,10 @@ export type QuizQuestion = {
   printed_page_start?: number | null;
   printed_page_end?: number | null;
   source_metadata?: Record<string, unknown>;
+  question_type?: "judgment" | "choice" | "short-answer";
+  instruction?: string;
+  source_kind?: "textbook" | "ai_supplement";
+  source_quote?: string | null;
 };
 
 export type ImageGenerationRequest = {

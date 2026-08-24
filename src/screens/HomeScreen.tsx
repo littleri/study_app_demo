@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CalendarDays, CircleAlert, Upload } from "lucide-react";
 import { HomeBookCarousel } from "../components/home/HomeBookCarousel";
-import { SelectedBookWorkspace } from "../components/home/SelectedBookWorkspace";
+import {
+  SelectedBookWorkspace,
+  type HomeBookPreviewAction
+} from "../components/home/SelectedBookWorkspace";
 import type { ChapterToolId } from "../components/study/ChapterToolCards";
 import { useAppContext } from "../context/AppContext";
 import { demoShelfBooks } from "../data/demoShelfBooks";
+import { demoShelfStudyPreviewFor } from "../data/demoShelfStudyPreviews";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 import {
   buildHomeBookModels,
@@ -56,6 +60,7 @@ export function HomeScreen() {
     refreshCourses,
     selectCourse,
     setActiveChapterId,
+    showToast,
     studyLocations,
     updateStudyLocation,
     uploadedFile
@@ -94,6 +99,9 @@ export function HomeScreen() {
     readyKind: courseSummariesReadyKind
   });
   const selectedBook = books.find((book) => book.bookId === selectedBookId) ?? null;
+  const selectedStudyPreview = demoShelfEnabled
+    ? demoShelfStudyPreviewFor(selectedBook?.bookId)
+    : null;
   const hasLocalSelectedUpload = Boolean(
     selectedBook
     && uploadedFile?.bookId === selectedBook.bookId
@@ -273,6 +281,20 @@ export function HomeScreen() {
     go(toolId === "assignment" ? "assignment" : "flashcards");
   }
 
+  function explainPreviewAction(action: HomeBookPreviewAction) {
+    if (!selectedBook || !selectedStudyPreview) return;
+    const actionLabel = action === "lesson"
+      ? "继续学习"
+      : action === "source"
+        ? "查看原书"
+        : action === "assignment"
+          ? "作业诊断"
+          : action === "flashcards"
+            ? "闪卡复习"
+            : "错题复习";
+    showToast(`《${selectedBook.title}》当前展示 Mock 学习内容，导入原书后即可使用${actionLabel}。`, "info");
+  }
+
   const globalActions = buildHomeGlobalActions({
     listState,
     selectedBookId: selectedBook?.bookId ?? null,
@@ -334,6 +356,7 @@ export function HomeScreen() {
             pendingBookId={pendingBookId}
             selectionError={selectionError}
             nextStep={nextStep}
+            studyPreview={selectedStudyPreview}
             onContinue={continueNextStep}
             onOpenOriginal={openSelectedOriginal}
             onOpenSource={openNextStepSource}
@@ -342,6 +365,7 @@ export function HomeScreen() {
             onSelectTool={openNextStepTool}
             onViewStatus={(book) => void openBookStatus(book)}
             onUpload={() => go("upload")}
+            onPreviewAction={explainPreviewAction}
           />
         </>
       ) : null}

@@ -1,3 +1,5 @@
+import type { QuizQuestion } from "../types/api";
+
 export type AssignmentExerciseType = "judgment" | "choice" | "short-answer";
 
 export type AssignmentChoiceOption = Readonly<{
@@ -7,40 +9,65 @@ export type AssignmentChoiceOption = Readonly<{
 
 export type AssignmentExercise = Readonly<{
   id: AssignmentExerciseType;
+  questionId: string;
   label: string;
   prompt: string;
   instruction: string;
   options?: readonly AssignmentChoiceOption[];
+  answer: string;
+  explanation: string;
+  concept: string;
+  sourceChunkIds: readonly string[];
+  pageStart: number;
+  pageEnd: number;
+  printedPageStart?: number | null;
+  printedPageEnd?: number | null;
+  sourceKind: "textbook" | "ai_supplement";
+  sourceQuote?: string | null;
 }>;
 
-export const assignmentExercises: readonly AssignmentExercise[] = [
-  {
-    id: "judgment",
-    label: "判断题",
-    prompt: "同源染色体在减数第一次分裂后期彼此分离。",
-    instruction: "判断这句话是否正确"
-  },
-  {
-    id: "choice",
-    label: "选择题",
-    prompt: "减数第一次分裂后期，细胞中发生的主要变化是？",
-    instruction: "选择一个最准确的答案",
-    options: [
-      { key: "A", text: "姐妹染色单体分离" },
-      { key: "B", text: "同源染色体分离" },
-      { key: "C", text: "DNA 再次复制" },
-      { key: "D", text: "染色体数目加倍" }
-    ]
-  },
-  {
-    id: "short-answer",
-    label: "简答题",
-    prompt: "请用自己的话说明减数分裂为什么能使生殖细胞中的染色体数目减半。",
-    instruction: "先写出染色体复制次数，再说明两次分裂。"
-  }
-];
+const labels: Record<AssignmentExerciseType, string> = {
+  judgment: "判断题",
+  choice: "选择题",
+  "short-answer": "简答题"
+};
 
-export function getNextAssignmentExerciseIndex(currentIndex: number) {
-  return Math.min(currentIndex + 1, assignmentExercises.length - 1);
+const defaultInstructions: Record<AssignmentExerciseType, string> = {
+  judgment: "判断这句话是否正确",
+  choice: "选择一个最准确的答案",
+  "short-answer": "请结合本节核心概念，用完整的因果关系作答。"
+};
+
+export function buildAssignmentExercises(quizzes: readonly QuizQuestion[]): AssignmentExercise[] {
+  return quizzes.map((quiz) => {
+    const type = quiz.question_type
+      ?? (quiz.choices.length === 0 ? "short-answer" : quiz.choices.length === 2 && quiz.choices.includes("正确") ? "judgment" : "choice");
+    return {
+      id: type,
+      questionId: quiz.question_id,
+      label: labels[type],
+      prompt: quiz.prompt,
+      instruction: quiz.instruction ?? defaultInstructions[type],
+      options: type === "choice"
+        ? quiz.choices.slice(0, 4).map((text, index) => ({
+            key: (["A", "B", "C", "D"] as const)[index],
+            text
+          }))
+        : undefined,
+      answer: quiz.answer,
+      explanation: quiz.explanation,
+      concept: quiz.concept,
+      sourceChunkIds: quiz.source_chunk_ids,
+      pageStart: quiz.page_start,
+      pageEnd: quiz.page_end,
+      printedPageStart: quiz.printed_page_start,
+      printedPageEnd: quiz.printed_page_end,
+      sourceKind: quiz.source_kind ?? (quiz.page_start > 0 ? "textbook" : "ai_supplement"),
+      sourceQuote: quiz.source_quote
+    };
+  });
 }
 
+export function getNextAssignmentExerciseIndex(currentIndex: number, exerciseCount = 3) {
+  return Math.min(currentIndex + 1, Math.max(0, exerciseCount - 1));
+}

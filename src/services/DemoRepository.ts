@@ -110,32 +110,25 @@ function clone<T>(value: T): T {
   return structuredClone(value);
 }
 
-function asCitation(chapterId: string, chunkId: string, quote: string) {
-  const chapter = seed.chapters.find((item) => item.chapter_id === chapterId);
-  const chunk = seed.chunks.find((item) => item.chunk_id === chunkId);
-  const metadata = (chunk?.source_metadata ?? {}) as {
-    pdf_pages?: number[];
-    printed_pages?: number[];
-  };
-  const page = metadata.pdf_pages?.[0] ?? chunk?.page_start ?? 1;
-  const printedPage = metadata.printed_pages?.[0] ?? chunk?.printed_page_start ?? null;
+function citationFromQuiz(quiz: QuizQuestion, chapters: readonly ApiChapter[]) {
+  const chapter = chapters.find((item) => item.chapter_id === quiz.chapter_id);
+  const page = quiz.page_start;
+  const printedPage = quiz.printed_page_start ?? null;
+  const quote = quiz.source_quote ?? quiz.explanation;
   return {
-    chapter_id: chapterId,
+    chapter_id: quiz.chapter_id,
     chapter_title: chapter?.source_title ?? "教材原文",
     page,
-    chunk_id: chunkId,
+    chunk_id: quiz.source_chunk_ids[0] ?? quiz.question_id,
     quote,
     score: 0.93,
-    retrieval_method: "mineru-fixture",
+    retrieval_method: "published-textbook-rag",
     source_type: "textbook",
     location_type: "page" as const,
     location_label: printedPage ? `教材第 ${printedPage} 页（PDF 第 ${page} 页）` : `PDF 第 ${page} 页`,
     source_metadata: {
-      ...metadata,
-      parser: seed.provenance.parser,
-      parser_version: seed.provenance.parser_version,
-      retrieval_quote: quote,
-      retrieved_chunk_text: chunk?.text ?? quote
+      ...(quiz.source_metadata ?? {}),
+      retrieval_quote: quote
     }
   };
 }
@@ -251,13 +244,17 @@ export function createOfflineTextbookRagResponse(
 export class DemoRepository {
   private readonly jobs = new Map<string, DemoJob>();
   private readonly lessonJobs = new Map<string, number>();
+  private readonly assignmentSubmissions = new Map<string, AssignmentSubmitRequest>();
   private parseJobSequence = 0;
+  private assignmentSubmissionSequence = 0;
   private state: DemoState = clone(seed);
 
   reset() {
     this.jobs.clear();
     this.lessonJobs.clear();
+    this.assignmentSubmissions.clear();
     this.parseJobSequence = 0;
+    this.assignmentSubmissionSequence = 0;
     this.state = clone(seed);
   }
 
@@ -605,25 +602,61 @@ export class DemoRepository {
     return createOfflineTextbookRagResponse([], this.state.chapters, payload.book_id);
   }
 
-  async submitAssignment(assignmentId: string, _payload: AssignmentSubmitRequest): Promise<AssignmentSubmitResponse> {
+  async submitAssignment(assignmentId: string, payload: AssignmentSubmitRequest): Promise<AssignmentSubmitResponse> {
     await wait();
-    return { assignment_id: assignmentId, submission_id: "submission_demo_01", status: "submitted" };
+    this.assignmentSubmissionSequence += 1;
+    const submissionId = `submission_demo_${String(this.assignmentSubmissionSequence).padStart(2, "0")}`;
+    this.assignmentSubmissions.set(assignmentId, clone(payload));
+    return { assignment_id: assignmentId, submission_id: submissionId, status: "submitted" };
   }
 
   async diagnoseAssignment(assignmentId: string, submissionId: string): Promise<DiagnosisResponse> {
     await wait();
+    const submission = this.assignmentSubmissions.get(assignmentId);
+    const chapterId = submission?.chapter_id ?? assignmentId.replace(/^assignment_/u, "");
+    const sectionQuizzes = this.state.quizzes.filter((quiz) => quiz.chapter_id === chapterId);
+    if (sectionQuizzes.length === 0) throw new Error("当前小节暂无可诊断的练习内容");
+
+    const judgment = sectionQuizzes.find((quiz) => quiz.question_type === "judgment");
+    const choice = sectionQuizzes.find((quiz) => quiz.question_type === "choice");
+    const shortAnswer = sectionQuizzes.find((quiz) => quiz.question_type === "short-answer");
+    const submittedAnswer = submission?.answer ?? "";
+    const judgmentAnswer = submittedAnswer.match(/^判断题：(.+)$/mu)?.[1]?.trim() ?? "未作答";
+    const choiceKey = submittedAnswer.match(/^选择题：([A-D])(?:\b|｜|$)/mu)?.[1] ?? null;
+    const choiceIndex = choiceKey ? ["A", "B", "C", "D"].indexOf(choiceKey) : -1;
+    const choiceAnswer = choice && choiceIndex >= 0 ? choice.choices[choiceIndex] : "未作答";
+    const objectiveChecks = [
+      judgment ? { quiz: judgment, correct: judgmentAnswer === judgment.answer } : null,
+      choice ? { quiz: choice, correct: choiceAnswer === choice.answer } : null
+    ].filter((item): item is { quiz: QuizQuestion; correct: boolean } => Boolean(item));
+    const incorrect = objectiveChecks.filter((item) => !item.correct);
+    const focusQuiz = incorrect[0]?.quiz ?? shortAnswer ?? sectionQuizzes[0];
+    const groundedQuiz = [focusQuiz, ...sectionQuizzes].find((quiz) => (
+      quiz.source_kind !== "ai_supplement" && quiz.page_start > 0 && quiz.source_chunk_ids.length > 0
+    ));
+    const correctCount = objectiveChecks.length - incorrect.length;
+    const result = incorrect.length === 0
+      ? `判断题和选择题共 ${objectiveChecks.length} 题，已答对 ${correctCount} 题。简答题已按本节核心要点生成复习建议。`
+      : `判断题和选择题共 ${objectiveChecks.length} 题，已答对 ${correctCount} 题；建议优先复习“${focusQuiz.concept}”。`;
+    const hint = incorrect.length > 0
+      ? `${focusQuiz.explanation} 正确答案：${focusQuiz.answer}`
+      : shortAnswer
+        ? `简答题参考要点：${shortAnswer.answer}`
+        : focusQuiz.explanation;
     return {
       assignment_id: assignmentId,
       submission_id: submissionId,
-      result: this.state.diagnosis.result,
-      stuck_point: this.state.diagnosis.stuck_point,
-      knowledge_points: clone(this.state.diagnosis.knowledge_points),
-       review_citations: [asCitation("c2s1", "chunk_c2s1_13", "配对的两条同源染色体彼此分离")],
-      related_assets: clone(this.state.assets.filter((asset) => asset.chapter_id === "c2s1")),
-      hint: this.state.diagnosis.hint,
+      result,
+      stuck_point: incorrect.length > 0
+        ? `客观题暴露出对“${focusQuiz.concept}”的理解偏差。`
+        : `客观题已通过，接下来需要用完整因果链表达“${focusQuiz.concept}”。`,
+      knowledge_points: [...new Set(sectionQuizzes.map((quiz) => quiz.concept))],
+      review_citations: groundedQuiz ? [citationFromQuiz(groundedQuiz, this.state.chapters)] : [],
+      related_assets: clone(this.state.assets.filter((asset) => asset.chapter_id === chapterId)),
+      hint,
       needs_followup: false,
       followup_question: null,
-      mistake_recorded: true
+      mistake_recorded: incorrect.length > 0
     };
   }
 

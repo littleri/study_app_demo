@@ -214,6 +214,20 @@
       "grounded_section_count": 13,
       "supplemental_section_count": 2,
       "chapter_one_source_status": "当前源 PDF 缺少第 1 章正文；仅目录页码可核验，课程为 AI 补充草稿。"
+    },
+    "expanded_practice": {
+      "scope": "正式章节第 1–5 章的全部 15 个小节",
+      "flashcard_count": 90,
+      "exercise_count": 45,
+      "flashcards_per_section": 6,
+      "exercises_per_section": 3,
+      "exercise_order": [
+        "judgment",
+        "choice",
+        "short-answer"
+      ],
+      "grounded_section_count": 13,
+      "supplemental_section_count": 2
     }
   },
   "scan": {

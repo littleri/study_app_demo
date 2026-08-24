@@ -51,6 +51,20 @@ describe("chapter structure helpers", () => {
     ]);
   });
 
+  it("does not treat unresolved 0–0 supplemental ranges as real page conflicts", () => {
+    const chapters = [
+      chapter({ chapter_id: "parent", page_start: 0, page_end: 0 }),
+      chapter({ chapter_id: "first", level: 2, parent_id: "parent", page_start: 0, page_end: 0 }),
+      chapter({ chapter_id: "second", level: 2, parent_id: "parent", page_start: 0, page_end: 0 }),
+      chapter({ chapter_id: "third", level: 2, parent_id: "parent", page_start: 2, page_end: 5 }),
+      chapter({ chapter_id: "fourth", level: 2, parent_id: "parent", page_start: 5, page_end: 8 })
+    ];
+
+    expect(findChapterRangeConflicts(chapters)).toEqual([
+      { chapterId: "third", otherChapterId: "fourth", overlapStart: 5, overlapEnd: 5 }
+    ]);
+  });
+
   it("collects all descendants for safe subtree removal", () => {
     const chapters = [
       chapter({ chapter_id: "root" }),

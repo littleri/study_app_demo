@@ -3,9 +3,9 @@ import type { HomeBookCatalogItem } from "../screens/homeBookModel";
 /**
  * Display-only shelf entries sourced from the local demonstration files.
  *
- * These records deliberately contain no parsed pages, chapters, or study data.
- * The current biology course is matched by id so it receives its original cover;
- * the remaining records stay as catalog previews until the user imports a book.
+ * These records deliberately contain no parsed pages or imported course state.
+ * Catalog records matched by local courses keep their real generated content;
+ * display-only records receive separate, clearly scoped Demo study previews.
  */
 export const demoShelfBooks: readonly HomeBookCatalogItem[] = [
   {

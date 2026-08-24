@@ -8,9 +8,16 @@ import {
   Metric
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
-import { useMotionHistory, useReducedMotion, useStageThreeImageMotion } from "../motion";
+import {
+  globalEmphasisMotionDurationMs,
+  localMotionMaxMs,
+  useMotionHistory,
+  useReducedMotion,
+  useStageThreeImageMotion
+} from "../motion";
 
 const courseReadyHeroSource = "/assets/brand/cloud-mascot-success-transparent-v1.png";
+const courseReadySpriteSource = "/assets/brand/success/cloud-mascot-success-strip-v1.png";
 
 function CourseReadySuccessMark({ motionKey }: { motionKey: string }) {
   const { consume } = useMotionHistory();
@@ -90,7 +97,109 @@ type CourseCompletionScreenProps = {
   onViewPlan: () => void;
   ragChunkCount: number;
   statusTitle: string;
+  focused?: boolean;
 };
+
+type FocusedCourseCompletionProps = Pick<
+  CourseCompletionScreenProps,
+  "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "statusTitle"
+>;
+
+type CourseReadyPhase = "celebrating" | "moving" | "revealing" | "settled";
+
+function FocusedCourseCompletion({
+  courseTitle,
+  lessonCount,
+  motionKey,
+  onEnterStudy,
+  onViewPlan,
+  statusTitle
+}: FocusedCourseCompletionProps) {
+  const { consume } = useMotionHistory();
+  const reducedMotion = useReducedMotion();
+  const [phase, setPhase] = useState<CourseReadyPhase>("celebrating");
+  const sequenceRef = useRef<{ key: string; shouldPlay: boolean } | null>(null);
+
+  useLayoutEffect(() => {
+    const sequenceKey = `${motionKey}:focused-sequence`;
+    if (sequenceRef.current?.key !== sequenceKey) {
+      sequenceRef.current = {
+        key: sequenceKey,
+        shouldPlay: consume(sequenceKey) && !reducedMotion
+      };
+    } else if (reducedMotion) {
+      sequenceRef.current.shouldPlay = false;
+    }
+
+    const shouldPlay = sequenceRef.current.shouldPlay && !reducedMotion;
+    if (!shouldPlay) {
+      setPhase("settled");
+      return;
+    }
+
+    setPhase("celebrating");
+    const celebrationHoldMs = globalEmphasisMotionDurationMs * 2;
+    const moveTimer = window.setTimeout(() => setPhase("moving"), celebrationHoldMs);
+    const revealTimer = window.setTimeout(
+      () => setPhase("revealing"),
+      celebrationHoldMs + globalEmphasisMotionDurationMs
+    );
+    const settleTimer = window.setTimeout(
+      () => setPhase("settled"),
+      celebrationHoldMs + globalEmphasisMotionDurationMs + localMotionMaxMs
+    );
+    return () => {
+      window.clearTimeout(moveTimer);
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(settleTimer);
+    };
+  }, [consume, motionKey, reducedMotion]);
+
+  const copyRevealed = phase === "revealing" || phase === "settled";
+  const actionsRevealed = phase === "settled";
+  const completionMessage = `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课程。`;
+
+  return (
+    <div
+      className="screen-stack centered-flow parse-complete-screen course-ready-screen course-ready-focus"
+      data-course-ready-phase={phase}
+    >
+      <div className="course-ready-focus-stage">
+        <div className="course-ready-mascot-scene">
+          <div className="course-ready-mascot-motion">
+            <div className="course-ready-success-sprite-viewport" aria-hidden="true">
+              <img
+                className="course-ready-success-sprite-strip"
+                src={courseReadySpriteSource}
+                alt=""
+              />
+            </div>
+            <div className="course-ready-final-image">
+              <CourseReadyHeroImage key={`${motionKey}:image`} statusTitle={statusTitle} />
+            </div>
+          </div>
+        </div>
+
+        <div className="course-ready-focus-copy" aria-hidden={!copyRevealed}>
+          <div className="course-ready-success-heading">
+            <h1>{statusTitle}</h1>
+            <CourseReadySuccessMark key={motionKey} motionKey={motionKey} />
+          </div>
+          <p>{completionMessage}</p>
+        </div>
+      </div>
+
+      <div className="course-ready-actions course-ready-focus-actions" aria-hidden={!actionsRevealed}>
+        <Button disabled={!actionsRevealed} onClick={onEnterStudy}>进入学习</Button>
+        <Button disabled={!actionsRevealed} variant="secondary" onClick={onViewPlan}>查看学习计划</Button>
+      </div>
+
+      <p className="motion-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+        {copyRevealed ? completionMessage : "课程已经生成，正在展示完成状态。"}
+      </p>
+    </div>
+  );
+}
 
 export function CourseCompletionScreen({
   assetCount,
@@ -102,8 +211,22 @@ export function CourseCompletionScreen({
   onEnterStudy,
   onViewPlan,
   ragChunkCount,
-  statusTitle
+  statusTitle,
+  focused = false
 }: CourseCompletionScreenProps) {
+  if (focused) {
+    return (
+      <FocusedCourseCompletion
+        courseTitle={courseTitle}
+        lessonCount={lessonCount}
+        motionKey={motionKey}
+        onEnterStudy={onEnterStudy}
+        onViewPlan={onViewPlan}
+        statusTitle={statusTitle}
+      />
+    );
+  }
+
   const moduleValues = [
     ["课程", `${lessonCount}`, `${chapterCount} 个目录项完成编排`],
     ["RAG 片段", `${ragChunkCount}`, "可用于问答检索"],
@@ -168,6 +291,7 @@ export function CourseReadyScreen() {
       onViewPlan={() => go("plan")}
       ragChunkCount={parsedChunks?.length ?? 0}
       statusTitle="生成成功"
+      focused
     />
   );
 }

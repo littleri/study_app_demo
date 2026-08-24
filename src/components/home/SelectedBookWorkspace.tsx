@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import { ChapterToolCards, type ChapterToolId } from "../study/ChapterToolCards";
 import type { HomeBookListState, HomeBookModel } from "../../screens/homeBookModel";
+import type { HomeBookStudyPreview } from "../../screens/homeBookPreview";
 import type { HomeNextStep } from "../../screens/homeNextStep";
+
+export type HomeBookPreviewAction = "lesson" | "source" | ChapterToolId;
 
 type SelectedBookWorkspaceProps = Readonly<{
   book: HomeBookModel | null;
@@ -23,6 +26,7 @@ type SelectedBookWorkspaceProps = Readonly<{
   pendingBookId: string | null;
   selectionError: string | null;
   nextStep: HomeNextStep | null;
+  studyPreview?: HomeBookStudyPreview | null;
   onContinue: () => void;
   onOpenOriginal: () => void;
   onOpenSource: () => void;
@@ -31,6 +35,7 @@ type SelectedBookWorkspaceProps = Readonly<{
   onRetrySelection: () => void;
   onViewStatus: (book: HomeBookModel) => void;
   onUpload: () => void;
+  onPreviewAction?: (action: HomeBookPreviewAction) => void;
 }>;
 
 function workspaceHeading(book: HomeBookModel): string {
@@ -220,6 +225,7 @@ export function SelectedBookWorkspace({
   pendingBookId,
   selectionError,
   nextStep,
+  studyPreview = null,
   onContinue,
   onOpenOriginal,
   onOpenSource,
@@ -227,7 +233,8 @@ export function SelectedBookWorkspace({
   onRestart,
   onRetrySelection,
   onViewStatus,
-  onUpload
+  onUpload,
+  onPreviewAction
 }: SelectedBookWorkspaceProps) {
   if (listState === "loading") return <LoadingBookWorkspace book={null} />;
   if (listState === "error") return null;
@@ -254,15 +261,23 @@ export function SelectedBookWorkspace({
   if (pending) return <LoadingBookWorkspace book={book} />;
 
   const loadedReady = book.status === "ready" && book.bookId === loadedBookId && Boolean(nextStep);
+  const previewReady = book.status === "catalog" && studyPreview?.bookId === book.bookId;
+  const workspaceReady = loadedReady || previewReady;
   const readyLoadFailed = Boolean(selectionError && book.status === "ready" && !loadedReady);
+  const workspaceChapterTitle = loadedReady
+    ? nextStep?.chapter.source_title
+    : previewReady
+      ? studyPreview.chapterTitle
+      : null;
 
   return (
     <section
-      className={`home-focus-panel home-book-workspace is-${book.status}`}
+      className={`home-focus-panel home-book-workspace is-${workspaceReady ? "ready" : book.status}${previewReady ? " is-demo-preview" : ""}`}
       aria-labelledby="home-workspace-title"
       data-book-id={book.bookId}
-      data-chapter-id={loadedReady ? nextStep?.chapter.chapter_id : undefined}
-      data-loaded={loadedReady ? "true" : "false"}
+      data-chapter-id={loadedReady ? nextStep?.chapter.chapter_id : studyPreview?.chapterId}
+      data-loaded={workspaceReady ? "true" : "false"}
+      data-preview={previewReady ? "true" : undefined}
     >
       {selectionError ? (
         <div
@@ -280,17 +295,17 @@ export function SelectedBookWorkspace({
       <div className="home-workspace-copy">
         <span className="home-workspace-label">
           {statusIcon(book)}
-          {loadedReady ? "这本书的下一步" : book.statusLabel}
+          {workspaceReady ? "这本书的下一步" : book.statusLabel}
         </span>
         <p className="home-workspace-course" title={book.title}>{book.title}</p>
         <h2 id="home-workspace-title">
-          {loadedReady
-            ? nextStep?.chapter.source_title
+          {workspaceReady
+            ? workspaceChapterTitle
             : readyLoadFailed
               ? "暂时无法打开这本教材"
               : workspaceHeading(book)}
         </h2>
-        {!loadedReady ? (
+        {!workspaceReady ? (
           <p>
             {readyLoadFailed
               ? "本次学习资源加载没有完成。可以重试切换，或先查看教材详情。"
@@ -311,15 +326,23 @@ export function SelectedBookWorkspace({
         ) : null}
       </div>
 
-      {loadedReady && nextStep ? (
+      {workspaceReady ? (
         <>
           <div className="home-workspace-actions" aria-label="本章主要操作">
-            <button className="home-primary-action" type="button" onClick={onContinue}>
+            <button
+              className="home-primary-action"
+              type="button"
+              onClick={previewReady ? () => onPreviewAction?.("lesson") : onContinue}
+            >
               <Play size={17} aria-hidden="true" />
               <span>继续学习</span>
               <ArrowRight size={16} aria-hidden="true" />
             </button>
-            <button className="home-source-action" type="button" onClick={onOpenSource}>
+            <button
+              className="home-source-action"
+              type="button"
+              onClick={previewReady ? () => onPreviewAction?.("source") : onOpenSource}
+            >
               <BookOpenText size={17} aria-hidden="true" />
               <span>回到原书</span>
             </button>
@@ -330,9 +353,12 @@ export function SelectedBookWorkspace({
               <span>围绕当前章节继续练习与复习</span>
             </div>
             <ChapterToolCards
-              ariaLabel={`${nextStep.chapter.source_title}的本章工具`}
-              chapterTitle={nextStep.chapter.source_title}
-              onSelectTool={onSelectTool}
+              ariaLabel={`${workspaceChapterTitle}的本章工具`}
+              chapterTitle={workspaceChapterTitle ?? book.title}
+              onSelectTool={previewReady
+                ? (toolId) => onPreviewAction?.(toolId)
+                : onSelectTool}
+              previewContent={previewReady ? studyPreview.toolPreview : undefined}
             />
           </div>
         </>

@@ -15,6 +15,37 @@ export type ParseStarterApi = {
   startParse: (bookId: string) => Promise<ParseJobResponse>;
 };
 
+export const presetBiologyCourseFile = {
+  name: "人教版高中生物必修2遗传与进化.pdf",
+  sizeBytes: Math.round(38.8 * 1024 * 1024),
+  contentType: "application/pdf",
+  lastModified: 1_785_628_800_000
+} as const;
+
+/**
+ * The product demo creates its biology textbook only after the learner clicks
+ * the upload add control. The file keeps a tiny in-memory body while exposing
+ * the real demo metadata, so selecting it never allocates a 38.8 MB placeholder.
+ */
+export function createPresetBiologyCourseFile(): File {
+  const file = new File(["BookCourse AI preset biology textbook"], presetBiologyCourseFile.name, {
+    type: presetBiologyCourseFile.contentType,
+    lastModified: presetBiologyCourseFile.lastModified
+  });
+  Object.defineProperty(file, "size", {
+    configurable: false,
+    enumerable: true,
+    value: presetBiologyCourseFile.sizeBytes
+  });
+  return file;
+}
+
+export function isPresetBiologyCourseFile(file: File): boolean {
+  return file.name === presetBiologyCourseFile.name
+    && file.size === presetBiologyCourseFile.sizeBytes
+    && file.lastModified === presetBiologyCourseFile.lastModified;
+}
+
 export async function uploadConfirmedCourseFile(
   file: File,
   api: UploadConfirmationApi,

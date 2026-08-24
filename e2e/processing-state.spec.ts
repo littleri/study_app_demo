@@ -105,19 +105,18 @@ test.describe("production App parse state injection", () => {
     await expect(page.locator(".processing-flow-screen")).toHaveCount(0);
     await expect(page.locator(".toc-directory")).toBeVisible();
     await expect(page.locator(".book-summary h2")).toHaveText(uploadedTitle);
+    await expect(page.locator(".book-summary-cover")).toHaveAttribute(
+      "src",
+      "/assets/textbook/biology-cover-thumb.webp"
+    );
+    await expect(page.locator(".book-summary-cover")).toHaveAttribute("alt", /生物 必修 2 遗传与进化/u);
+    await expect(page.locator(".mapping-summary")).toHaveCount(0);
     await expect(page.getByText("扫描版目录识别证据", { exact: true })).toHaveCount(0);
     await expect(page.locator(".toc-directory-helper")).toHaveCount(0);
     const initialRootExpansionStates = await page.locator(".toc-directory > .toc-node > .toc-entry > .toc-expand-button").evaluateAll((toggles) => (
       toggles.map((toggle) => toggle.getAttribute("aria-expanded"))
     ));
     expect(initialRootExpansionStates.every((expanded) => expanded === "false"), "top-level chapters start collapsed").toBe(true);
-    const metricHeights = await page.locator(".mapping-summary .metric-card").evaluateAll((metrics) => (
-      metrics.map((metric) => metric.getBoundingClientRect().height)
-    ));
-    expect(metricHeights).toHaveLength(3);
-    metricHeights.forEach((height, index) => {
-      expect(height, `${testInfo.project.name}: summary metric ${index + 1} stays compact`).toBeLessThanOrEqual(64);
-    });
     const rootRows = page.locator(".toc-directory > .toc-node > .toc-entry");
     const rootRowHeights = await rootRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
     expect(rootRowHeights.length).toBeGreaterThan(1);

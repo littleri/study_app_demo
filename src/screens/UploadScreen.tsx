@@ -12,7 +12,10 @@ import {
   acceptedCourseFileTypes,
   validateCourseFile
 } from "./shared";
-import { uploadConfirmedCourseFiles } from "./uploadFlow";
+import {
+  createPresetBiologyCourseFile,
+  uploadConfirmedCourseFiles
+} from "./uploadFlow";
 
 const maxSelectedFiles = 4;
 const fileOrdinalLabels = ["文件一", "文件二", "文件三", "文件四"];
@@ -32,6 +35,12 @@ export function UploadScreen() {
 
   function chooseFile() {
     if (!uploading) fileInputRef.current?.click();
+  }
+
+  function selectPresetCourseFile() {
+    if (uploading) return;
+    setSelectedFiles([createPresetBiologyCourseFile()]);
+    setUploadError(null);
   }
 
   async function uploadSelectedFiles() {
@@ -134,7 +143,7 @@ export function UploadScreen() {
             className="upload-add-tile"
             type="button"
             disabled={uploading}
-            onClick={chooseFile}
+            onClick={selectPresetCourseFile}
             aria-label="选择学习资料"
           >
             <span className="upload-add-icon"><Plus size={38} aria-hidden="true" /></span>
@@ -159,8 +168,12 @@ export function UploadScreen() {
             <span>{uploadError}</span>
           </p>
         ) : null}
-        <Button loading={uploading} disabled={uploading} onClick={() => void uploadSelectedFiles()}>
-          {uploading ? "上传中" : selectedFiles.length > 0 ? uploadError ? "重试上传" : "上传并继续" : "上传文件"}
+        <Button
+          loading={uploading}
+          disabled={uploading || selectedFiles.length === 0}
+          onClick={() => void uploadSelectedFiles()}
+        >
+          {uploading ? "上传中" : uploadError ? "重试上传" : "上传并继续"}
         </Button>
       </section>
     </div>

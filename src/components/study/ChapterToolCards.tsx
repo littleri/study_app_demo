@@ -1,6 +1,7 @@
 import { type ComponentType } from "react";
 import { BookX, ChevronRight, ClipboardCheck, Layers3, Plus } from "lucide-react";
 import {
+  type ChapterToolPreviewContent,
   studyToolDefinitions,
   type StudyToolDefinition,
   type StudyToolId
@@ -12,6 +13,7 @@ export type ChapterToolCardsProps = Readonly<{
   chapterTitle: string;
   onSelectTool: (toolId: ChapterToolId) => void;
   ariaLabel?: string;
+  previewContent?: ChapterToolPreviewContent;
 }>;
 
 const toolIcons: Record<
@@ -32,10 +34,21 @@ function isChapterTool(
 export function ChapterToolCards({
   chapterTitle,
   onSelectTool,
-  ariaLabel = "本节辅助工具"
+  ariaLabel = "本节辅助工具",
+  previewContent
 }: ChapterToolCardsProps) {
   const cardTools = studyToolDefinitions.filter(isChapterTool);
   const previewTitle = chapterTitle.replace(/^第\s*\d+\s*[章节]\s*/, "");
+  const assignmentKicker = previewContent?.assignmentKicker ?? "知识检测";
+  const assignmentPrompt = previewContent?.assignmentPrompt ?? "这一节的核心概念是？";
+  const assignmentOptionLabel = previewContent?.assignmentOptionLabel ?? "选择你的答案";
+  const flashcardTitle = previewContent?.flashcardTitle ?? previewTitle;
+  const mistakeKicker = previewContent?.mistakeKicker ?? "今日待复习";
+  const mistakeCount = previewContent?.mistakeCount ?? "3 道";
+  const mistakeItems = previewContent?.mistakeItems ?? [
+    { label: "减数分裂", status: "错 2 次" },
+    { label: "同源染色体", status: "待复习" }
+  ];
 
   return (
     <div className="study-tool-grid" aria-label={ariaLabel}>
@@ -53,22 +66,25 @@ export function ChapterToolCards({
             <span className="study-tool-cover" aria-hidden="true">
               {tool.id === "assignment" ? (
                 <span className="study-assignment-preview">
-                  <small>知识检测</small>
-                  <strong>这一节的核心概念是？</strong>
-                  <span><b>A</b>选择你的答案</span>
+                  <small>{assignmentKicker}</small>
+                  <strong>{assignmentPrompt}</strong>
+                  <span><b>A</b>{assignmentOptionLabel}</span>
                 </span>
               ) : tool.id === "mistakes" ? (
                 <span className="study-mistake-preview">
                   <span className="study-mistake-preview-head">
-                    <small>今日待复习</small>
-                    <strong>3 道</strong>
+                    <small>{mistakeKicker}</small>
+                    <strong>{mistakeCount}</strong>
                   </span>
-                  <span className="study-mistake-preview-row"><i />减数分裂 <b>错 2 次</b></span>
-                  <span className="study-mistake-preview-row"><i />同源染色体 <b>待复习</b></span>
+                  {mistakeItems.slice(0, 2).map((item) => (
+                    <span className="study-mistake-preview-row" key={`${item.label}:${item.status}`}>
+                      <i />{item.label} <b>{item.status}</b>
+                    </span>
+                  ))}
                 </span>
               ) : (
                 <span className="study-flashcard-preview">
-                  <span>{previewTitle}</span>
+                  <span>{flashcardTitle}</span>
                 </span>
               )}
             </span>

@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { validateCourseFile } from "./shared";
-import { startConfirmedCourseParse, uploadConfirmedCourseFile, uploadConfirmedCourseFiles } from "./uploadFlow";
+import {
+  createPresetBiologyCourseFile,
+  isPresetBiologyCourseFile,
+  presetBiologyCourseFile,
+  startConfirmedCourseParse,
+  uploadConfirmedCourseFile,
+  uploadConfirmedCourseFiles
+} from "./uploadFlow";
 
 const selectedPdf = {
   name: "biology.pdf",
@@ -9,6 +16,18 @@ const selectedPdf = {
 } as File;
 
 describe("upload confirmation flow", () => {
+  it("creates the biology textbook preset on demand without allocating its full demo size", () => {
+    const file = createPresetBiologyCourseFile();
+
+    expect(file).toBeInstanceOf(File);
+    expect(file.name).toBe("人教版高中生物必修2遗传与进化.pdf");
+    expect(file.type).toBe("application/pdf");
+    expect(file.size).toBe(Math.round(38.8 * 1024 * 1024));
+    expect(file.lastModified).toBe(presetBiologyCourseFile.lastModified);
+    expect(isPresetBiologyCourseFile(file)).toBe(true);
+    expect(isPresetBiologyCourseFile(selectedPdf)).toBe(false);
+  });
+
   it("keeps file choice local until the learner confirms upload", async () => {
     const initUpload = vi.fn();
     const uploadFile = vi.fn();

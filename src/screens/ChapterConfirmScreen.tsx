@@ -19,7 +19,6 @@ import type {
 import {
   Button,
   Card,
-  Metric,
   Pill,
   Section
 } from "../components/ui";
@@ -104,7 +103,8 @@ function hasChapterDraftChanges(chapter: ApiChapter, draft: ChapterDraft): boole
 
 function chapterPageLabel(node: ChapterTreeNode): string {
   const { page_start: start, page_end: end } = node.chapter;
-  return start === end ? `${start}` : `${start}–${end}`;
+  if (start < 1 || end < start) return "原文页码待补充";
+  return start === end ? `第 ${start} 页` : `第 ${start}–${end} 页`;
 }
 
 function chapterTreeIds(node: ChapterTreeNode): string[] {
@@ -277,7 +277,7 @@ function ChapterDirectoryNode({
           <span className="toc-entry-title-copy">
             <strong>{node.chapter.source_title}</strong>
             <small>
-              <span>第 {chapterPageLabel(node)} 页</span>
+              <span>{chapterPageLabel(node)}</span>
               {hasChildren ? <span>{node.children.length} 个下级目录</span> : null}
               {conflictCount > 0 ? (
                 <em className="toc-entry-issue conflict"><AlertTriangle size={12} aria-hidden="true" />页码冲突</em>
@@ -634,7 +634,6 @@ export function ChapterConfirmScreen() {
   const chapterMotionBookId = uploadedFile?.bookId ?? parsedScanResult?.book_id ?? null;
   const displayChapters = parsedChapters?.map(apiChapterToChapter) ?? [];
   const confidence = averageConfidence(displayChapters);
-  const reviewCount = displayChapters.filter((chapter) => chapter.status !== "匹配良好").length;
   const documentTitle = uploadedFile?.name ?? parsedScanResult?.filename ?? "未选择教材";
   const displayDocumentTitle = fileTitleBeforeParenthesis(documentTitle);
   const pageCount = parsedScanResult?.page_count ?? 0;
@@ -816,9 +815,11 @@ export function ChapterConfirmScreen() {
   return (
     <div className="screen-stack chapter-confirm-screen">
       <Card className="book-summary">
-        <span className="book-summary-icon">
-          <FileText size={32} aria-hidden="true" />
-        </span>
+        <img
+          className="book-summary-cover"
+          src="/assets/textbook/biology-cover-thumb.webp"
+          alt="《生物 必修 2 遗传与进化》教材封面"
+        />
         <div>
           <Pill tone="purple">{isLiveResult ? "本次文件解析结果" : "等待后端解析结果"}</Pill>
           <h2 title={documentTitle}>{displayDocumentTitle}</h2>
@@ -829,11 +830,6 @@ export function ChapterConfirmScreen() {
           </p>
         </div>
       </Card>
-      <div className="mapping-summary">
-        <Metric label="目录匹配" value={`${confidence}%`} />
-        <Metric label="来源定位" value={isLiveResult ? sourceCount : "20 节"} />
-        <Metric label="需检查" value={`${reviewCount} 项`} />
-      </div>
       {chapterRangeConflicts.length > 0 ? (
         <Card className="chapter-conflict-card">
           <div className="chapter-conflict-heading">

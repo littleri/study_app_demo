@@ -22,6 +22,7 @@ import "./styles/upload.css";
 import "./styles/parse-ready.css";
 import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
+import "./styles/course-ready.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isPreviewStudio = searchParams.get("preview") === "device-preview";

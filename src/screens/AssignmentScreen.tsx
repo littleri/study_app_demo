@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpenCheck,
   Check,
@@ -19,11 +19,7 @@ import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { MotionErrorShake, useOneShotFeedback, useReducedMotion } from "../motion";
 import {
-  backendAssetUrl,
-  sourcePageImageUrl
-} from "./shared";
-import {
-  assignmentExercises,
+  buildAssignmentExercises,
   getNextAssignmentExerciseIndex
 } from "./assignmentExercises";
 
@@ -37,7 +33,7 @@ const exerciseIcons = {
 
 export function AssignmentScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { activeChapterId, answer, go, openSourcePage, openSheet, parsedAssets, parsedChapters, parsedChunks, setAnswer, setLatestDiagnosis, showToast, uploadedFile } = useAppContext();
+  const { activeChapterId, answer, generatedLessons, generatedQuizzes, go, openSourcePage, parsedChapters, setAnswer, setLatestDiagnosis, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [exerciseIndex, setExerciseIndex] = useState(0);
   const [judgmentAnswer, setJudgmentAnswer] = useState<JudgmentAnswer | null>(null);
@@ -52,22 +48,21 @@ export function AssignmentScreen() {
   const questionHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const hasMountedExerciseRef = useRef(false);
   const liveChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId) ?? parsedChapters?.[0] ?? null;
-  const liveChunk = liveChapter ? parsedChunks?.find((chunk) => chunk.chapter_id === liveChapter.chapter_id) ?? null : null;
-  const liveAsset = liveChapter ? parsedAssets?.find((asset) => asset.chapter_id === liveChapter.chapter_id) ?? null : null;
+  const assignmentExercises = useMemo(() => buildAssignmentExercises(
+    (generatedQuizzes ?? []).filter((quiz) => quiz.chapter_id === liveChapter?.chapter_id)
+  ), [generatedQuizzes, liveChapter?.chapter_id]);
   const currentExercise = assignmentExercises[exerciseIndex] ?? assignmentExercises[0];
-  const ExerciseIcon = exerciseIcons[currentExercise.id];
-  const citationImage = liveAsset?.image_url
-    ? backendAssetUrl(liveAsset.image_url)
-    : uploadedFile && liveChunk
-      ? sourcePageImageUrl(uploadedFile.bookId, liveChunk.page_start)
-      : "";
-  const sourcePageLabel = liveChunk
-    ? liveChunk.page_start === liveChunk.page_end
-      ? `教材第 ${liveChunk.page_start} 页`
-      : `教材第 ${liveChunk.page_start}-${liveChunk.page_end} 页`
-    : "教材页码待确认";
+  const ExerciseIcon = currentExercise ? exerciseIcons[currentExercise.id] : FileText;
+  const displayedPageStart = currentExercise?.printedPageStart ?? currentExercise?.pageStart;
+  const displayedPageEnd = currentExercise?.printedPageEnd ?? currentExercise?.pageEnd;
+  const canOpenSource = Boolean(uploadedFile && currentExercise?.sourceKind === "textbook" && currentExercise.pageStart > 0);
+  const sourcePageLabel = canOpenSource && displayedPageStart
+    ? displayedPageStart === displayedPageEnd
+      ? `教材第 ${displayedPageStart} 页`
+      : `教材第 ${displayedPageStart}-${displayedPageEnd} 页`
+    : "AI 补充 · 待原文核验";
   const hasAnswer = answer.trim().length > 0;
-  const canContinue = currentExercise.id === "judgment"
+  const canContinue = currentExercise?.id === "judgment"
     ? judgmentAnswer !== null
     : currentExercise.id === "choice"
       ? choiceAnswer !== null
@@ -95,27 +90,27 @@ export function AssignmentScreen() {
     return () => window.cancelAnimationFrame(frame);
   }, [exerciseIndex]);
 
+  useEffect(() => {
+    setExerciseIndex(0);
+    setJudgmentAnswer(null);
+    setChoiceAnswer(null);
+    setAnswer("");
+  }, [liveChapter?.chapter_id, setAnswer]);
+
   function openAssignmentSource() {
-    if (uploadedFile && liveChapter && liveChunk) {
+    if (uploadedFile && liveChapter && currentExercise && canOpenSource) {
       openSourcePage({
         bookId: uploadedFile.bookId,
         title: liveChapter.source_title,
-        pageStart: liveChunk.page_start,
-        pageEnd: liveChunk.page_end
+        pageStart: currentExercise.pageStart,
+        pageEnd: currentExercise.pageEnd
       });
-      return;
     }
-    openSheet({
-      type: "source",
-      title: "作业来源页",
-      page: sourcePageLabel,
-      image: citationImage
-    });
   }
 
   function continueToNextExercise() {
     if (!canContinue) return;
-    setExerciseIndex((current) => getNextAssignmentExerciseIndex(current));
+    setExerciseIndex((current) => getNextAssignmentExerciseIndex(current, assignmentExercises.length));
   }
 
   async function submit() {
@@ -146,7 +141,7 @@ export function AssignmentScreen() {
       const submission = await bookcourseRepository.submitAssignment(assignmentId, {
         user_id: runtimeConfig.defaultUserId,
         book_id: uploadedFile.bookId,
-        lesson_id: `lesson_${liveChapter.chapter_id}`,
+        lesson_id: generatedLessons?.find((lesson) => lesson.chapter_id === liveChapter.chapter_id)?.lesson_id ?? `lesson_${liveChapter.chapter_id}`,
         chapter_id: liveChapter.chapter_id,
         question,
         answer: combinedAnswer
@@ -162,13 +157,13 @@ export function AssignmentScreen() {
     }
   }
 
-  if (!uploadedFile || !liveChapter) {
+  if (!uploadedFile || !liveChapter || !currentExercise) {
     return (
       <div className="screen-stack assignment-screen">
         <Card className="parse-empty-card">
           <ClipboardCheck size={34} aria-hidden="true" />
           <h2>暂无可练习的章节</h2>
-          <p>完成教材解析并进入章节后，就能按判断题、选择题、简答题的顺序检查理解。</p>
+          <p>{uploadedFile && liveChapter ? "本节练习内容尚未生成。" : "完成教材解析并进入章节后，就能按判断题、选择题、简答题的顺序检查理解。"}</p>
           <Button icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传教材</Button>
           <Button variant="secondary" onClick={() => go("library")}>查看课程库</Button>
         </Card>
@@ -323,15 +318,17 @@ export function AssignmentScreen() {
           ) : null}
 
           <div className="assignment-exercise-footer">
-            <button
-              className="assignment-source-button"
-              type="button"
-              aria-label={`${sourcePageLabel}，查看原文`}
-              title={sourcePageLabel}
-              onClick={openAssignmentSource}
-            >
-              <span>查看原文</span>
-            </button>
+            {canOpenSource ? (
+              <button
+                className="assignment-source-button"
+                type="button"
+                aria-label={`${sourcePageLabel}，查看原文`}
+                title={sourcePageLabel}
+                onClick={openAssignmentSource}
+              >
+                <span>查看原文</span>
+              </button>
+            ) : <span className="assignment-source-button" title={sourcePageLabel}>{sourcePageLabel}</span>}
           </div>
 
           <div className="assignment-primary-action">

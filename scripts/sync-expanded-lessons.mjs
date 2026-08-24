@@ -10,12 +10,15 @@ const paths = {
   demoState: join(generatedDir, "demo-state.json"),
   lessons: join(generatedDir, "lessons.json"),
   chapters: join(generatedDir, "chapters.json"),
+  flashcards: join(generatedDir, "flashcards.json"),
+  quizzes: join(generatedDir, "quiz.json"),
   book: join(generatedDir, "book.json"),
   meta: join(generatedDir, "demo-state-meta.json"),
   lessonsOneToThree: join(seedDir, "lessons-chapters-1-3.json"),
   lessonsFourToFive: join(seedDir, "lessons-chapters-4-5.json"),
   chapterOne: join(seedDir, "chapter-one-supplement.json"),
-  lessonAssets: join(seedDir, "expanded-lesson-assets.json")
+  lessonAssets: join(seedDir, "expanded-lesson-assets.json"),
+  practice: join(seedDir, "practice-chapters-1-5.json")
 };
 
 function readJson(path) {
@@ -68,6 +71,7 @@ const lessonSeeds = [
   ...readJson(paths.lessonsFourToFive)
 ];
 const lessonAssetSeeds = readJson(paths.lessonAssets);
+const practiceSeeds = readJson(paths.practice);
 const ragChunks = readJson(ragPath).chunks;
 const ragById = new Map(ragChunks.map((chunk) => [chunk.chunk_id, chunk]));
 
@@ -200,6 +204,86 @@ const lessons = [
 assert(lessons.length === expectedSectionIds.length, "Expanded lesson output must contain all fifteen Chapter 1–5 sections.");
 assert(new Set(lessons.map((lesson) => lesson.chapter_id)).size === lessons.length, "Expanded lesson output contains duplicate chapter lessons.");
 
+assert(practiceSeeds.length === expectedSectionIds.length, "Practice seed must contain all fifteen Chapter 1–5 sections.");
+const practiceByChapterId = new Map(practiceSeeds.map((practice) => [practice.chapter_id, practice]));
+assert(practiceByChapterId.size === practiceSeeds.length, "Practice seed contains duplicate chapter IDs.");
+const lessonByChapterId = new Map(lessons.map((lesson) => [lesson.chapter_id, lesson]));
+
+function practiceSource(lesson, blockIndex) {
+  const block = lesson.blocks[blockIndex];
+  assert(block, `${lesson.lesson_id}: practice references missing block ${blockIndex}.`);
+  if (lesson.chapter_id.startsWith("c1")) {
+    return {
+      source_chunk_ids: [],
+      page_start: 0,
+      page_end: 0,
+      printed_page_start: null,
+      printed_page_end: null,
+      source_kind: "ai_supplement",
+      source_quote: null
+    };
+  }
+  const citation = block.citations[0];
+  assert(citation, `${lesson.lesson_id}/${block.block_id}: grounded practice source is missing.`);
+  return {
+    source_chunk_ids: [citation.chunk_id],
+    page_start: citation.page_start,
+    page_end: citation.page_end,
+    printed_page_start: citation.printed_page_start,
+    printed_page_end: citation.printed_page_end,
+    source_metadata: citation.source_metadata,
+    source_kind: "textbook",
+    source_quote: citation.quote
+  };
+}
+
+const flashcards = expectedSectionIds.flatMap((chapterId) => {
+  const practice = practiceByChapterId.get(chapterId);
+  const lesson = lessonByChapterId.get(chapterId);
+  assert(practice && lesson, `${chapterId}: practice cannot be paired with its lesson.`);
+  assert(practice.flashcards?.length === 6, `${chapterId}: expected exactly six flashcards.`);
+  return practice.flashcards.map((card, index) => ({
+    card_id: `fc_${chapterId}_${String(index + 1).padStart(2, "0")}`,
+    book_id: lesson.book_id,
+    lesson_id: lesson.lesson_id,
+    chapter_id: chapterId,
+    front: card.front,
+    back: card.back,
+    concept: card.concept,
+    ...practiceSource(lesson, card.block_index),
+    due: "today",
+    mastery: [42, 50, 58, 64, 72, 80][index],
+    reason: chapterId.startsWith("c1")
+      ? "基于本节 AI 补充课程生成，待教材原文核验"
+      : "基于本节教材原文与核心概念生成"
+  }));
+});
+
+const quizTypeOrder = ["judgment", "choice", "short-answer"];
+const quizzes = expectedSectionIds.flatMap((chapterId) => {
+  const practice = practiceByChapterId.get(chapterId);
+  const lesson = lessonByChapterId.get(chapterId);
+  assert(practice && lesson, `${chapterId}: exercises cannot be paired with their lesson.`);
+  assert(practice.exercises?.length === 3, `${chapterId}: expected exactly three exercises.`);
+  assert(JSON.stringify(practice.exercises.map((item) => item.question_type)) === JSON.stringify(quizTypeOrder), `${chapterId}: exercise order must be judgment, choice, short-answer.`);
+  return practice.exercises.map((exercise, index) => ({
+    question_id: `quiz_${chapterId}_${String(index + 1).padStart(2, "0")}`,
+    book_id: lesson.book_id,
+    lesson_id: lesson.lesson_id,
+    chapter_id: chapterId,
+    prompt: exercise.prompt,
+    choices: exercise.choices,
+    answer: exercise.answer,
+    explanation: exercise.explanation,
+    concept: exercise.concept,
+    question_type: exercise.question_type,
+    instruction: exercise.instruction,
+    ...practiceSource(lesson, exercise.block_index)
+  }));
+});
+assert(flashcards.length === 90, "Expanded practice must contain exactly ninety flashcards.");
+assert(quizzes.length === 45, "Expanded practice must contain exactly forty-five exercises.");
+
 const frontmatter = demoState.chapters.find((chapter) => chapter.chapter_id === "frontmatter");
 assert(frontmatter, "Demo directory is missing frontmatter.");
 const chapters = [
@@ -221,6 +305,16 @@ const expandedProvenance = {
     grounded_section_count: lessons.filter((lesson) => !lesson.chapter_id.startsWith("c1")).length,
     supplemental_section_count: lessons.filter((lesson) => lesson.chapter_id.startsWith("c1")).length,
     chapter_one_source_status: "当前源 PDF 缺少第 1 章正文；仅目录页码可核验，课程为 AI 补充草稿。"
+  },
+  expanded_practice: {
+    scope: "正式章节第 1–5 章的全部 15 个小节",
+    flashcard_count: flashcards.length,
+    exercise_count: quizzes.length,
+    flashcards_per_section: 6,
+    exercises_per_section: 3,
+    exercise_order: quizTypeOrder,
+    grounded_section_count: expectedSectionIds.filter((chapterId) => !chapterId.startsWith("c1")).length,
+    supplemental_section_count: expectedSectionIds.filter((chapterId) => chapterId.startsWith("c1")).length
   }
 };
 const bookValues = {
@@ -234,12 +328,16 @@ const nextState = {
   book: bookValues,
   chapters,
   assets: allAssets,
-  lessons
+  lessons,
+  flashcards,
+  quizzes
 };
 
 writeJson(paths.demoState, nextState);
 writeJson(paths.lessons, lessons);
 writeJson(paths.chapters, chapters);
+writeJson(paths.flashcards, flashcards);
+writeJson(paths.quizzes, quizzes);
 writeJson(paths.book, {
   ...generatedBook,
   provenance: expandedProvenance,
@@ -252,3 +350,4 @@ writeJson(paths.meta, {
 
 console.log(`Expanded lessons synced: ${lessons.length} lessons across Chapters 1–5 (${overviewAssets.length} ImageGen overviews).`);
 console.log(`Grounded lessons: ${lessons.filter((lesson) => !lesson.chapter_id.startsWith("c1")).length}; source-missing supplements: ${lessons.filter((lesson) => lesson.chapter_id.startsWith("c1")).length}.`);
+console.log(`Practice synced: ${flashcards.length} flashcards and ${quizzes.length} exercises.`);

@@ -52,6 +52,7 @@ const lessons = read("lessons.json");
 const quizzes = read("quiz.json");
 const flashcards = read("flashcards.json");
 const replies = read("ai-responses.json");
+const practiceSourceById = new Map([...ragChunks, ...state.chunks].map((chunk) => [chunk.chunk_id, chunk]));
 // The checked-in demo must remain locally verifiable without an ignored
 // MinerU cache. When a developer has a raw run available we retain the much
 // stricter provenance checks below; otherwise validate the published fixture
@@ -118,7 +119,38 @@ for (const lesson of lessons.filter((item) => item.lesson_id !== "lesson_meiosis
   }
 }
 assert(expandedCitationCount >= 48, "Expanded Chapter 2–5 lessons do not contain enough published-RAG citations.");
-assert(flashcards.length >= 6 && quizzes.length >= 3, "P0 practice fixtures are incomplete.");
+assert(flashcards.length === 90 && quizzes.length === 45, "Chapter 1–5 practice fixtures must contain 90 flashcards and 45 exercises.");
+assert(JSON.stringify(state.flashcards) === JSON.stringify(flashcards), "Demo state flashcards drifted from the generated flashcard fixture.");
+assert(JSON.stringify(state.quizzes) === JSON.stringify(quizzes), "Demo state quizzes drifted from the generated quiz fixture.");
+for (const chapterId of expectedLessonChapterIds) {
+  const sectionCards = flashcards.filter((card) => card.chapter_id === chapterId);
+  const sectionQuizzes = quizzes.filter((quiz) => quiz.chapter_id === chapterId);
+  assert(sectionCards.length === 6, `${chapterId}: expected exactly six flashcards.`);
+  assert(sectionQuizzes.length === 3, `${chapterId}: expected exactly three exercises.`);
+  assert(JSON.stringify(sectionQuizzes.map((quiz) => quiz.question_type)) === JSON.stringify(["judgment", "choice", "short-answer"]), `${chapterId}: exercise order or types are invalid.`);
+  assert(sectionQuizzes[0].choices.length === 2 && sectionQuizzes[1].choices.length === 4 && sectionQuizzes[2].choices.length === 0, `${chapterId}: exercise choice shapes are invalid.`);
+  for (const practiceItem of [...sectionCards, ...sectionQuizzes]) {
+    if (chapterId.startsWith("c1")) {
+      assert(practiceItem.source_kind === "ai_supplement", `${practiceItem.card_id ?? practiceItem.question_id}: Chapter 1 practice must disclose AI supplement provenance.`);
+      assert(practiceItem.page_start === 0 && practiceItem.page_end === 0 && practiceItem.source_chunk_ids.length === 0, `${practiceItem.card_id ?? practiceItem.question_id}: Chapter 1 practice cannot claim a textbook source.`);
+      continue;
+    }
+    const sourceId = practiceItem.source_chunk_ids?.[0];
+    const chunk = practiceSourceById.get(sourceId);
+    const itemId = practiceItem.card_id ?? practiceItem.question_id;
+    assert(practiceItem.source_kind === "textbook" && practiceItem.source_chunk_ids.length === 1, `${itemId}: grounded practice must point to one textbook chunk.`);
+    assert(chunk, `${itemId}: source chunk ${sourceId} is missing from the published RAG corpus.`);
+    assert((chunk.section_id ?? chunk.chapter_id) === chapterId, `${itemId}: source chunk crosses section scope.`);
+    assert(typeof practiceItem.source_quote === "string" && chunk.text.includes(practiceItem.source_quote), `${itemId}: source quote is not present in its RAG chunk.`);
+    assert(practiceItem.page_start === chunk.page_start && practiceItem.page_end === chunk.page_end, `${itemId}: PDF page range drifted from its source chunk.`);
+    assert(practiceItem.printed_page_start === chunk.printed_page_start && practiceItem.printed_page_end === chunk.printed_page_end, `${itemId}: printed-page range drifted from its source chunk.`);
+    if (chunk.section_id) {
+      assert(JSON.stringify(practiceItem.source_metadata) === JSON.stringify(chunk.source_metadata), `${itemId}: source metadata drifted from its RAG chunk.`);
+    } else {
+      assert(practiceItem.source_metadata?.parser === "mineru", `${itemId}: core source metadata must retain MinerU provenance.`);
+    }
+  }
+}
 assert(replies.default && replies.quiz, "AI response fixtures are incomplete.");
 if (!existsSync(latestPath)) {
   console.log("Fixtures valid without ignored MinerU cache: " + chapters.length + " directory entries, " + lessons.length + " lessons, " + expandedCitationCount + " expanded citations, " + state.chunks.length + " core chunks, " + flashcards.length + " flashcards, " + quizzes.length + " quizzes.");
@@ -142,7 +174,7 @@ assert(state.scan?.has_text_layer === false && state.scan?.needs_ocr === true, "
 assert(book.id === "book_biology_2" && book.pages === manifest.page_count, "Unexpected book metadata.");
 assert(Array.isArray(chapters) && chapters.length >= 3, "Chapter fixture is too small.");
 assert(Array.isArray(lessons) && lessons.some((lesson) => lesson.chapter_id === "c2s1"), "Core meiosis lesson is missing.");
-assert(flashcards.length >= 6 && quizzes.length >= 3, "P0 practice fixtures are incomplete.");
+assert(flashcards.length === 90 && quizzes.length === 45, "Chapter 1–5 practice fixtures are incomplete.");
 assert(replies.default && replies.quiz, "AI response fixtures are incomplete.");
 
 const rawFiles = manifest.files ?? [];
@@ -286,7 +318,7 @@ for (const lesson of lessons.filter((item) => item.lesson_id === "lesson_meiosis
 }
 assert(p0CitationCount >= 7, "P0 lesson does not contain enough grounded citations.");
 
-for (const card of flashcards) {
+for (const card of flashcards.filter((item) => item.chapter_id === "c2s1")) {
   assert(card.source_chunk_ids?.length === 1, `Flashcard ${card.card_id} must point to one source chunk.`);
   const chunk = chunkById.get(card.source_chunk_ids[0]);
   assert(chunk, `Flashcard ${card.card_id} points to a missing chunk.`);
@@ -294,7 +326,7 @@ for (const card of flashcards) {
   validateSourceMetadata(card.source_metadata, `Flashcard ${card.card_id}`);
 }
 
-for (const quiz of quizzes) {
+for (const quiz of quizzes.filter((item) => item.chapter_id === "c2s1")) {
   assert(quiz.source_chunk_ids?.length === 1, `Quiz ${quiz.question_id} must point to one source chunk.`);
   const chunk = chunkById.get(quiz.source_chunk_ids[0]);
   assert(chunk, `Quiz ${quiz.question_id} points to a missing chunk.`);

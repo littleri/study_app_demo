@@ -36,10 +36,12 @@ test.describe("local DemoRepository P0 flow", () => {
     await clickUniqueAction(page, continueLearning, "continue the current chapter");
 
     const lesson = await expectScreenReady(page, ".lesson-screen", "current chapter lesson");
-    await expect(lesson.locator(".lesson-title-card h2")).toHaveText("减数分裂和受精作用");
+    await expect(lesson.getByRole("heading", { name: "减数分裂和受精作用", level: 2 })).toBeVisible();
+    await clickUniqueAction(page, page.getByRole("button", { name: "返回", exact: true }), "return to the current course home");
+    const home = await expectScreenReady(page, ".home-dashboard", "returned course home");
     await clickUniqueAction(
       page,
-      lesson.getByRole("button", { name: "做练习", exact: true }),
+      home.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }),
       "open assignment diagnosis"
     );
     await expectScreenReady(page, ".assignment-screen", "assignment");
@@ -73,6 +75,12 @@ test.describe("local DemoRepository P0 flow", () => {
     await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 12_000 });
     await expectScreenReady(page, ".chapter-confirm-screen", "quiet chapter confirmation");
     await expect(page.locator(".toast"), "parse completion does not open a Toast").toHaveCount(0);
+    await expect(page.locator(".book-summary-cover")).toBeVisible();
+    await expect(page.locator(".mapping-summary")).toHaveCount(0);
+    await expect(page.locator(".chapter-conflict-card")).toHaveCount(0);
+    await expect(page.locator(".toc-entry-issue.conflict")).toHaveCount(0);
+    await expect(page.getByText("第 0 页", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("原文页码待补充", { exact: true }).first()).toBeVisible();
 
     await clickUniqueAction(
       page,
@@ -81,6 +89,12 @@ test.describe("local DemoRepository P0 flow", () => {
     );
     await expect(page.locator(".course-ready-screen")).toBeVisible({ timeout: 10_000 });
     await expectScreenReady(page, ".course-ready-screen", "quiet course ready");
+    await expect(page.locator(".course-ready-focus")).toHaveAttribute("data-course-ready-phase", "settled");
+    await expect(page.locator(".course-ready-mascot-scene .success-hero-image")).toBeVisible();
+    await expect(page.locator(".course-ready-focus-copy")).toBeVisible();
+    await expect(page.locator(".course-ready-support")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "进入学习", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "查看学习计划", exact: true })).toBeEnabled();
     await expect(page.locator(".toast"), "course generation does not open a Toast").toHaveCount(0);
   });
 
@@ -112,13 +126,10 @@ test.describe("local DemoRepository P0 flow", () => {
 
     await clickUniqueAction(page, page.getByRole("button", { name: "开始解析", exact: true }), "start parsing");
     await expectScreenReady(page, ".processing-flow-screen", "processing");
-    for (const progress of [18, 46, 74]) {
-      await expect.poll(
-        async () => page.locator(".processing-card .progress-wrap").getAttribute("aria-label"),
-        { timeout: 8_000 }
-      ).toBe(`解析进度 ${progress}%`);
-    }
-
+    // Intermediate percentages are intentionally short-lived in the local
+    // fixture. Their individual states are covered by processing-state.spec;
+    // this end-to-end replay waits for the stable directory result.
+    await expect(page.locator(".chapter-confirm-screen")).toBeVisible({ timeout: 12_000 });
     await expectScreenReady(page, ".chapter-confirm-screen", "chapter confirmation");
     const confirmCourseButton = page.getByRole("button", { name: "确认生成课程", exact: true });
     await clickUniqueAction(page, confirmCourseButton, "confirm chapters and generate the course");
@@ -168,6 +179,10 @@ test.describe("local DemoRepository P0 flow", () => {
     await clickUniqueAction(page, page.getByRole("button", { name: "查看原文", exact: true }), "return to the lesson");
     await expectScreenReady(page, ".lesson-screen", "lesson");
 
+    const lessonPager = page.locator(".lesson-knowledge-pager");
+    for (let attempt = 0; attempt < 10 && await page.getByRole("button", { name: "完成本节", exact: true }).count() === 0; attempt += 1) {
+      await lessonPager.press("ArrowRight");
+    }
     await clickUniqueAction(page, page.getByRole("button", { name: "完成本节", exact: true }), "complete the chapter");
     await expectScreenReady(page, ".book-course-screen", "study directory");
     await expect(page.locator(".report-screen")).toHaveCount(0);

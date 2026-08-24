@@ -6,6 +6,19 @@ export type StudyToolDefinition = Readonly<{
   description: string;
 }>;
 
+export type ChapterToolPreviewContent = Readonly<{
+  assignmentKicker?: string;
+  assignmentPrompt: string;
+  assignmentOptionLabel?: string;
+  flashcardTitle: string;
+  mistakeKicker?: string;
+  mistakeCount?: string;
+  mistakeItems: readonly Readonly<{
+    label: string;
+    status: string;
+  }>[];
+}>;
+
 /**
  * The study panel is intentionally data-driven: adding a tool here is enough
  * to reserve its position in the section flow without changing the accordion.

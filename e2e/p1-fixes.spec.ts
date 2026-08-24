@@ -69,23 +69,27 @@ test.describe("P1 learning flow safeguards", () => {
     await expect.poll(() => readMainScrollTop(page)).toBe(0);
   });
 
-  test("keeps choosing local, uploads only after confirmation, and starts parsing only from ParseReady", async ({ page }) => {
+  test("reveals the preset textbook only after the learner clicks the add control", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
     await page.locator('[data-home-global-action="upload"]').click();
     await expect(page.locator(".upload-flow-screen")).toBeVisible();
 
     const sourceCopy = page.locator(".upload-source-copy");
     const emptySourceCopy = await sourceCopy.innerText();
+    const addCourseFile = page.getByRole("button", { name: "选择学习资料", exact: true });
+    const uploadAction = page.getByRole("button", { name: "上传并继续", exact: true });
+    await expect(addCourseFile).toBeVisible();
+    await expect(page.locator(".upload-add-tile.has-selection")).toHaveCount(0);
+    await expect(page.getByText("文件一", { exact: true })).toHaveCount(0);
+    await expect(uploadAction).toBeDisabled();
+    await expect(page.locator(".parse-ready-screen")).toHaveCount(0);
 
-    await page.locator('input[type="file"]').setInputFiles({
-      name: "biology-confirmation.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("%PDF-1.4 confirmation fixture")
-    });
+    await addCourseFile.click();
     const selectedFileTile = page.locator(".upload-add-tile.has-selection");
     await expect(selectedFileTile).toContainText("文件一");
-    await expect(selectedFileTile).not.toContainText("biology-confirmation.pdf");
     await expect(selectedFileTile).toHaveAccessibleName("已选择 1 份学习资料");
+    await expect(uploadAction).toBeEnabled();
+    await expect(page.locator(".parse-ready-screen")).toHaveCount(0);
     await expect(selectedFileTile.locator(".upload-selected-file-icon")).toBeVisible();
     await expect(selectedFileTile.locator(".upload-add-icon")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "添加更多学习资料", exact: true })).toBeVisible();

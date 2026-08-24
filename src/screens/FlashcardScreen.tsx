@@ -116,9 +116,16 @@ export function FlashcardScreen() {
           concept: card.concept,
           due: card.due === "today" ? "今天复习" : card.due,
           mastery: card.mastery,
-          source: `第 ${card.page_start}-${card.page_end} 页`,
+          source: card.source_kind === "ai_supplement" || card.page_start <= 0
+            ? "AI 补充 · 待原文核验"
+            : (() => {
+                const start = card.printed_page_start ?? card.page_start;
+                const end = card.printed_page_end ?? card.page_end;
+                return start === end ? `教材第 ${start} 页` : `教材第 ${start}-${end} 页`;
+              })(),
           pageStart: card.page_start,
           pageEnd: card.page_end,
+          canOpenSource: card.source_kind !== "ai_supplement" && card.page_start > 0,
           reason: card.reason || "基于本节核心概念生成"
         }))
     : [];
@@ -366,7 +373,7 @@ export function FlashcardScreen() {
               <footer className="flashcard-deck-preview-footer">
                 <div className="flashcard-deck-preview-source">
                   <span>{card.source}</span>
-                  <strong>查看原文</strong>
+                  {card.canOpenSource ? <strong>查看原文</strong> : null}
                 </div>
                 <div className="flashcard-deck-preview-progress">
                   <div>
@@ -435,7 +442,7 @@ export function FlashcardScreen() {
 
             <div className="memory-card-source-row">
               <p className="memory-card-source">{current.source}</p>
-              {uploadedFile && current.pageStart ? (
+              {uploadedFile && current.canOpenSource ? (
                 <button
                   className="inline-link"
                   type="button"

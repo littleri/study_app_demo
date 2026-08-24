@@ -48,10 +48,16 @@ export function findChapterRangeConflicts(chapters: ApiChapter[]): ChapterRangeC
   const conflicts: ChapterRangeConflict[] = [];
 
   chapters.forEach((chapter, index) => {
+    // A 0–0 range means the source PDF does not contain this supplemental
+    // chapter. It is an unresolved placeholder, not PDF page zero, so two
+    // such entries must never be reported as overlapping pages.
+    if (chapter.page_start < 1 || chapter.page_end < chapter.page_start) return;
+
     chapters.slice(index + 1).forEach((other) => {
       if (chapter.level !== other.level || (chapter.parent_id ?? null) !== (other.parent_id ?? null)) {
         return;
       }
+      if (other.page_start < 1 || other.page_end < other.page_start) return;
 
       const overlapStart = Math.max(chapter.page_start, other.page_start);
       const overlapEnd = Math.min(chapter.page_end, other.page_end);

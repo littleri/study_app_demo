@@ -26,6 +26,7 @@ export {
 } from "./presenceMachine";
 export { reducedMotionMediaQuery, useReducedMotion } from "./useReducedMotion";
 export {
+  globalEmphasisMotionDurationMs,
   globalMotionDurationMs,
   globalMotionFallbackMs,
   localMotionFallbackMs,
