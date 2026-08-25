@@ -30,6 +30,7 @@ import { getRuntimePlatform } from "../platform/nativeApp";
 import { getTextbookRetriever } from "../services/TextbookRetriever";
 import { getCitationSourceText } from "../screens/sheets/citationSource";
 import { communityBooks } from "../data/mockBook";
+import { getPublishedSourcePageImageUrl } from "../data/publishedSourcePages";
 import { answerCommunityCourseQuery } from "../screens/communityAssistant";
 
 gsap.registerPlugin(useGSAP);
@@ -710,6 +711,15 @@ function getCitationPrintedPage(citation: Citation) {
   return Number.isFinite(labelPage) && labelPage > 0 ? labelPage : null;
 }
 
+function getCitationSheetPageLabel(citation: Citation) {
+  const printedPage = getCitationPrintedPage(citation);
+  if (!printedPage) return citation.location_label?.trim() || `PDF 第 ${citation.page} 页`;
+  const learnerLabel = `教材第 ${printedPage} 页`;
+  return printedPage !== citation.page
+    ? `${learnerLabel} · PDF 第 ${citation.page} 页`
+    : learnerLabel;
+}
+
 function getUniqueCitationPages(citations: Citation[]) {
   const seen = new Set<string>();
   return citations.filter((citation) => {
@@ -807,8 +817,8 @@ function GlobalAIAssistant({
     generatedLessons,
     go,
     loadedBookId,
+    openSheet,
     parsedChapters,
-    openSourcePage,
     selectCommunityBook,
     uploadedFile
   } = useAppContext();
@@ -927,18 +937,27 @@ function GlobalAIAssistant({
 
   const openCitationSource = useCallback((citation: Citation) => {
     const printedPage = getCitationPrintedPage(citation);
+    const title = citation.chapter_title || "教材原文";
+    const sourceText = getCitationSourceText(citation);
     requestDialogClose();
-    openSourcePage({
-      bookId: ragBookId,
-      title: citation.chapter_title || "教材原文",
-      pageStart: citation.page,
-      pageEnd: citation.page,
-      printedPageStart: printedPage,
-      printedPageEnd: printedPage,
-      sourceText: getCitationSourceText(citation),
-      from: active
+    openSheet({
+      type: "source",
+      title,
+      page: getCitationSheetPageLabel(citation),
+      image: getPublishedSourcePageImageUrl(ragBookId, citation.page),
+      text: sourceText || undefined,
+      source: {
+        bookId: ragBookId,
+        title,
+        pageStart: citation.page,
+        pageEnd: citation.page,
+        printedPageStart: printedPage,
+        printedPageEnd: printedPage,
+        sourceText: sourceText || undefined,
+        from: active
+      }
     });
-  }, [active, openSourcePage, ragBookId, requestDialogClose]);
+  }, [active, openSheet, ragBookId, requestDialogClose]);
 
   useEffect(() => {
     const closeForNativeBack: EventListener = (event) => {
@@ -1420,10 +1439,16 @@ function AIAssistantDialog({
   const sharedIconRef = useRef<HTMLSpanElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const latestAiMessageRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
+  const anchoredAiMessageRef = useRef<AiAssistantMessage | null>(null);
   const titleId = useId();
   const hasConversation = messages.length > 0 || loading;
   const showSuggestions = !hasConversation && input.trim().length === 0;
+  const latestAiMessageIndex = messages.reduce(
+    (latestIndex, message, index) => message.role === "ai" ? index : latestIndex,
+    -1
+  );
   const focusPresenceRef = useRef(presenceId);
   if (visible && state !== "closing") focusPresenceRef.current = presenceId;
   const panelKey = `ai-assistant:${focusPresenceRef.current}`;
@@ -1465,8 +1490,43 @@ function AIAssistantDialog({
   }, [onAnimationCancel, state, visible]);
 
   useEffect(() => {
-    if (!visible || !hasConversation) return;
-    messageEndRef.current?.scrollIntoView({
+    if (!visible) return;
+
+    const messageEnd = messageEndRef.current;
+    if (!hasConversation) {
+      messageEnd?.style.removeProperty("height");
+      anchoredAiMessageRef.current = null;
+      return;
+    }
+
+    const latestMessage = messages.at(-1);
+    if (latestMessage?.role === "ai") {
+      if (anchoredAiMessageRef.current === latestMessage) return;
+      anchoredAiMessageRef.current = latestMessage;
+      const latestAiMessage = latestAiMessageRef.current;
+      const messageList = latestAiMessage?.closest<HTMLElement>(".ai-message-list");
+      const dialogScroller = latestAiMessage?.closest<HTMLElement>(".ai-dialog-scroll");
+      const messageListStyle = messageList ? getComputedStyle(messageList) : null;
+      const messageListIsScrollViewport = Boolean(
+        messageList
+        && messageListStyle
+        && messageListStyle.maxHeight !== "none"
+        && /auto|scroll/.test(messageListStyle.overflowY)
+      );
+      const scroller = messageListIsScrollViewport ? messageList : dialogScroller;
+      if (messageEnd && latestAiMessage && scroller) {
+        const readingTailHeight = Math.max(scroller.clientHeight - latestAiMessage.offsetHeight, 1);
+        messageEnd.style.height = `${readingTailHeight}px`;
+      }
+      latestAiMessage?.scrollIntoView({
+        behavior: reducedMotion ? "auto" : "smooth",
+        block: "start"
+      });
+      return;
+    }
+
+    messageEnd?.style.removeProperty("height");
+    messageEnd?.scrollIntoView({
       behavior: reducedMotion ? "auto" : "smooth",
       block: "end"
     });
@@ -1623,7 +1683,11 @@ function AIAssistantDialog({
           ) : null}
           <div className="ai-message-list" aria-live="polite" aria-busy={loading}>
             {messages.map((message, index) => (
-              <div className={`ai-message-row ${message.role}`} key={`${message.role}-${index}`}>
+              <div
+                ref={message.role === "ai" && index === latestAiMessageIndex ? latestAiMessageRef : undefined}
+                className={`ai-message-row ${message.role}`}
+                key={`${message.role}-${index}`}
+              >
                 <span className="ai-message-avatar" aria-hidden="true">
                   {message.role === "ai" ? <Bot size={15} /> : <User size={15} />}
                 </span>

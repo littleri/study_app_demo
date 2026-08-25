@@ -1497,7 +1497,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
   test("keeps Community same-state direct while rebuilt local surfaces and covers receive one new DOM entry", async ({ page }) => {
     await gotoApp(page);
-    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-results-switch, .community-detail-overview, .community-cover-image");
+    const pause = await installPauseStyle(page, ".community-discovery-controls, .community-results-switch, .community-detail-overview, .community-detail-tab-panel, .community-cover-image");
     await page.getByRole("button", { name: "发现", exact: true }).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
@@ -1584,6 +1584,64 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     const detailEntryName = await expectLocalEntry(detail, "Community book detail");
     await dispatchAnimation(detail, "animationend", detailEntryName);
     await expect(detail).toHaveAttribute("data-motion-item-state", "idle");
+
+    const overviewTab = page.getByRole("tab", { name: "课程简介", exact: true });
+    const commentsTab = page.getByRole("tab", { name: "评论", exact: true });
+    let detailTabPanel = page.getByRole("tabpanel");
+    await expect(detailTabPanel, "initial detail tab remains direct").toHaveAttribute("data-motion-item-state", "idle");
+    expect((await readAnimation(detailTabPanel)).name).toBe("none");
+
+    await commentsTab.click();
+    detailTabPanel = page.getByRole("tabpanel");
+    await expect(detailTabPanel).toHaveAttribute("data-community-tab-transition-direction", "forward");
+    await expect(detailTabPanel).toHaveAttribute("data-motion-item-state", "entering");
+    let detailTabMotion = await readAnimation(detailTabPanel);
+    expect(detailTabMotion).toMatchObject({
+      duration: "0.36s",
+      name: "motion-local-item-in",
+      playState: "paused"
+    });
+    expect(
+      await detailTabPanel.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41),
+      "comments enter from the right"
+    ).toBeGreaterThan(0);
+    await dispatchAnimation(detailTabPanel, "animationend", "motion-local-item-in");
+    await expect(detailTabPanel).toHaveAttribute("data-motion-item-state", "idle");
+
+    await overviewTab.click();
+    detailTabPanel = page.getByRole("tabpanel");
+    await expect(detailTabPanel).toHaveAttribute("data-community-tab-transition-direction", "back");
+    await expect(detailTabPanel).toHaveAttribute("data-motion-item-state", "entering");
+    detailTabMotion = await readAnimation(detailTabPanel);
+    expect(detailTabMotion).toMatchObject({
+      duration: "0.36s",
+      name: "motion-local-item-in",
+      playState: "paused"
+    });
+    expect(
+      await detailTabPanel.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41),
+      "overview enters from the left"
+    ).toBeLessThan(0);
+    await dispatchAnimation(detailTabPanel, "animationend", "motion-local-item-in");
+    await expect(detailTabPanel).toHaveAttribute("data-motion-item-state", "idle");
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await commentsTab.click();
+    detailTabPanel = page.getByRole("tabpanel");
+    await expect(detailTabPanel, "reduced motion swaps detail tabs synchronously").toHaveAttribute(
+      "data-motion-item-state",
+      "idle"
+    );
+    expect((await readAnimation(detailTabPanel)).name).toBe("none");
+    await expect(detailTabPanel).toHaveCSS("transform", "none");
+    expect(
+      Number.parseFloat(await commentsTab.evaluate((element) => getComputedStyle(element, "::after").transitionDuration)),
+      "the active underline also settles synchronously under reduced motion"
+    ).toBeLessThanOrEqual(0.001);
+    await overviewTab.click();
+    await expect(page.getByRole("tabpanel")).toHaveAttribute("data-motion-item-state", "idle");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+
     await page.locator(".header-bar .icon-button").click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);

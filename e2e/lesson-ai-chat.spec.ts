@@ -157,16 +157,23 @@ test.describe("lesson AI chat entry", () => {
     const citationPageButton = citationList.getByRole("button", { name: /查看教材第.*页/ }).first();
     await expect(citationPageButton).toContainText("查看教材原文");
     await citationPageButton.click();
-    await expect(page.locator(".source-reader-screen")).toBeVisible();
-    await expect(page.locator(".source-reader-screen")).toContainText(citedPageLabel);
-    await expect(page.locator(".source-page-image")).toBeVisible();
-    await expect(page.locator(".source-page-image")).toHaveAttribute("src", /\/assets\/textbook\/pages\/page_\d{3}\.jpeg/);
+    const sourceSheet = page.locator(".sheet[data-sheet-type='source']");
+    await expect(sourceSheet).toBeVisible();
+    await expect(sourceSheet.getByRole("heading", { name: "查看原文", exact: true })).toBeVisible();
+    await expect(sourceSheet).toContainText(citedPageLabel);
+    await expect(sourceSheet.locator(".source-reference-sheet")).toBeVisible();
+    await expect(sourceSheet.locator(".source-page-preview img")).toBeVisible();
+    await expect(sourceSheet.locator(".source-page-preview img"))
+      .toHaveAttribute("src", /\/assets\/textbook\/pages\/page_\d{3}\.jpeg/);
+    await expect(sourceSheet.getByRole("button", { name: "全屏阅读教材", exact: true })).toBeVisible();
+    await expect(page.locator(".source-reader-screen")).toHaveCount(0);
     await expect(page.locator(".source-page-text-document")).toHaveCount(0);
     expect(directDeepSeekRequests).toBe(0);
     expect(unexpectedRemoteModelRequests).toBe(0);
     expect(publishedCitationPageRequests).toBeGreaterThan(0);
 
-    await page.getByRole("button", { name: "回到课程", exact: true }).click();
+    await sourceSheet.locator(".sheet-close").click();
+    await expect(sourceSheet).toHaveCount(0);
     await expect(page.locator(".lesson-screen")).toBeVisible();
     const pager = page.locator(".lesson-knowledge-pager");
     const progress = pager.getByRole("progressbar", { name: "章节学习进度" });

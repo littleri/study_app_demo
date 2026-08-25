@@ -303,6 +303,23 @@ test.describe("community discovery", () => {
     await expect(catalogReply.getByRole("button", { name: /^查看课程：/ })).toHaveCount(10);
     await expect(dialog.locator(".ai-message-row.user")).toHaveCount(2);
     await expect(dialog.locator(".ai-message-row.ai")).toHaveCount(2);
+    const messageList = dialog.locator(".ai-message-list");
+    const catalogReplyRow = dialog.locator(".ai-message-row.ai").last();
+    await expect.poll(async () => catalogReplyRow.evaluate((element) => {
+      const list = element.closest<HTMLElement>(".ai-message-list");
+      if (!list) return Number.POSITIVE_INFINITY;
+      return Math.abs(element.getBoundingClientRect().top - list.getBoundingClientRect().top);
+    }), {
+      message: "the completed AI response settles at the start of the reading viewport"
+    }).toBeLessThanOrEqual(4);
+    const completedAnswerScroll = await messageList.evaluate((element) => ({
+      maxScrollTop: element.scrollHeight - element.clientHeight,
+      scrollTop: element.scrollTop
+    }));
+    expect(
+      completedAnswerScroll.scrollTop,
+      "a long completed answer no longer forces the conversation to its bottom"
+    ).toBeLessThan(completedAnswerScroll.maxScrollTop - 4);
     expect(
       bookCourseApi.requests.filter(({ path }) => path === "/api/rag/query").length,
       "the discovery assistant never queries the textbook RAG endpoint"

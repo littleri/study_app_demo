@@ -6,14 +6,32 @@ import { useLocalMotionItem } from "../motion";
 import { CommunityCover } from "./CommunityCover";
 import { resolveCommunityBook } from "./communityCatalog";
 
+type CommunityDetailTab = "overview" | "comments";
+
+const communityDetailTabs: CommunityDetailTab[] = ["overview", "comments"];
+
 export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
   const { selectedCommunityBookId } = useAppContext();
   const book = resolveCommunityBook(selectedCommunityBookId);
   const detailMotion = useLocalMotionItem(`community-book:${book.id}:detail`);
-  const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "comments">("overview");
+  const [activeDetailTab, setActiveDetailTab] = useState<CommunityDetailTab>("overview");
+  const [detailTabTransitionDirection, setDetailTabTransitionDirection] = useState<"forward" | "back">("forward");
+  const detailTabMotion = useLocalMotionItem(
+    `community-book:${book.id}:tab:${activeDetailTab}`,
+    "content",
+    { animateInitial: false }
+  );
   const [isCollapsed, setIsCollapsed] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
   const collapseSentinelRef = useRef<HTMLSpanElement>(null);
+
+  function selectDetailTab(nextTab: CommunityDetailTab) {
+    if (nextTab === activeDetailTab) return;
+    const currentIndex = communityDetailTabs.indexOf(activeDetailTab);
+    const nextIndex = communityDetailTabs.indexOf(nextTab);
+    setDetailTabTransitionDirection(nextIndex > currentIndex ? "forward" : "back");
+    setActiveDetailTab(nextTab);
+  }
 
   useEffect(() => {
     const screen = screenRef.current;
@@ -92,7 +110,7 @@ export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
                 role="tab"
                 aria-controls="community-detail-overview-panel"
                 aria-selected={activeDetailTab === "overview"}
-                onClick={() => setActiveDetailTab("overview")}
+                onClick={() => selectDetailTab("overview")}
               >
                 课程简介
               </button>
@@ -102,7 +120,7 @@ export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
                 role="tab"
                 aria-controls="community-detail-comments-panel"
                 aria-selected={activeDetailTab === "comments"}
-                onClick={() => setActiveDetailTab("comments")}
+                onClick={() => selectDetailTab("comments")}
               >
                 评论
               </button>
@@ -110,7 +128,10 @@ export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
 
             {activeDetailTab === "overview" ? (
               <section
+                {...detailTabMotion.attributes}
+                key={detailTabMotion.motionKey}
                 className="community-detail-tab-panel community-detail-description"
+                data-community-tab-transition-direction={detailTabTransitionDirection}
                 id="community-detail-overview-panel"
                 role="tabpanel"
                 aria-labelledby="community-detail-overview-tab"
@@ -119,7 +140,10 @@ export function CommunityBookScreen({ onImport }: { onImport: () => void }) {
               </section>
             ) : (
               <section
+                {...detailTabMotion.attributes}
+                key={detailTabMotion.motionKey}
                 className="community-detail-tab-panel community-detail-comments"
+                data-community-tab-transition-direction={detailTabTransitionDirection}
                 id="community-detail-comments-panel"
                 role="tabpanel"
                 aria-labelledby="community-detail-comments-tab"
