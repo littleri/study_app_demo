@@ -19,6 +19,8 @@ import { localMotionFallbackMs, useReducedMotion } from "../motion";
 import {
   clampFlashcardDrag,
   isHorizontalFlashcardGesture,
+  isLastFlashcard,
+  nextFlashcardIndex,
   shouldAdvanceFlashcardSwipe
 } from "./flashcardGestures";
 
@@ -98,7 +100,7 @@ function getFlashcardThemeStyle(theme: (typeof flashcardThemes)[number]) {
 
 export function FlashcardScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { activeChapterId, generatedFlashcards, generatedLessons, go, openSourcePage, setGeneratedFlashcards, showToast, uploadedFile } = useAppContext();
+  const { activeChapterId, back, generatedFlashcards, generatedLessons, go, openSourcePage, setGeneratedFlashcards, showToast, uploadedFile } = useAppContext();
   const reducedMotion = useReducedMotion();
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
@@ -135,16 +137,17 @@ export function FlashcardScreen() {
         }))
     : [];
   const cards = liveCards;
-  const current = cards.length > 0 ? cards[index % cards.length] : null;
+  const current = cards.length > 0 ? cards[index] ?? cards[cards.length - 1] : null;
+  const lastCard = isLastFlashcard(index, cards.length);
   const currentTheme = flashcardThemes[index % flashcardThemes.length];
   const nextTheme = flashcardThemes[(index + 1) % flashcardThemes.length];
   const afterNextTheme = flashcardThemes[(index + 2) % flashcardThemes.length];
   const stackedCards = [
-    ...(cards.length > 2
-      ? [{ card: cards[(index + 2) % cards.length], depth: "back" as const, offset: 2, theme: afterNextTheme }]
+    ...(cards[index + 2]
+      ? [{ card: cards[index + 2], depth: "back" as const, offset: 2, theme: afterNextTheme }]
       : []),
-    ...(cards.length > 1
-      ? [{ card: cards[(index + 1) % cards.length], depth: "middle" as const, offset: 1, theme: nextTheme }]
+    ...(cards[index + 1]
+      ? [{ card: cards[index + 1], depth: "middle" as const, offset: 1, theme: nextTheme }]
       : [])
   ];
   const dueCount = cards.filter((card) => card.due === "今天复习" || card.due === "today").length;
@@ -275,7 +278,8 @@ export function FlashcardScreen() {
     setFlipState("idle");
     setDragging(false);
     setDragOffset(0);
-    const nextIndex = (index + 1) % Math.max(cards.length, 1);
+    const nextIndex = nextFlashcardIndex(index, cards.length);
+    if (nextIndex === index) return;
     if (reducedMotion) {
       setIndex(nextIndex);
       setShowAnswer(false);
@@ -288,6 +292,17 @@ export function FlashcardScreen() {
 
   function moveNext(feedback: "again" | "known") {
     advanceCard(feedback);
+  }
+
+  function completeMemory() {
+    if (!current || cardSwitchState !== "idle") return;
+    if (generatedFlashcards) {
+      setGeneratedFlashcards(generatedFlashcards.map((card) => card.card_id === current.id
+        ? { ...card, mastery: Math.min(100, card.mastery + 8) }
+        : card));
+    }
+    showToast("已完成本轮闪卡记忆", "success");
+    back();
   }
 
   function startSwipe(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -320,7 +335,7 @@ export function FlashcardScreen() {
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
     const movedHorizontally = isHorizontalFlashcardGesture(deltaX, deltaY);
-    const shouldAdvance = shouldAdvanceFlashcardSwipe(deltaX, deltaY, cards.length);
+    const shouldAdvance = shouldAdvanceFlashcardSwipe(deltaX, deltaY, cards.length, index);
     try {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
@@ -384,7 +399,7 @@ export function FlashcardScreen() {
             <strong>{dueCount > 0 ? `${dueCount} 张今天复习` : `${cards.length} 张本节闪卡`}</strong>
             <span>{cards.length} 张卡片</span>
           </div>
-          <p>点击卡片翻面 · 左滑下一张</p>
+          <p>{lastCard ? "最后一张 · 完成后结束本轮" : "点击卡片翻面 · 左滑下一张"}</p>
         </header>
 
         <div className="flashcard-deck-stage">
@@ -416,10 +431,10 @@ export function FlashcardScreen() {
                 <div className="flashcard-deck-preview-progress">
                   <div>
                     <span>本轮进度</span>
-                    <strong>{((index + offset) % cards.length) + 1} / {cards.length}</strong>
+                    <strong>{index + offset + 1} / {cards.length}</strong>
                   </div>
                   <span className="flashcard-progress-track">
-                    <span style={{ width: `${((((index + offset) % cards.length) + 1) / cards.length) * 100}%` }} />
+                    <span style={{ width: `${((index + offset + 1) / cards.length) * 100}%` }} />
                   </span>
                 </div>
               </footer>
@@ -445,7 +460,7 @@ export function FlashcardScreen() {
               className="memory-card-trigger memory-reveal"
               data-mouse-drag-scroll="self"
               type="button"
-              aria-label={`${showAnswer ? "参考答案" : "问题"}：${showAnswer ? current.back : current.front}。${showAnswer ? "点击返回问题" : "点击查看答案"}，左滑切换下一张。`}
+              aria-label={`${showAnswer ? "参考答案" : "问题"}：${showAnswer ? current.back : current.front}。${showAnswer ? "点击返回问题" : "点击查看答案"}，${lastCard ? "这是最后一张，完成后点击完成记忆。" : "左滑切换下一张。"}`}
               aria-pressed={showAnswer}
               disabled={flipState === "flipping" || cardSwitchState !== "idle"}
               onClick={handleCardClick}
@@ -525,8 +540,19 @@ export function FlashcardScreen() {
           </section>
         </div>
 
-        <div className="flashcard-actions" data-motion-flash-card-state={cardSwitchState} aria-live="polite">
-          {showAnswer ? (
+        <div className={`flashcard-actions ${lastCard ? "is-complete" : ""}`} data-motion-flash-card-state={cardSwitchState} aria-live="polite">
+          {lastCard ? (
+            <Button
+              icon={<Check size={18} aria-hidden="true" />}
+              disabled={cardSwitchState !== "idle"}
+              onClick={completeMemory}
+            >
+              <span className="flashcard-rating-copy">
+                <strong>完成记忆</strong>
+                <small>结束本轮闪卡复习</small>
+              </span>
+            </Button>
+          ) : showAnswer ? (
             <>
               <Button
                 variant="secondary"

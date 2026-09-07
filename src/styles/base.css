@@ -6475,6 +6475,10 @@ html {
   display: none;
 }
 
+.flashcard-actions.is-complete {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .flashcard-actions .button {
   min-height: 64px;
   gap: 8px;
