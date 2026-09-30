@@ -12,6 +12,15 @@ vi.mock("../context/AppContext", () => ({
   useAppContext: contextMock
 }));
 
+vi.mock("../context/BookCourseRepositoryContext", () => ({
+  useBookCourseRepository: () => ({ queryRag: vi.fn() })
+}));
+
+vi.mock("../features/credits/creditStore", () => ({
+  creditCosts: { chat: 10 },
+  useCredits: () => ({ balance: 100, reserve: vi.fn(), complete: vi.fn(), refund: vi.fn() })
+}));
+
 vi.mock("../components/ui", async () => {
   const React = await import("react");
   return {
@@ -25,6 +34,7 @@ vi.mock("../motion", async () => {
   const React = await import("react");
   return {
     SkeletonReveal: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
+    globalMotionFallbackMs: 900,
     useImageMotion: () => ({
       imageRef: { current: null },
       onError: vi.fn(),
@@ -36,7 +46,15 @@ vi.mock("../motion", async () => {
       attributes: {},
       motionKey,
       state: "idle"
-    })
+    }),
+    useMotionPresence: ({ requested }: { requested: unknown }) => ({
+      rendered: requested ?? null,
+      state: "idle",
+      presenceId: 0,
+      onAnimationCancel: vi.fn(),
+      onAnimationEnd: vi.fn()
+    }),
+    useReducedMotion: () => false
   };
 });
 
@@ -85,6 +103,9 @@ function renderSourceReader({
       pageEnd: page,
       sourceText
     },
+    sourceReaderCurrentPage: page,
+    setSourceReaderCurrentPage: vi.fn(),
+    startNote: vi.fn(),
     showToast: vi.fn(),
     uploadedFile: {
       bookId,
@@ -101,34 +122,32 @@ afterEach(() => {
 });
 
 describe("SourceReaderScreen citation headings", () => {
-  it("does not mislabel a front-matter citation as the missing chapter-one body", () => {
+  it("shows the chapter heading and a single page number above the page tools", () => {
     const markup = renderSourceReader({
       title: "教材前言与目录",
       page: 3,
       sourceText: "本书目录与使用说明。",
       chapters: [{
-        // This deliberately overlapping parser entry proves a citation title
-        // wins over any page-number guess for front matter.
-        source_title: "错误的前置页解析标题",
+        source_title: "教材封面、前言与目录",
         page_start: 1,
         page_end: 9
       }],
       locationLabel: "PDF 第 3 页 · 目录"
     });
 
-    expect(markup).toContain("教材前言与目录");
+    expect(markup).toContain("教材封面、前言与目录");
     expect(markup).not.toContain("第 1 章");
-    expect(markup).not.toContain("错误的前置页解析标题");
-    expect(markup).toContain("PDF 第 3 页 · 目录");
+    expect(markup).toContain("第 3 页");
+    expect(markup).not.toContain("PDF 第 3 页");
   });
 
-  it("renders the actual citation chapter title and mapped PDF page", () => {
+  it("prefers the chapter title over a citation title", () => {
     const markup = renderSourceReader({
-      title: "第 3 章 基因的本质",
+      title: "本节导读",
       page: 40,
       sourceText: "赫尔希和蔡斯的实验表明 DNA 是遗传物质。",
       chapters: [{
-        source_title: "错误的页面猜测标题",
+        source_title: "第 3 章 基因的本质",
         page_start: 40,
         page_end: 40
       }],
@@ -136,8 +155,48 @@ describe("SourceReaderScreen citation headings", () => {
     });
 
     expect(markup).toContain("第 3 章 基因的本质");
-    expect(markup).not.toContain("错误的页面猜测标题");
-    expect(markup).toContain("PDF 第 40 页 · 第 3 章 基因的本质");
+    expect(markup).not.toContain("PDF 第 40 页");
+    expect(markup).not.toContain("保存草稿");
+    expect(markup).not.toContain("完成并整理");
+  });
+});
+
+describe("SourceReaderScreen AI region entry", () => {
+  function readerToolbar() {
+    const markup = renderSourceReader({
+      title: "第 1 节 减数分裂和受精作用",
+      page: 16,
+      sourceText: "减数分裂是进行有性生殖的生物产生成熟生殖细胞时进行的染色体数目减半的细胞分裂。",
+      chapters: [{ source_title: "第 1 节 减数分裂和受精作用", page_start: 16, page_end: 17 }],
+      locationLabel: "PDF 第 16 页 · 第 1 节"
+    });
+    const start = markup.indexOf("source-reader-topbar");
+    return markup.slice(start, markup.indexOf("source-reader-workspace", start));
+  }
+
+  it("leads the note toolbar with the region-ask star before every other tool", () => {
+    const toolbar = readerToolbar();
+    expect(toolbar).toContain('class="source-reader-ai-entry"');
+    expect(toolbar).toContain('aria-label="圈选问 AI"');
+    expect(toolbar).toContain('aria-pressed="false"');
+    expect(toolbar.indexOf("source-reader-ai-entry"))
+      .toBeLessThan(toolbar.indexOf("source-reader-note-shortcuts"));
+    expect(toolbar.indexOf("source-reader-ai-entry"))
+      .toBeLessThan(toolbar.indexOf("ink-annotation-tools"));
+  });
+
+  it("keeps the page in reading mode until the star is pressed", () => {
+    const markup = renderSourceReader({
+      title: "第 1 节 减数分裂和受精作用",
+      page: 16,
+      sourceText: "减数分裂是进行有性生殖的生物产生成熟生殖细胞时进行的染色体数目减半的细胞分裂。",
+      chapters: [{ source_title: "第 1 节 减数分裂和受精作用", page_start: 16, page_end: 17 }],
+      locationLabel: "PDF 第 16 页 · 第 1 节"
+    });
+    expect(markup).toContain('data-note-mode="read"');
+    expect(markup).toContain('data-region-mode="false"');
+    expect(markup).not.toContain("source-region-hint");
+    expect(markup).not.toContain('data-region-ai="open"');
   });
 });
 

@@ -14,11 +14,14 @@ import type {
   StudyPlan,
 } from "../types/api";
 import type { AppActions, SourcePageTarget, StudyLocation, UploadedCourseFile } from "../types/app";
+import type { NoteCaptureIntent } from "../features/studyNotes/types";
+import type { LearningSetController } from "../features/learningSets/repository";
 
 export type CourseSummariesLoadState = "loading" | "ready" | "error";
 export type CourseSummariesReadyKind = "content" | "empty";
 
 export type AppContextValue = AppActions & {
+  learningSets: LearningSetController;
   /** Enables local display-only shelf metadata in the bundled demo app. */
   demoShelfEnabled?: boolean;
   selectedUpload: boolean;
@@ -72,6 +75,9 @@ export type AppContextValue = AppActions & {
   savedNoteCount: number;
   setSavedNoteCount: (fn: (count: number) => number) => void;
   sourcePageTarget: SourcePageTarget | null;
+  sourceReaderCurrentPage: number;
+  setSourceReaderCurrentPage: (page: number) => void;
+  noteCaptureIntent: NoteCaptureIntent | null;
   studyLocations: Record<string, StudyLocation>;
 };
 

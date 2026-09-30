@@ -13,6 +13,7 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
+import { courseResourceId } from "../features/learningSets/model";
 import {
   fileTitleBeforeParenthesis,
   formatFileSize,
@@ -36,7 +37,13 @@ function resolveUploadedCover(fileName: string) {
 
 export function ParseReadyScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { clearLoadedCourse, go, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus } = useAppContext();
+  const { clearLoadedCourse, go, learningSets, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus } = useAppContext();
+  const draft = learningSets.state.draft;
+  const forLearningSet = Boolean(
+    draft && uploadedFile && !draft.editingSetId
+    && draft.uploadedCourse?.bookId === uploadedFile.bookId
+    && draft.resourceIds.includes(courseResourceId(uploadedFile.bookId))
+  );
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -49,6 +56,9 @@ export function ParseReadyScreen() {
     setParseError(null);
     try {
       const job = await startConfirmedCourseParse(uploadedFile, bookcourseRepository);
+      if (forLearningSet) {
+        learningSets.updateDraft({ step: -2, parseJobId: job.job_id, parseCompleted: false });
+      }
       setParseJobId(job.job_id);
       setParseJobStatus({
         job_id: job.job_id,
@@ -84,7 +94,7 @@ export function ParseReadyScreen() {
     );
   }
 
-  const fileKind = getFileKind(uploadedFile.name, uploadedFile.contentType);
+  const fileKind = getFileKind(uploadedFile.name, uploadedFile.contentType || "application/octet-stream");
   const displayTitle = fileTitleBeforeParenthesis(uploadedFile.name);
   const coverSource = resolveUploadedCover(uploadedFile.name);
   const uploadTime = new Intl.DateTimeFormat("zh-CN", {
@@ -98,7 +108,7 @@ export function ParseReadyScreen() {
       ? parseJobStatus.error ?? parseJobStatus.message ?? "解析失败，请检查文件后重试"
       : null);
   const primaryActionText = parseJobStatus?.status === "done"
-    ? "查看目录"
+    ? forLearningSet ? "填写学习方式问卷" : "查看目录"
     : retryable
       ? "重新解析"
       : parseJobId
@@ -165,7 +175,7 @@ export function ParseReadyScreen() {
           disabled={parsing}
           onClick={() => {
             if (parseJobStatus?.status === "done") {
-              go("chapterConfirm");
+              go(forLearningSet ? "learningSetSetup" : "chapterConfirm");
               return;
             }
             if (retryable) {

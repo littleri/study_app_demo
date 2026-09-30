@@ -1,5 +1,5 @@
 import { type ComponentType } from "react";
-import { BookX, ChevronRight, ClipboardCheck, Layers3, Plus } from "lucide-react";
+import { BookX, ChevronRight, ClipboardCheck, Layers3, NotebookPen } from "lucide-react";
 import {
   type ChapterToolPreviewContent,
   studyToolDefinitions,
@@ -14,6 +14,7 @@ export type ChapterToolCardsProps = Readonly<{
   onSelectTool: (toolId: ChapterToolId) => void;
   ariaLabel?: string;
   previewContent?: ChapterToolPreviewContent;
+  orderedToolIds?: readonly ChapterToolId[];
 }>;
 
 const toolIcons: Record<
@@ -22,7 +23,8 @@ const toolIcons: Record<
 > = {
   assignment: ClipboardCheck,
   flashcards: Layers3,
-  mistakes: BookX
+  mistakes: BookX,
+  notes: NotebookPen
 };
 
 function isChapterTool(
@@ -35,9 +37,13 @@ export function ChapterToolCards({
   chapterTitle,
   onSelectTool,
   ariaLabel = "本节辅助工具",
-  previewContent
+  previewContent,
+  orderedToolIds
 }: ChapterToolCardsProps) {
-  const cardTools = studyToolDefinitions.filter(isChapterTool);
+  const cardTools = studyToolDefinitions.filter(isChapterTool).slice().sort((a, b) => {
+    if (!orderedToolIds) return 0;
+    return orderedToolIds.indexOf(a.id) - orderedToolIds.indexOf(b.id);
+  });
   const previewTitle = chapterTitle.replace(/^第\s*\d+\s*[章节]\s*/, "");
   const assignmentKicker = previewContent?.assignmentKicker ?? "知识检测";
   const assignmentPrompt = previewContent?.assignmentPrompt ?? "这一节的核心概念是？";
@@ -82,6 +88,13 @@ export function ChapterToolCards({
                     </span>
                   ))}
                 </span>
+              ) : tool.id === "notes" ? (
+                <span className="study-note-preview">
+                  <i />
+                  <i />
+                  <i />
+                  <small>原始记录 · 整理版</small>
+                </span>
               ) : (
                 <span className="study-flashcard-preview">
                   <span>{flashcardTitle}</span>
@@ -99,25 +112,6 @@ export function ChapterToolCards({
           </button>
         );
       })}
-      <button
-        aria-label="更多功能 预留新学习工具"
-        className="study-tool-card study-tool-card-future"
-        data-tool="future"
-        type="button"
-        disabled
-      >
-        <span className="study-tool-cover study-future-preview" aria-hidden="true">
-          <span><Plus size={25} /></span>
-          <small>新工具</small>
-        </span>
-        <span className="study-tool-card-footer">
-          <span className="study-tool-card-icon" aria-hidden="true"><Plus size={17} /></span>
-          <span className="study-tool-copy">
-            <strong>更多功能</strong>
-            <small>预留新学习工具</small>
-          </span>
-        </span>
-      </button>
     </div>
   );
 }

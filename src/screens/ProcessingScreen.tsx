@@ -54,7 +54,10 @@ function StageCompletionCheck({
 }
 
 export function ProcessingScreen() {
-  const { go, parseJobId, parseJobStatus, parsedChapters } = useAppContext();
+  const { go, learningSets, parseJobId, parseJobStatus, parsedChapters, uploadedFile } = useAppContext();
+  const draft = learningSets.state.draft;
+  const continuesLearningSet = Boolean(draft?.parseCompleted && uploadedFile
+    && draft.uploadedCourse?.bookId === uploadedFile.bookId);
   const { consume } = useMotionHistory();
   const reducedMotion = useReducedMotion();
   const stageCompletionSnapshotRef = useRef<StageCompletionSnapshot | null>(null);
@@ -201,7 +204,7 @@ export function ProcessingScreen() {
       </p>
       <div className="processing-flow-actions">
         {parseError ? <Button variant="secondary" onClick={() => go("parseReady")}>返回重新解析</Button> : null}
-        {isDone ? <Button onClick={() => go("chapterConfirm")}>查看目录</Button> : null}
+        {isDone ? <Button onClick={() => go(continuesLearningSet ? "learningSetSetup" : "chapterConfirm")}>{continuesLearningSet ? "填写学习方式问卷" : "查看目录"}</Button> : null}
         {parseJobId && !isDone && !parseError ? <Button variant="secondary" onClick={() => go("home")}>后台运行，先回首页</Button> : null}
       </div>
     </div>

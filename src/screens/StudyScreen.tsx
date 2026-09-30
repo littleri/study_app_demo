@@ -26,6 +26,8 @@ import { calculateChapterProgress } from "./studyProgress";
 import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
 import { buildStudyDirectory, normalizeStudyLocation } from "./studyDirectory";
 import { currentStudyPlanTask, mergeFrontEndMockStudyTasks } from "./studyPlanPresentation";
+import { preferredToolIds } from "../features/learningSets/recommendations";
+import { courseResourceId } from "../features/learningSets/model";
 
 const curatedBiologyBookId = "book_biology_2";
 
@@ -64,7 +66,10 @@ function getChapterNodeIds(node: ChapterTreeNode): string[] {
 }
 
 function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
-  const { go, setActiveChapterId } = useAppContext();
+  const { go, learningSets, openSheet, setActiveChapterId, uploadedFile } = useAppContext();
+  const activeSet = learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId
+    && uploadedFile && item.resourceIds.includes(courseResourceId(uploadedFile.bookId)));
+  const toolOrder = activeSet ? preferredToolIds(activeSet.diagnosis) : undefined;
   const primaryTool = studyToolDefinitions.find((tool) => tool.id === "source");
 
   function openTool(toolId: StudyToolId) {
@@ -75,6 +80,10 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
     }
     if (toolId === "assignment") {
       go("assignment");
+      return;
+    }
+    if (toolId === "notes") {
+      go("notes");
       return;
     }
     go(toolId === "mistakes" ? "mistakes" : "flashcards");
@@ -92,7 +101,13 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
           <ChevronRight size={17} aria-hidden="true" />
         </button>
       </div>
-      <ChapterToolCards chapterTitle={chapter.source_title} onSelectTool={openTool} />
+      {activeSet?.diagnosis.aids.includes("chat") || activeSet?.diagnosis.aids.includes("video") ? (
+        <div className="study-personal-aids" aria-label="偏好的学习辅助">
+          {activeSet.diagnosis.aids.includes("chat") ? <button type="button" onClick={() => openSheet({ type: "chat" })}>优先问 AI 讲解</button> : null}
+          {activeSet.diagnosis.aids.includes("video") ? <button type="button" onClick={() => openTool("source")}>查看已有图示与动画 · 视频待提供</button> : null}
+        </div>
+      ) : null}
+      <ChapterToolCards chapterTitle={chapter.source_title} onSelectTool={openTool} orderedToolIds={toolOrder} />
     </section>
   );
 }
@@ -357,6 +372,7 @@ export function StudyScreen() {
     generatedLessons,
     generatedQuizzes,
     loadedBookId,
+    learningSets,
     openSheet,
     parsedAssets,
     parsedChapters,
@@ -405,11 +421,13 @@ export function StudyScreen() {
 
   useEffect(() => {
     if (uploadedFile) return;
-    const readyCourse = courseSummaries.find((course) => course.status === "ready");
+    const activeSet = learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId);
+    const readyCourse = courseSummaries.find((course) => course.status === "ready" && activeSet?.resourceIds.includes(courseResourceId(course.book_id)))
+      ?? courseSummaries.find((course) => course.status === "ready");
     if (!readyCourse || attemptedBookId === readyCourse.book_id || courseSelectionLoadingId) return;
     setAttemptedBookId(readyCourse.book_id);
     void selectCourse(readyCourse.book_id);
-  }, [attemptedBookId, courseSelectionLoadingId, courseSummaries, parsedChapters, selectCourse, uploadedFile]);
+  }, [attemptedBookId, courseSelectionLoadingId, courseSummaries, learningSets.state.activeSetId, learningSets.state.sets, parsedChapters, selectCourse, uploadedFile]);
 
   useEffect(() => {
     const scroller = studyScreenRef.current?.closest<HTMLElement>(".screen-content");
@@ -532,6 +550,12 @@ export function StudyScreen() {
 
   return (
     <div ref={studyScreenRef} className="study-screen book-course-screen">
+      {learningSets.state.sets.length > 0 ? (
+        <div className="study-active-set-link">
+          <span>学习集：{learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId)?.name ?? "选择学习集"}</span>
+          <button type="button" onClick={() => go("learningSet")}>查看学习集 <ChevronRight size={15} aria-hidden="true" /></button>
+        </div>
+      ) : null}
       <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
         <header className="study-book-bar">
           <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>

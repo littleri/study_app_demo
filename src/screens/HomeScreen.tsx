@@ -48,6 +48,7 @@ export function HomeScreen() {
     generatedLessons,
     generatedQuizzes,
     go,
+    learningSets,
     loadedBookId,
     openSourcePage,
     parseJobId,
@@ -177,6 +178,8 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (
+      learningSets.state.draft?.uploadedCourse
+      ||
       !selectedBook
       || selectedBook.status !== "ready"
       || selectedBook.bookId === loadedBookId
@@ -203,7 +206,7 @@ export function HomeScreen() {
     return () => {
       active = false;
     };
-  }, [failedSelectionBookId, loadedBookId, selectedBook?.bookId, selectedBook?.status, selectedBook?.title]);
+  }, [failedSelectionBookId, learningSets.state.draft?.uploadedCourse, loadedBookId, selectedBook?.bookId, selectedBook?.status, selectedBook?.title]);
 
   function handleSelectBook(bookId: string) {
     const nextBook = books.find((book) => book.bookId === bookId);
@@ -278,7 +281,7 @@ export function HomeScreen() {
 
   function openNextStepTool(toolId: ChapterToolId) {
     if (!setNextStepContext()) return;
-    go(toolId === "assignment" ? "assignment" : "flashcards");
+    go(toolId === "assignment" ? "assignment" : toolId === "mistakes" ? "mistakes" : toolId === "notes" ? "notes" : "flashcards");
   }
 
   async function openBookDetail(bookId: string) {
@@ -311,6 +314,15 @@ export function HomeScreen() {
     showToast(`《${selectedBook.title}》当前展示 Mock 学习内容，导入原书后即可使用${actionLabel}。`, "info");
   }
 
+  function createLearningSet() {
+    const draft = learningSets.state.draft;
+    if (draft?.uploadedCourse && !draft.parseCompleted) {
+      go(draft.parseJobId ? "processing" : "parseReady");
+      return;
+    }
+    go(draft && (draft.editingSetId || draft.step >= 0) ? "learningSetSetup" : "upload");
+  }
+
   const globalActions = buildHomeGlobalActions({
     listState,
     selectedBookId: selectedBook?.bookId ?? null,
@@ -326,17 +338,17 @@ export function HomeScreen() {
     <div className="home-dashboard">
       <header className="home-topline">
         <div>
-          <h1>Hi，小明同学</h1>
+          <h1>Hi，{learningSets.state.preferences?.displayName ?? "同学"}</h1>
           <p>今天，沿着原书继续前进</p>
         </div>
         <button
           className="home-import-course-action"
           type="button"
-          aria-label="导入课程"
-          onClick={() => go("upload")}
+          aria-label="创建学习集"
+          onClick={createLearningSet}
         >
           <Upload size={16} aria-hidden="true" />
-          <span>导入课程</span>
+          <span>创建学习集</span>
         </button>
       </header>
 

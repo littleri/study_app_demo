@@ -5,6 +5,15 @@ import { responsiveProjects } from "./e2e/fixtures/viewports";
 const e2ePort = Number(env.E2E_PORT ?? 4173);
 const coreProjects = responsiveProjects.filter((project) => !project.name.startsWith("small-phone"));
 const smallProjects = responsiveProjects.filter((project) => project.name.startsWith("small-phone"));
+const existingDemoState = JSON.stringify({
+  version: 1,
+  preferences: { displayName: "小明同学", primaryGoal: null, dailyTime: null, completedAt: 1 },
+  onboardingDraft: { displayName: "", primaryGoal: null, dailyTime: null, step: 0 },
+  sets: [],
+  resources: [],
+  draft: null,
+  activeSetId: null
+});
 
 export default defineConfig({
   testDir: "./e2e",
@@ -18,6 +27,13 @@ export default defineConfig({
   workers: 4,
   use: {
     baseURL: `http://127.0.0.1:${e2ePort}`,
+    storageState: {
+      cookies: [],
+      origins: [{
+        origin: `http://127.0.0.1:${e2ePort}`,
+        localStorage: [{ name: "bookcourse.learning-sets.v1", value: existingDemoState }]
+      }]
+    },
     trace: "retain-on-failure"
   },
   webServer: {

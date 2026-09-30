@@ -234,7 +234,6 @@ async function openSourceReader(page: Page) {
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
   await page.locator(".lesson-source-link").first().click();
-  await page.getByRole("button", { name: "全屏阅读教材", exact: true }).click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -535,9 +534,9 @@ test.describe("current DemoRepository responsive matrix", () => {
 
     await openSourceReader(page);
     await expectCurrentScreenGeometry(page, ".source-reader-screen", [
-      ".source-reader-toolbar button",
+      ".source-reader-note-shortcuts button:not(:disabled)",
       ".source-page-frame",
-      ".source-reader-actions .button"
+      ".source-voice-fab"
     ], `${project.name} SourceReader`);
     await page.locator(".header-bar .icon-button").click();
     await expect(page.locator(".lesson-screen")).toBeVisible();

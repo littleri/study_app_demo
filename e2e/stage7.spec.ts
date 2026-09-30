@@ -288,10 +288,6 @@ async function openProductionSourceReader(page: Page, scenario = "default") {
   await openProductionLesson(page, scenario);
   await clickAfterMotionAndScrollSettle(
     page.locator(".lesson-source-link").first(),
-    "open production source sheet"
-  );
-  await clickAfterMotionAndScrollSettle(
-    page.getByRole("button", { name: "全屏阅读教材", exact: true }),
     "open production SourceReader"
   );
   await expect(page.locator(".source-reader-screen")).toBeVisible();
@@ -588,7 +584,7 @@ test.describe("Stage 7 final responsive acceptance", () => {
     ]);
     await waitForVisualMotionToSettle(page);
     await captureVisualBaseline(page, "source-reader.png");
-    await expectSurfaceContract(page, "Source reader", ".source-reader-toolbar button");
+    await expectSurfaceContract(page, "Source reader", ".source-reader-note-shortcuts button:not(:disabled)");
   });
 
   test("records the StudyPlan visual baseline from deterministic local resources", async ({ page, bookCourseApi }) => {

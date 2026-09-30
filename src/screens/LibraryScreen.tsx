@@ -26,6 +26,7 @@ import {
 import {
   resolveProgressOpenMode
 } from "./courseResourceIdentity";
+import { AddCourseToSetControl } from "../features/learningSets/HomeScreens";
 
 type CourseCardModel = {
   bookId: string;
@@ -309,6 +310,7 @@ export function LibraryScreen() {
               >
                 {actionLabel}
               </Button>
+              <AddCourseToSetControl bookId={course.bookId} />
             </div>
             {isEditing ? (
               <div className="course-card-menu">

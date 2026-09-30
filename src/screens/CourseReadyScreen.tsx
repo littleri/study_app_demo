@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import {
   FileText,
   Upload
@@ -8,6 +8,7 @@ import {
   Metric
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
+import { AddCourseToSetControl } from "../features/learningSets/HomeScreens";
 import {
   globalEmphasisMotionDurationMs,
   localMotionMaxMs,
@@ -95,6 +96,7 @@ type CourseCompletionScreenProps = {
   motionKey: string;
   onEnterStudy: () => void;
   onViewPlan: () => void;
+  joinControl?: ReactNode;
   ragChunkCount: number;
   statusTitle: string;
   focused?: boolean;
@@ -102,7 +104,7 @@ type CourseCompletionScreenProps = {
 
 type FocusedCourseCompletionProps = Pick<
   CourseCompletionScreenProps,
-  "className" | "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "statusTitle"
+  "className" | "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "joinControl" | "statusTitle"
 >;
 
 type CourseReadyPhase = "celebrating" | "moving" | "revealing" | "settled";
@@ -114,6 +116,7 @@ function FocusedCourseCompletion({
   motionKey,
   onEnterStudy,
   onViewPlan,
+  joinControl,
   statusTitle
 }: FocusedCourseCompletionProps) {
   const { consume } = useMotionHistory();
@@ -193,6 +196,7 @@ function FocusedCourseCompletion({
       <div className="course-ready-actions course-ready-focus-actions" aria-hidden={!actionsRevealed}>
         <Button disabled={!actionsRevealed} onClick={onEnterStudy}>进入学习</Button>
         <Button disabled={!actionsRevealed} variant="secondary" onClick={onViewPlan}>查看学习计划</Button>
+        {actionsRevealed ? joinControl : null}
       </div>
 
       <p className="motion-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
@@ -211,6 +215,7 @@ export function CourseCompletionScreen({
   motionKey,
   onEnterStudy,
   onViewPlan,
+  joinControl,
   ragChunkCount,
   statusTitle,
   focused = false
@@ -224,6 +229,7 @@ export function CourseCompletionScreen({
         motionKey={motionKey}
         onEnterStudy={onEnterStudy}
         onViewPlan={onViewPlan}
+        joinControl={joinControl}
         statusTitle={statusTitle}
       />
     );
@@ -256,6 +262,7 @@ export function CourseCompletionScreen({
       <div className="course-ready-actions">
         <Button onClick={onEnterStudy}>进入学习</Button>
         <Button variant="secondary" onClick={onViewPlan}>查看学习计划</Button>
+        {joinControl}
       </div>
     </div>
   );
@@ -291,6 +298,7 @@ export function CourseReadyScreen() {
         go("study");
       }}
       onViewPlan={() => go("plan")}
+      joinControl={<AddCourseToSetControl bookId={uploadedFile.bookId} />}
       ragChunkCount={parsedChunks?.length ?? 0}
       statusTitle="生成成功"
       focused

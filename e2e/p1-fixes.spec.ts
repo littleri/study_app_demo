@@ -143,6 +143,7 @@ test.describe("P1 learning flow safeguards", () => {
     await expect(sourceButton).toContainText("教材第 18 页");
     await expectNoHorizontalOverflow(page);
     await sourceButton.click();
-    await expect(page.locator(".sheet[data-sheet-type='source']")).toBeVisible();
+    await expect(page.locator(".source-reader-screen")).toBeVisible();
+    await expect(page.locator(".sheet[data-sheet-type='source']")).toHaveCount(0);
   });
 });

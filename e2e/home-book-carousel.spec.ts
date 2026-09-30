@@ -658,14 +658,14 @@ test.describe("default homepage visual regression", () => {
       .toBeLessThanOrEqual(2.7);
   });
 
-  test("keeps the greeting bar pinned and opens import from its primary action", async ({ page }, testInfo) => {
+  test("keeps the greeting bar pinned and opens learning set creation from its primary action", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "iphone-17-pro", "The browser annotation targets the iPhone portrait header.");
     await page.setViewportSize({ width: 434, height: 903 });
     await page.goto("/?embedded=device-preview");
 
     const header = page.locator(".home-topline");
     const screen = page.locator('.screen-content[data-screen="home"]');
-    const importAction = header.getByRole("button", { name: "导入课程" });
+    const importAction = header.getByRole("button", { name: "创建学习集" });
     await expect(importAction).toBeVisible();
     await expect(importAction).toHaveCSS("background-color", "rgb(124, 58, 237)");
 

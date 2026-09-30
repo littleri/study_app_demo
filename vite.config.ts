@@ -44,6 +44,6 @@ export default defineConfig({
     ...httpsOptions
   },
   test: {
-    exclude: [...configDefaults.exclude, "e2e/**"]
+    exclude: [...configDefaults.exclude, "e2e/**", "tmp/**"]
   }
 });

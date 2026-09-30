@@ -46,14 +46,15 @@ import {
   MistakeBookScreen,
   NoteSheetContent,
   NotesScreen,
+  NoteTypeSheetContent,
   ParseReadyScreen,
   ProcessingScreen,
   ProfileScreen,
   SourceReaderScreen,
-  SourceSheetContent,
   StudyScreen,
   StudyPlanScreen,
-  UploadScreen
+  UploadScreen,
+  VoiceNoteScreen
 } from "./screens";
 import type {
   ApiAsset,
@@ -70,6 +71,12 @@ import type {
   StudyPlan
 } from "./types/api";
 import type { Screen, SheetState, SourcePageTarget, StudyLocation, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
+import type { NoteCaptureIntent } from "./features/studyNotes/types";
+import { resolveSourceReaderHeading } from "./features/studyNotes/sourceReaderHeading";
+import { useLearningSetStore } from "./features/learningSets/repository";
+import { courseResourceId } from "./features/learningSets/model";
+import { LearningSetSetupScreen, OnboardingScreen } from "./features/learningSets/FlowScreens";
+import { LearningSetDetailScreen } from "./features/learningSets/HomeScreens";
 import { createCourseSelectionCoordinator } from "./screens/homeBookModel";
 import { lessonHeaderSubtitle } from "./screens/lessonHeader";
 import {
@@ -100,7 +107,10 @@ function loadStudyLocations(): Record<string, StudyLocation> {
 
 const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
   home: {},
-  upload: { title: "上传书籍", back: true, hideNav: true },
+  onboarding: { hideNav: true },
+  learningSetSetup: { hideNav: true },
+  learningSet: { title: "学习集", back: true },
+  upload: { title: "创建学习集", back: true, hideNav: true },
   parseReady: { title: "解析教材", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
   chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
@@ -117,8 +127,9 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   assignment: { title: "作业练习", subtitle: "按顺序练习，定位卡点", back: true, hideNav: true },
   diagnosis: { title: "作业诊断", subtitle: "看懂原因，马上巩固", back: true, hideNav: true },
   mistakes: { title: "错题集", subtitle: "重做卡点，直到真正掌握", back: true, hideNav: true },
-  notes: { title: "导学笔记", subtitle: "沉淀学习产出", back: true, hideNav: true },
-  source: { title: "原文文档", subtitle: "定位到引用页", back: true, hideNav: true },
+  notes: { title: "学习笔记", subtitle: "保留原始记录与独立整理版", back: true, hideNav: true },
+  voiceNote: { title: "语音笔记", subtitle: "录下想法，再结合教材整理", back: true, hideNav: true },
+  source: { back: true, hideNav: true },
   export: { title: "导出预览", subtitle: "选择要导出的模块", back: true, hideNav: true },
   report: { title: "章节报告", subtitle: "完成后调整计划", back: true, hideNav: true },
   profile: { title: "我的", subtitle: "学习数据与偏好" }
@@ -145,10 +156,10 @@ function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
   switch (sheet.type) {
     case "chat":
       return { type: "chat" };
-    case "source":
-      return { ...sheet };
     case "note":
       return { ...sheet };
+    case "noteType":
+      return { ...sheet, intent: { ...sheet.intent }, pageOptions: sheet.pageOptions?.map((option) => ({ ...option })) };
     case "editChapter":
       return {
         ...sheet,
@@ -164,7 +175,13 @@ function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
 export default function App() {
   const bookcourseRepository = useBookCourseRepository();
   const reducedMotion = useReducedMotion();
-  const navigationRef = useRef<NavigationSnapshot>(createInitialNavigation());
+  const learningSets = useLearningSetStore();
+  const learningSetsRef = useRef(learningSets);
+  learningSetsRef.current = learningSets;
+  const parseDraft = learningSets.state.draft;
+  const navigationRef = useRef<NavigationSnapshot>(createInitialNavigation(
+    learningSets.state.preferences ? "home" : "onboarding"
+  ));
   const [navigation, setNavigation] = useState<NavigationSnapshot>(navigationRef.current);
   const screen = navigation.screen;
   const [sheet, setSheet] = useState<SheetState>(null);
@@ -177,11 +194,23 @@ export default function App() {
   const toastIdRef = useRef(0);
   const toastTimerRef = useRef<number | undefined>(undefined);
   const [selectedUpload, setSelectedUpload] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<UploadedCourseFile | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<UploadedCourseFile | null>(parseDraft?.uploadedCourse ?? null);
   const uploadedFileRef = useRef(uploadedFile);
   uploadedFileRef.current = uploadedFile;
-  const [parseJobId, setParseJobId] = useState<string | null>(null);
-  const [parseJobStatus, setParseJobStatus] = useState<JobStatusResponse | null>(null);
+  const [parseJobId, setParseJobId] = useState<string | null>(parseDraft?.parseJobId ?? null);
+  const [parseJobStatus, setParseJobStatus] = useState<JobStatusResponse | null>(() =>
+    parseDraft?.parseCompleted && parseDraft.parseJobId && parseDraft.uploadedCourse
+      ? {
+          job_id: parseDraft.parseJobId,
+          book_id: parseDraft.uploadedCourse.bookId,
+          status: "done",
+          stage: "completed",
+          progress: 100,
+          message: "教材解析已完成",
+          error: null
+        }
+      : null
+  );
   const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([]);
   const [courseSummariesLoadState, setCourseSummariesLoadState] = useState<CourseSummariesLoadState>("loading");
   const [courseSummariesReadyKind, setCourseSummariesReadyKind] = useState<CourseSummariesReadyKind>("empty");
@@ -213,10 +242,12 @@ export default function App() {
   const [answer, setAnswer] = useState("");
   const [savedNoteCount, setSavedNoteCount] = useState(6);
   const [sourcePageTarget, setSourcePageTarget] = useState<SourcePageTarget | null>(null);
+  const [sourceReaderCurrentPage, setSourceReaderCurrentPage] = useState(1);
+  const [noteCaptureIntent, setNoteCaptureIntent] = useState<NoteCaptureIntent | null>(null);
   const [studyLocations, setStudyLocations] = useState<Record<string, StudyLocation>>(loadStudyLocations);
   const studyLocationsRef = useRef(studyLocations);
   studyLocationsRef.current = studyLocations;
-  const completedParseJobRef = useRef<string | null>(null);
+  const completedParseJobRef = useRef<string | null>(parseDraft?.parseCompleted ? parseDraft.parseJobId ?? null : null);
   const parseSessionGenerationRef = useRef(0);
   const loadedCourseContextRef = useRef<LoadedCourseContext>({
     loadedBookId,
@@ -295,7 +326,14 @@ export default function App() {
 
   const go = useCallback((next: Screen) => {
     const current = navigationRef.current;
-    const nextNavigation = navigate(current, { type: "go", screen: next });
+    const draft = learningSetsRef.current.state.draft;
+    const pendingSetImport = draft && !draft.editingSetId && draft.uploadedCourse
+      && draft.uploadedCourse.bookId === uploadedFileRef.current?.bookId;
+    const target = next === "chapterConfirm" && pendingSetImport
+      ? draft.parseCompleted ? "learningSetSetup" : draft.parseJobId ? "processing" : "parseReady"
+      : next;
+    if (current.screen === "voiceNote" && target !== "voiceNote") setNoteCaptureIntent(null);
+    const nextNavigation = navigate(current, { type: "go", screen: target });
     saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     commitNavigation(() => nextNavigation);
@@ -312,6 +350,14 @@ export default function App() {
 
   const back = useCallback(() => {
     const current = navigationRef.current;
+    if (current.screen === "source" || current.screen === "voiceNote" || current.screen === "onboarding" || current.screen === "learningSetSetup") {
+      const recordingBackEvent = new CustomEvent("bookcourse:native-back", { cancelable: true });
+      window.dispatchEvent(recordingBackEvent);
+      if (recordingBackEvent.defaultPrevented) return;
+    }
+    if (current.screen === "source" || current.screen === "voiceNote") {
+      setNoteCaptureIntent(null);
+    }
     const nextNavigation = navigate(current, { type: "back" });
     saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
@@ -320,6 +366,12 @@ export default function App() {
 
   const openSourcePage = useCallback((target: SourcePageTarget) => {
     const current = navigationRef.current;
+    setSourceReaderCurrentPage(Math.max(1, target.pageStart));
+    if (current.screen === "source") {
+      requestSheetCloseForNavigation(true);
+      setSourcePageTarget(target);
+      return;
+    }
     const nextNavigation = navigate(current, { type: "source" });
     saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
@@ -404,6 +456,52 @@ export default function App() {
     }, toastDwellDurationMs);
     toastTimerRef.current = timer;
   }, []);
+
+  const finishNoteCapture = useCallback(() => {
+    setNoteCaptureIntent(null);
+  }, []);
+
+  const startNote = useCallback((intent: NoteCaptureIntent) => {
+    const source = intent.source ?? (intent.anchor?.bookId && intent.anchor.pageStart ? {
+      bookId: intent.anchor.bookId,
+      title: intent.anchor.chapterTitle ?? intent.anchor.bookTitle ?? "教材原文",
+      pageStart: intent.anchor.pageStart,
+      pageEnd: intent.anchor.pageEnd,
+      printedPageStart: intent.anchor.printedPageStart,
+      printedPageEnd: intent.anchor.printedPageEnd,
+      sourceText: intent.anchor.sourceText,
+      from: intent.from
+    } satisfies SourcePageTarget : null);
+    if (intent.kind === "text") {
+      setNoteCaptureIntent(intent);
+      if (source) {
+        openSourcePage(source);
+        return;
+      }
+      openSheet({
+        type: "note",
+        kind: intent.anchor?.quote ? "selection" : "concept",
+        concept: intent.anchor?.chapterTitle ?? intent.anchor?.bookTitle ?? "学习笔记",
+        quote: intent.anchor?.quote,
+        sourceLabel: intent.anchor?.pageStart ? `教材第 ${intent.anchor.pageStart} 页` : undefined,
+        source: intent.source
+      });
+      return;
+    }
+    if (intent.kind === "voice") {
+      setNoteCaptureIntent(intent);
+      go("voiceNote");
+      return;
+    }
+
+    if (!source) {
+      setNoteCaptureIntent(null);
+      showToast("请先选择要批注的教材页", "warning");
+      return;
+    }
+    setNoteCaptureIntent(intent);
+    openSourcePage(source);
+  }, [go, openSheet, openSourcePage, showToast]);
 
   const clearLoadedCourse = useCallback((expectedBookId?: string) => {
     if (
@@ -547,7 +645,7 @@ export default function App() {
           bookId,
           name: scan.filename || summary?.title || "已选择教材",
           sizeBytes: 0,
-          contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type,
+          contentType: scan.file_type === "pdf" ? "application/pdf" : scan.file_type || "application/octet-stream",
           uploadedAt: Date.now(),
           origin: "remote-course"
         };
@@ -699,10 +797,23 @@ export default function App() {
         if (job.status === "done") {
           await loadParsedCourse(activeBookId);
           if (!isCurrentParseSession()) return;
+          const setDraft = learningSetsRef.current.state.draft;
+          const continuesLearningSet = Boolean(
+            setDraft && !setDraft.editingSetId
+            && setDraft.uploadedCourse?.bookId === activeBookId
+            && setDraft.resourceIds.includes(courseResourceId(activeBookId))
+          );
+          if (continuesLearningSet && setDraft) {
+            learningSetsRef.current.updateDraft({
+              step: Math.max(0, setDraft.step),
+              parseJobId: activeParseJobId,
+              parseCompleted: true
+            });
+          }
           completedParseJobRef.current = activeParseJobId;
           void refreshCourses();
           if (navigationRef.current.screen === "parseReady" || navigationRef.current.screen === "processing") {
-            replaceScreen("chapterConfirm");
+            replaceScreen(continuesLearningSet ? "learningSetSetup" : "chapterConfirm");
           }
           return;
         }
@@ -727,9 +838,13 @@ export default function App() {
 
   const sharedProps = useMemo(
     () => ({
+      learningSets,
       go,
+      replaceScreen,
       back,
       openSourcePage,
+      startNote,
+      finishNoteCapture,
       openSheet,
       closeSheet,
       showToast,
@@ -787,9 +902,13 @@ export default function App() {
       savedNoteCount,
       setSavedNoteCount,
       sourcePageTarget,
+      sourceReaderCurrentPage,
+      setSourceReaderCurrentPage,
+      noteCaptureIntent,
       studyLocations
     }),
     [
+      learningSets,
       activeChapterId,
       answer,
       back,
@@ -800,8 +919,11 @@ export default function App() {
       closeSheet,
       currentStudyPlan,
       go,
+      replaceScreen,
       openSheet,
       openSourcePage,
+      startNote,
+      finishNoteCapture,
       latestDiagnosis,
       lessonBuildJobId,
       lessonBuildJobStatus,
@@ -829,6 +951,8 @@ export default function App() {
       selectCourse,
       showToast,
       sourcePageTarget,
+      sourceReaderCurrentPage,
+      noteCaptureIntent,
       studyLocations,
       updateStudyLocation,
       uploadedFile
@@ -846,33 +970,9 @@ export default function App() {
         content: (
           <ChatSheetContent
             activeChapterId={activeChapterId}
-            openSheet={openSheet}
+            openSourcePage={openSourcePage}
             parsedChapters={parsedChapters}
             uploadedFile={uploadedFile}
-          />
-        )
-      };
-    }
-
-    if (sheet.type === "source") {
-      return {
-        key: `source:${sheet.title}:${sheet.page}`,
-        sheet,
-        title: "查看原文",
-        content: (
-          <SourceSheetContent
-            title={sheet.title}
-            page={sheet.page}
-            image={sheet.image}
-            text={sheet.text}
-            onCreateNote={(quote) => openSheet({
-              type: "note",
-              kind: "selection",
-              concept: sheet.title,
-              quote,
-              sourceLabel: sheet.page
-            })}
-            onOpenFullSource={sheet.source ? () => openSourcePage(sheet.source!) : undefined}
           />
         )
       };
@@ -896,6 +996,34 @@ export default function App() {
             setSavedNoteCount={setSavedNoteCount}
             closeSheet={closeSheet}
             showToast={showToast}
+          />
+        )
+      };
+    }
+
+    if (sheet.type === "noteType") {
+      return {
+        key: `noteType:${sheet.intent.source?.bookId ?? "free"}:${sheet.intent.anchor?.pageStart ?? "none"}`,
+        sheet,
+        title: "记笔记",
+        content: (
+          <NoteTypeSheetContent
+            contextLabel={sheet.contextLabel}
+            inkAvailable={sheet.inkAvailable}
+            pageOptions={sheet.pageOptions}
+            initialPage={sheet.intent.source?.pageStart ?? sheet.intent.anchor?.pageStart}
+            onChoose={(kind, page) => {
+              const printedPage = page && sheet.intent.source?.printedPageStart != null
+                ? sheet.intent.source.printedPageStart + page - sheet.intent.source.pageStart
+                : undefined;
+              const source = page && sheet.intent.source
+                ? { ...sheet.intent.source, pageStart: page, pageEnd: page, printedPageStart: printedPage, printedPageEnd: printedPage }
+                : sheet.intent.source;
+              const anchor = page && sheet.intent.anchor
+                ? { ...sheet.intent.anchor, pageStart: page, pageEnd: page, printedPageStart: printedPage, printedPageEnd: printedPage }
+                : sheet.intent.anchor;
+              startNote({ ...sheet.intent, source, anchor, kind });
+            }}
           />
         )
       };
@@ -948,6 +1076,7 @@ export default function App() {
     closeSheet,
     openSheet,
     openSourcePage,
+    startNote,
     parsedChapters,
     parsedScanResult?.page_count,
     sheet,
@@ -963,17 +1092,34 @@ export default function App() {
     maxMotionMs: globalMotionFallbackMs
   });
 
+  const sourceHeading = resolveSourceReaderHeading(
+    sourcePageTarget,
+    sourceReaderCurrentPage,
+    parsedChapters,
+    parsedScanResult,
+    uploadedFile?.name?.trim() || "教材原文"
+  );
   const header = screen === "lesson"
     ? {
         ...titles.lesson,
         subtitle: lessonHeaderSubtitle(parsedChapters, activeChapterId)
       }
+    : screen === "source"
+      ? { ...titles.source, title: sourceHeading.title, subtitle: sourceHeading.pageLabel }
+    : screen === "learningSet"
+      ? { ...titles.learningSet, title: learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId)?.name ?? "学习集" }
     : titles[screen];
 
   function renderScreen() {
     switch (screen) {
       case "home":
         return <HomeScreen />;
+      case "onboarding":
+        return <OnboardingScreen />;
+      case "learningSetSetup":
+        return <LearningSetSetupScreen />;
+      case "learningSet":
+        return <LearningSetDetailScreen />;
       case "upload":
         return <UploadScreen />;
       case "parseReady":
@@ -1010,6 +1156,8 @@ export default function App() {
         return <MistakeBookScreen />;
       case "notes":
         return <NotesScreen />;
+      case "voiceNote":
+        return <VoiceNoteScreen />;
       case "source":
         return <SourceReaderScreen />;
       case "export":

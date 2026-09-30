@@ -102,7 +102,7 @@ export function SourceSheetContent({
             onPointerDown={(event) => event.preventDefault()}
             onClick={() => onCreateNote(selectedText)}
           >
-            做笔记
+            记笔记
           </Button>
         </div>
       ) : null}

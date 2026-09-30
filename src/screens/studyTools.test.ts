@@ -7,7 +7,8 @@ describe("study tool registry", () => {
       "source",
       "assignment",
       "flashcards",
-      "mistakes"
+      "mistakes",
+      "notes"
     ]);
   });
 

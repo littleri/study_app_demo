@@ -237,7 +237,7 @@ test.describe("study directory flow", () => {
     await expect(page.getByRole("button", { name: "第 1 节 减数分裂和受精作用 教材第 16-26 页", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "第 3 节 伴性遗传 教材第 33-40 页", exact: true })).toBeVisible();
 
-    await expect(page.getByRole("button", { name: "更多功能 预留新学习工具", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /学习笔记/u }).first()).toBeEnabled();
     await page.getByRole("button", { name: "进入学习", exact: true }).click();
     await expect(page.locator(".lesson-screen")).toBeVisible();
     const lessonPager = page.locator(".lesson-knowledge-pager");
@@ -289,21 +289,15 @@ test.describe("study directory flow", () => {
     expect(compactReadingMetrics.figureRatio).toBeLessThanOrEqual(0.93);
 
     await page.locator(".lesson-source-link").click();
-    const sourceSheet = page.locator(".sheet[data-sheet-type='source']");
-    await expect(sourceSheet).toBeVisible();
-    await expect(sourceSheet.locator(".source-reference-sheet h3")).toHaveCount(0);
-    expect(await sourceSheet.evaluate((element) => Number.parseFloat(getComputedStyle(element).borderTopLeftRadius))).toBe(28);
-    await expect(sourceSheet.getByRole("img")).toBeVisible();
-    await expect(sourceSheet.getByRole("button", { name: "全屏阅读教材", exact: true })).toBeVisible();
-    await expect(sourceSheet.getByRole("tablist", { name: "教材查看方式" })).toHaveCount(0);
-    await expect(sourceSheet.getByRole("tab")).toHaveCount(0);
-    await expect(sourceSheet.locator(".source-reference-sheet")).toHaveCSS("scrollbar-width", "none");
-    await expect(sourceSheet.locator(".source-selectable-text")).toHaveCount(0);
-    const selectableSource = sourceSheet.locator(".source-page-text-layer");
+    const sourceReader = page.locator(".source-reader-screen");
+    await expect(sourceReader).toBeVisible();
+    await expect(page.locator(".sheet[data-sheet-type='source']")).toHaveCount(0);
+    await expect(sourceReader.locator(".source-annotation-page > img")).toBeVisible();
+    const selectableSource = sourceReader.locator(".source-page-text-layer.is-reader");
     await expect(selectableSource).toBeVisible();
     await expect(selectableSource).not.toBeEmpty();
-    const sourceLayerPlacement = await sourceSheet.evaluate((element) => {
-      const image = element.querySelector<HTMLImageElement>(".source-page-selection-surface > img")!;
+    const sourceLayerPlacement = await sourceReader.evaluate((element) => {
+      const image = element.querySelector<HTMLImageElement>(".source-annotation-page > img")!;
       const layer = element.querySelector<HTMLElement>(".source-page-text-layer")!;
       const imageBounds = image.getBoundingClientRect();
       const layerBounds = layer.getBoundingClientRect();
@@ -326,37 +320,18 @@ test.describe("study directory flow", () => {
       range.setEnd(textNode, Math.min(24, textNode.textContent.length));
       selection?.removeAllRanges();
       selection?.addRange(range);
-      document.dispatchEvent(new Event("selectionchange"));
+      element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
     });
-    await expect(sourceSheet.getByRole("button", { name: "做笔记", exact: true })).toBeVisible();
-    await sourceSheet.getByRole("button", { name: "做笔记", exact: true }).click();
-
-    const selectionNoteSheet = page.getByRole("dialog", { name: "摘录笔记" });
-    await expect(selectionNoteSheet.locator(".selection-note-quote")).not.toBeEmpty();
-    await selectionNoteSheet.locator(".note-textarea").fill("摘录说明：这是我对选中文字的理解。");
-    await selectionNoteSheet.getByRole("button", { name: "保存摘录笔记", exact: true }).click();
-    const noteSaveCelebration = page.locator(".note-save-celebration-layer");
-    await expect(noteSaveCelebration).toBeVisible();
-    await expect(page.locator(".lesson-ai-entry")).toBeHidden();
-    await expect(noteSaveCelebration).toHaveAttribute("data-note-save-phase", "celebrating");
-    await expect(selectionNoteSheet.locator(".concept-detail-sheet")).toHaveAttribute(
-      "data-note-save-state",
-      "celebrating"
-    );
-    const noteSaveMotionNames = await noteSaveCelebration.evaluate((element) => ({
-      mascot: getComputedStyle(element.querySelector<HTMLElement>(".note-save-mascot-stage")!).animationName,
-      sprite: getComputedStyle(element.querySelector<HTMLElement>(".note-save-mascot-strip")!).animationName,
-      sheet: getComputedStyle(document.querySelector<HTMLElement>('.sheet[data-sheet-type="note"]')!).animationName
-    }));
-    expect(noteSaveMotionNames).toEqual({
-      mascot: "motion-note-save-mascot-form",
-      sprite: "motion-note-save-mascot-sprite",
-      sheet: "motion-note-save-sheet-collapse"
-    });
-    await expect(noteSaveCelebration).toHaveCount(0);
-    await expect(page.getByText("摘录已保存到导学笔记", { exact: true })).toHaveCount(0);
+    await sourceReader.locator(".source-reader-selection-action").getByRole("button", { name: "记笔记" }).click();
+    const notePanel = sourceReader.getByRole("region", { name: "原文文字笔记" });
+    await expect(notePanel.locator("blockquote")).not.toBeEmpty();
+    await notePanel.getByLabel("我的理解").fill("摘录说明：这是我对选中文字的理解。");
+    await page.locator(".header-bar .icon-button").click();
+    await expect(notePanel).toHaveCount(0);
+    await sourceReader.getByRole("button", { name: /本页笔记/ }).click();
+    await expect(sourceReader.locator(".source-page-notes")).toContainText("文字");
+    await page.locator(".header-bar .icon-button").click();
     await expect(page.locator(".lesson-ai-entry")).toBeVisible();
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.saved-study-notes.v1") ?? "[]").length)).toBeGreaterThan(0);
     await expect(page.locator(".lesson-screen")).toBeVisible();
     const lessonProgress = lessonPager.getByRole("progressbar", { name: "章节学习进度" });
     const lessonPageCount = Number(await lessonProgress.getAttribute("aria-valuemax"));
