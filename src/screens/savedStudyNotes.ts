@@ -1,3 +1,5 @@
+import { putStudyNote } from "../features/studyNotes/repository";
+
 export type SavedStudyNote = {
   id: string;
   title: string;
@@ -40,13 +42,28 @@ export function saveStudyNote(note: Omit<SavedStudyNote, "id" | "createdAt">) {
     createdAt: Date.now()
   };
   const storage = getStorage();
-  if (!storage) return savedNote;
-
-  try {
-    storage.setItem(storageKey, JSON.stringify([savedNote, ...loadSavedStudyNotes()]));
-  } catch {
-    // Saving the in-memory count and toast still provides feedback when a
-    // browser blocks storage (for example, a strict private session).
+  if (storage) {
+    try {
+      storage.setItem(storageKey, JSON.stringify([savedNote, ...loadSavedStudyNotes()]));
+    } catch {
+      // The unified repository below still keeps the current in-memory note
+      // and reports persistence failures to feature-level callers.
+    }
   }
+  void putStudyNote({
+    id: savedNote.id,
+    kind: "text",
+    title: savedNote.title,
+    body: savedNote.body,
+    anchor: savedNote.quote || savedNote.sourceLabel ? {
+      bookId: "local-text-note",
+      quote: savedNote.quote,
+      chapterTitle: savedNote.sourceLabel
+    } : undefined,
+    createdAt: savedNote.createdAt,
+    updatedAt: savedNote.createdAt,
+    noteVersion: 1,
+    pipelinePhase: "complete"
+  }).catch(() => undefined);
   return savedNote;
 }

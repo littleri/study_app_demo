@@ -267,7 +267,7 @@ body {
   max-height: none;
   min-height: 0;
   overflow: hidden;
-  border-radius: 28px 28px 24px 24px;
+  border-radius: var(--dialog-radius);
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -418,7 +418,7 @@ body {
   width: 100%;
   max-width: none;
   max-height: calc(var(--overlay-visual-height) - var(--safe-area-top) - var(--safe-area-bottom) - var(--space-layout));
-  border-radius: 28px 28px 0 0;
+  border-radius: var(--dialog-radius) var(--dialog-radius) 0 0;
   padding: 10px var(--space-inline) calc(var(--safe-area-bottom) + var(--space-layout));
 }
 
@@ -441,7 +441,7 @@ body {
     bottom: calc(var(--overlay-visual-bottom) + var(--safe-area-bottom) + var(--space-layout));
     left: auto;
     width: min(420px, calc(100% - var(--safe-area-left) - var(--safe-area-right) - var(--nav-rail-width) - var(--space-layout) - var(--space-layout) - var(--space-inline)));
-    border-radius: 28px;
+    border-radius: var(--dialog-radius);
   }
 
   .sheet-overlay {
@@ -456,7 +456,7 @@ body {
   .sheet {
     width: min(560px, 100%);
     max-height: calc(var(--overlay-visual-height) - var(--safe-area-top) - var(--safe-area-bottom) - var(--space-layout) - var(--space-layout));
-    border-radius: 28px;
+    border-radius: var(--dialog-radius);
     padding-bottom: var(--space-layout);
   }
 

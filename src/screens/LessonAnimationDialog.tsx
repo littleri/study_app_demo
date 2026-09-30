@@ -3,15 +3,19 @@ import {
   useId,
   useLayoutEffect,
   useRef,
+  useState,
   type AnimationEvent as ReactAnimationEvent,
   type RefObject
 } from "react";
-import { CirclePlay, PlayCircle, Sparkles, X } from "lucide-react";
+import { CirclePlay, PlayCircle, Sparkles, Video, X } from "lucide-react";
 import type {
   MotionAnimationEvent,
   MotionState
 } from "../motion";
+import { useReducedMotion } from "../motion";
 import type { LessonAnimation } from "./lessonAnimations";
+
+const videoRevealDurationMs = 350;
 
 export const lessonAnimationDialogMotionNames = [
   "motion-dialog-lesson-animation-in",
@@ -23,7 +27,11 @@ export function LessonAnimationDialog({
   originRef,
   presenceId,
   state,
+  preparing,
+  playbackError,
   onClose,
+  onVideoReady,
+  onVideoError,
   onAnimationEnd,
   onAnimationCancel
 }: {
@@ -31,7 +39,11 @@ export function LessonAnimationDialog({
   originRef: RefObject<HTMLButtonElement | null>;
   presenceId: number;
   state: MotionState;
+  preparing?: boolean;
+  playbackError?: boolean;
   onClose: () => void;
+  onVideoReady?: () => void;
+  onVideoError?: () => void;
   onAnimationEnd: (event: MotionAnimationEvent) => void;
   onAnimationCancel: (event: MotionAnimationEvent) => void;
 }) {
@@ -40,7 +52,11 @@ export function LessonAnimationDialog({
   const sharedSurfaceRef = useRef<HTMLDivElement | null>(null);
   const sharedOriginRef = useRef<HTMLSpanElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const loadingCancelRef = useRef<HTMLButtonElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [showPlayer, setShowPlayer] = useState(!preparing);
+  const reducedMotion = useReducedMotion();
+  const videoPhase = preparing ? "loading" : showPlayer ? "playing" : "revealing";
   const titleId = useId();
   const descriptionId = useId();
 
@@ -110,10 +126,6 @@ export function LessonAnimationDialog({
   }, [originRef, presenceId, state]);
 
   useEffect(() => {
-    const focusFrame = window.requestAnimationFrame(() => {
-      closeButtonRef.current?.focus({ preventScroll: true });
-      void videoRef.current?.play().catch(() => undefined);
-    });
     const previousOverflow = document.documentElement.style.overflow;
     document.documentElement.style.overflow = "hidden";
 
@@ -124,7 +136,6 @@ export function LessonAnimationDialog({
     window.addEventListener("bookcourse:native-back", closeFromNativeBack);
 
     return () => {
-      window.cancelAnimationFrame(focusFrame);
       window.removeEventListener("bookcourse:native-back", closeFromNativeBack);
       document.documentElement.style.overflow = previousOverflow;
       videoRef.current?.pause();
@@ -134,6 +145,27 @@ export function LessonAnimationDialog({
       }
     };
   }, [animation.animationId, onClose, originRef]);
+
+  useEffect(() => {
+    if (preparing || showPlayer) return;
+    const revealTimer = window.setTimeout(() => setShowPlayer(true), reducedMotion ? 0 : videoRevealDurationMs);
+    return () => window.clearTimeout(revealTimer);
+  }, [preparing, reducedMotion, showPlayer]);
+
+  useEffect(() => {
+    if (videoPhase !== "playing" || state === "closing" || playbackError) {
+      videoRef.current?.pause();
+      return;
+    }
+    void videoRef.current?.play().catch(() => undefined);
+  }, [playbackError, state, videoPhase]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      (videoPhase === "playing" ? closeButtonRef.current : loadingCancelRef.current)?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [videoPhase]);
 
   useEffect(() => {
     if (state === "closing") videoRef.current?.pause();
@@ -169,9 +201,11 @@ export function LessonAnimationDialog({
       className="lesson-animation-layer"
       data-motion-state={state}
       data-motion-presence={presenceId}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      aria-busy={state === "closing" ? true : undefined}
+      data-video-phase={videoPhase}
+      aria-label={videoPhase !== "playing" ? "正在生成讲解视频" : undefined}
+      aria-labelledby={videoPhase !== "playing" ? undefined : titleId}
+      aria-describedby={videoPhase !== "playing" ? undefined : descriptionId}
+      aria-busy={state === "closing" || videoPhase !== "playing" ? true : undefined}
       onCancel={(event) => {
         event.preventDefault();
         if (state !== "closing") onClose();
@@ -179,6 +213,7 @@ export function LessonAnimationDialog({
     >
       <button
         className="lesson-animation-scrim"
+        inert={videoPhase !== "playing"}
         data-motion-state={state}
         type="button"
         aria-label="关闭教学动画背景"
@@ -203,7 +238,7 @@ export function LessonAnimationDialog({
         <CirclePlay size={17} aria-hidden="true" />
       </span>
 
-      <div className="lesson-animation-positioner">
+      <div className="lesson-animation-positioner" data-video-phase={videoPhase} inert={videoPhase !== "playing"} aria-hidden={videoPhase !== "playing" ? true : undefined}>
         <article
           key={`lesson-animation-panel:${presenceId}`}
           ref={surfaceRef}
@@ -231,16 +266,18 @@ export function LessonAnimationDialog({
             <video
               ref={videoRef}
               controls
-              autoPlay
               muted
               playsInline
               preload="metadata"
               poster={animation.posterUrl}
               aria-label={`${animation.title}视频`}
+              onLoadedMetadata={onVideoReady}
+              onError={onVideoError}
             >
               <source src={animation.videoUrl} type="video/mp4" />
               当前设备暂不支持视频播放。
             </video>
+            {playbackError ? <p className="lesson-animation-playback-error" role="alert">当前设备无法播放这段视频，本次积分已退还。</p> : null}
             <span className="lesson-animation-duration" aria-hidden="true">
               <PlayCircle size={14} />{animation.durationLabel}
             </span>
@@ -252,6 +289,17 @@ export function LessonAnimationDialog({
           </div>
         </article>
       </div>
+      {videoPhase !== "playing" ? <div className="lesson-video-loading-screen" data-video-phase={videoPhase} role="status" aria-live="polite" aria-label="正在生成讲解视频">
+        <div className="lesson-video-loading-card">
+          <div className="lesson-video-loading-symbol" aria-hidden="true">
+            <span className="lesson-video-loading-ring" />
+            <span className="lesson-video-confirm-icon"><Video size={30} strokeWidth={2.3} /><Sparkles className="lesson-video-confirm-sparkle" size={17} strokeWidth={2.5} /></span>
+          </div>
+          <h2>正在生成讲解视频</h2>
+          <p>请稍等，准备好后会自动打开。</p>
+          <button ref={loadingCancelRef} type="button" onClick={onClose}>取消生成</button>
+        </div>
+      </div> : null}
     </dialog>
   );
 }

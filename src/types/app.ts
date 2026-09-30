@@ -1,7 +1,11 @@
 import type { ChapterEvidence } from "./api";
+import type { NoteCaptureIntent } from "../features/studyNotes/types";
 
 export type Screen =
   | "home"
+  | "onboarding"
+  | "learningSetSetup"
+  | "learningSet"
   | "upload"
   | "parseReady"
   | "processing"
@@ -20,6 +24,7 @@ export type Screen =
   | "diagnosis"
   | "mistakes"
   | "notes"
+  | "voiceNote"
   | "source"
   | "export"
   | "report"
@@ -27,14 +32,6 @@ export type Screen =
 
 export type SheetState =
   | { type: "chat" }
-  | {
-      type: "source";
-      title: string;
-      image?: string;
-      page: string;
-      text?: string;
-      source?: SourcePageTarget;
-    }
   | {
       type: "note";
       concept: string;
@@ -45,6 +42,13 @@ export type SheetState =
       source?: SourcePageTarget;
       image?: string;
       imageCaption?: string;
+    }
+  | {
+      type: "noteType";
+      intent: Omit<NoteCaptureIntent, "kind">;
+      contextLabel?: string;
+      inkAvailable?: boolean;
+      pageOptions?: Array<{ page: number; label: string }>;
     }
   | { type: "editChapter"; chapterId: string; evidence?: ChapterEvidence }
   | { type: "bookSwitcher" }
@@ -84,6 +88,8 @@ export type SourcePageTarget = {
    * fallback if that image is unavailable.
    */
   sourceText?: string | null;
+  /** A supplied citation preview when no published textbook page is available. */
+  previewImageUrl?: string;
   from?: Screen | null;
 };
 
@@ -108,8 +114,11 @@ export type Chapter = {
 
 export type AppActions = {
   go: (screen: Screen) => void;
+  replaceScreen: (screen: Screen) => void;
   back: () => void;
   openSourcePage: (target: SourcePageTarget) => void;
+  startNote: (intent: NoteCaptureIntent) => void;
+  finishNoteCapture: () => void;
   openSheet: (sheet: SheetState) => void;
   closeSheet: () => void;
   showToast: (text: string, tone?: ToastTone) => void;

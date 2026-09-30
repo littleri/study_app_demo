@@ -118,6 +118,10 @@
   --radius-card: 14px;
   --radius-large: 16px;
   --radius-glass: 16px;
+
+  /* One silhouette for every floating dialog: no stroke, one soft shadow. */
+  --dialog-radius: 28px;
+  --dialog-shadow: 0 24px 60px rgba(32, 38, 58, 0.22);
   --motion-duration-global: 350ms;
   --motion-duration-global-emphasis: 450ms;
   --motion-duration-local-fast: 150ms;

@@ -58,7 +58,7 @@ function DiagnosisKnowledgeProgress({
 }
 
 export function DiagnosisScreen() {
-  const { go, latestDiagnosis, showToast, openSourcePage, openSheet, uploadedFile } = useAppContext();
+  const { go, latestDiagnosis, showToast, openSourcePage, uploadedFile } = useAppContext();
   const diagnosisMotion = useDiagnosisMotion(latestDiagnosis?.submission_id ?? null);
   const liveCitation = latestDiagnosis?.review_citations[0] ?? null;
   const liveAsset = latestDiagnosis?.related_assets[0] ?? null;
@@ -122,19 +122,15 @@ export function DiagnosisScreen() {
               <strong>{liveCitation.chapter_title}</strong>
               <p>{liveCitation.quote}</p>
             </div>
-            <button className="inline-link" type="button" onClick={() => uploadedFile
-              ? openSourcePage({
-                  bookId: uploadedFile.bookId,
-                  title: liveCitation.chapter_title || "诊断来源页",
-                  pageStart: liveCitation.page,
-                  pageEnd: liveCitation.page
-                })
-              : openSheet({
-                  type: "source",
-                  title: "诊断来源页",
-                  page: `第 ${liveCitation.page} 页`,
-                  image: backendAssetUrl(liveAsset?.image_url)
-                })}>
+            <button className="inline-link" type="button" onClick={() => openSourcePage({
+              bookId: uploadedFile?.bookId ?? "",
+              title: liveCitation.chapter_title || "诊断来源页",
+              pageStart: liveCitation.page,
+              pageEnd: liveCitation.page,
+              sourceText: liveCitation.quote,
+              previewImageUrl: uploadedFile ? undefined : backendAssetUrl(liveAsset?.image_url),
+              from: "diagnosis"
+            })}>
               查看原文
             </button>
           </div>

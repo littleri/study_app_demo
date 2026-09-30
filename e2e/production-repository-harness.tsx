@@ -22,6 +22,7 @@ import "../src/styles/base.css";
 import "../src/styles/responsive.css";
 import "../src/styles/home.css";
 import "../src/styles/chapter-tools.css";
+import "../src/styles/study-notes.css";
 import "../src/styles/study.css";
 import "../src/styles/motion.css";
 import "../src/styles/card-system.css";

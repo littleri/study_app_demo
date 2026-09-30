@@ -34,6 +34,7 @@
 }
 
 .profile-card.profile-portrait-card,
+.profile-credits-card,
 .profile-today-card,
 .profile-courses-card {
   min-width: 0;
@@ -43,6 +44,14 @@
   background: var(--color-surface);
   box-shadow: none;
 }
+
+.profile-credits-card { padding: 16px; }
+.profile-credits-heading { display: flex; align-items: center; gap: 12px; }
+.profile-credits-icon { flex: 0 0 46px; width: 46px; height: 46px; display: grid; place-items: center; border: 2px solid #252436; border-radius: 13px 16px 12px 15px; background: #ffe883; color: #252436; box-shadow: 2px 2px 0 #252436; transform: rotate(-4deg); }
+.profile-credits-heading h2 { margin: 2px 0 0; color: var(--color-text); font-size: 1.125rem; }
+.profile-credits-heading > strong { margin-left: auto; color: var(--color-primary); font-size: 1.75rem; line-height: 1; white-space: nowrap; }
+.profile-credits-heading > strong small { margin-left: 4px; font-size: 0.75rem; }
+.profile-credits-card > p { margin: 14px 0 0; color: var(--color-text-secondary); font-size: 0.8rem; line-height: 1.45; }
 
 .profile-card.profile-portrait-card {
   display: grid;

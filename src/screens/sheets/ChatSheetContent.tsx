@@ -15,6 +15,7 @@ import { useBookCourseRepository } from "../../context/BookCourseRepositoryConte
 import { getAiRuntimeLabel, hasDirectDeepSeekKey } from "../../config/deepseek";
 import { getTextbookRetriever } from "../../services/TextbookRetriever";
 import { getCitationSourceText, getExtractedCitationSourcePageImage } from "./citationSource";
+import { creditCosts, useCredits } from "../../features/credits/creditStore";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -33,15 +34,16 @@ type ChatCitation = {
 
 export function ChatSheetContent({
   activeChapterId,
-  openSheet,
+  openSourcePage,
   parsedChapters,
   uploadedFile
-}: Pick<AppActions, "openSheet"> & {
+}: Pick<AppActions, "openSourcePage"> & {
   activeChapterId: string | null;
   parsedChapters: ApiChapter[] | null;
   uploadedFile: UploadedCourseFile | null;
 }) {
   const bookcourseRepository = useBookCourseRepository();
+  const credits = useCredits();
   const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId) ?? parsedChapters?.[0] ?? null;
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -65,6 +67,13 @@ export function ChatSheetContent({
     }
     if (!nextQuestion.trim()) {
       setError("请输入要提问的问题。");
+      return;
+    }
+    let reservationId: string;
+    try {
+      reservationId = credits.reserve("chat");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "积分不足，暂时无法提问。");
       return;
     }
     const normalizedQuestion = nextQuestion.trim();
@@ -93,6 +102,7 @@ export function ChatSheetContent({
           key_concepts: []
         }
       });
+      credits.complete(reservationId);
       setMessages((items) => [...items, { role: "assistant", text: result.answer }]);
       setCitations(result.citations.slice(0, 3).map((item) => ({
         bookId: uploadedFile.bookId,
@@ -104,6 +114,7 @@ export function ChatSheetContent({
         title: item.chapter_title
       })));
     } catch (err) {
+      credits.refund(reservationId);
       setError(err instanceof Error ? err.message : "教材资料暂时不可用");
     } finally {
       setLoading(false);
@@ -113,6 +124,7 @@ export function ChatSheetContent({
   return (
     <div className="sheet-body chat-sheet">
       <div className="chat-sheet-transcript">
+        <p className="chat-credit-summary" aria-live="polite">剩余 {credits.balance} 积分 · 每次提问消耗 {creditCosts.chat} 积分</p>
         <Pill tone="sky">{uploadedFile ? `当前教材：《${uploadedFile.name}》` : "需要先上传教材"}</Pill>
         <Pill tone={hasDirectDeepSeekKey() ? "purple" : "sky"}>{getAiRuntimeLabel()}</Pill>
         {messages.length === 0 ? (
@@ -136,19 +148,12 @@ export function ChatSheetContent({
             quote={citation.quote}
             image={citation.image}
             openLabel="查看教材原文"
-            onOpen={() => openSheet({
-              type: "source",
+            onOpen={() => openSourcePage({
+              bookId: citation.bookId,
               title: citation.title,
-              page: citation.page,
-              image: citation.image,
-              text: citation.quote,
-              source: {
-                bookId: citation.bookId,
-                title: citation.title,
-                pageStart: citation.pdfPage,
-                pageEnd: citation.pdfPage,
-                sourceText: citation.pageText
-              }
+              pageStart: citation.pdfPage,
+              pageEnd: citation.pdfPage,
+              sourceText: citation.pageText
             })}
           />
         )) : (

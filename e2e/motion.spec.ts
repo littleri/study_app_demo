@@ -47,6 +47,17 @@ function normalizeTimingFunction(value: string) {
   return value.replaceAll(/\s+/g, "");
 }
 
+async function swipeSourceReader(page: Page, direction: "left" | "right") {
+  await page.locator(".source-page-frame").evaluate((element, swipeDirection) => {
+    const bounds = element.getBoundingClientRect();
+    const from = swipeDirection === "left" ? bounds.right - 28 : bounds.left + 28;
+    const to = swipeDirection === "left" ? bounds.left + 28 : bounds.right - 28;
+    const y = bounds.top + bounds.height / 2;
+    element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 61, pointerType: "touch", clientX: from, clientY: y }));
+    element.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 61, pointerType: "touch", clientX: to, clientY: y }));
+  }, direction);
+}
+
 async function readAnimation(locator: Locator) {
   return locator.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -135,7 +146,6 @@ async function openSourceFromStudy(page: Page) {
   await expect(page.locator(".lesson-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
   await page.locator(".lesson-source-link").first().click();
-  await page.getByRole("button", { name: "全屏阅读教材", exact: true }).click();
   await expect(page.locator(".source-reader-screen")).toBeVisible({ timeout: 10_000 });
   await settleScreen(page);
 }
@@ -1327,8 +1337,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await dispatchAnimation(frame, "animationend", firstEntryName);
     await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
 
-    const next = page.locator(".source-reader-toolbar button").last();
-    await next.click();
+    await swipeSourceReader(page, "left");
     const secondEntryName = await expectLocalEntry(frame, "SourceReader next page");
     const secondFrame = await frame.elementHandle();
     if (!secondFrame) throw new Error("SourceReader second page frame is missing");
@@ -1338,7 +1347,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     }, firstEntryName);
     await expect(frame, "stale first-page completion cannot settle the second page").toHaveAttribute("data-motion-item-state", "entering");
 
-    await next.click();
+    await swipeSourceReader(page, "left");
     await expect(frame, "rapid second page switch owns a fresh local generation").toHaveAttribute("data-motion-item-state", "entering");
     const thirdEntryName = (await readAnimation(frame)).name.split(",")[0].trim();
     expect(await secondFrame.evaluate((element) => element.isConnected), "rapid page switch detaches the superseded second page").toBe(false);
@@ -1349,14 +1358,13 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await dispatchAnimation(frame, "animationend", thirdEntryName);
     await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
 
-    const returnToCitation = page.locator(".source-reader-actions .button").first();
-    await expect(returnToCitation).toBeEnabled();
-    await returnToCitation.click();
+    await swipeSourceReader(page, "right");
+    await swipeSourceReader(page, "right");
     await expect(frame).toHaveAttribute("data-motion-item-state", "entering");
     const citationEntryName = (await readAnimation(frame)).name.split(",")[0].trim();
     await dispatchAnimation(frame, "animationend", citationEntryName);
     await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
-    await expect(returnToCitation).toBeDisabled();
+    await expect(page.locator(".header-title p")).toHaveText("第 16 页");
     const citedFrame = await frame.elementHandle();
     if (!citedFrame) throw new Error("SourceReader cited page root is missing");
     await dispatchAnimation(frame, "animationend", citationEntryName);
@@ -1389,7 +1397,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     expect((await readAnimation(image)).name).toBe("none");
     const initialKey = await frame.getAttribute("data-motion-item-key");
 
-    await page.locator(".source-reader-toolbar button").last().click();
+    await swipeSourceReader(page, "left");
     await expect(frame).not.toHaveAttribute("data-motion-item-key", initialKey ?? "");
     await expect(frame, "a real page switch is direct under reduced motion").toHaveAttribute("data-motion-item-state", "idle");
     expect((await readAnimation(frame)).name).toBe("none");
@@ -1435,7 +1443,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
 
     await page.unroute(failedSourceAsset);
     const pause = await installPauseStyle(page, ".source-page-image");
-    await page.locator(".source-reader-toolbar button").last().click();
+    await swipeSourceReader(page, "left");
     const image = page.locator(".source-page-image");
     await expect(image).toHaveAttribute("data-motion-image-state", "entering");
     expect(await readAnimation(image)).toMatchObject({ duration: "0.18s", name: "motion-stage3-image-in", playState: "paused" });

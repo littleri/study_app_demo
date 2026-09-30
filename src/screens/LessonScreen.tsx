@@ -29,11 +29,9 @@ import {
 import {
   backendAssetUrl,
   liveBookTitle,
-  sourcePageImageUrl,
   sourcePageLabel
 } from "./shared";
 import {
-  detailedCitationPageLabel,
   learnerCitationPageLabel
 } from "./lessonEvidence";
 import {
@@ -44,12 +42,17 @@ import {
   LessonAnimationDialog,
   lessonAnimationDialogMotionNames
 } from "./LessonAnimationDialog";
+import { LessonVideoConfirmDialog } from "./LessonVideoConfirmDialog";
+import { useCredits } from "../features/credits/creditStore";
 import {
   lessonAnimationForAsset,
   type LessonAnimation
 } from "./lessonAnimations";
 
 const legacyLessonIntroductionAssetId = "asset_ai_meiosis_fertilization_cycle_v1";
+const minimumVideoPreparationMs = 1000;
+const maximumVideoPreparationMs = 12000;
+const lessonPagePositions = new Map<string, number>();
 
 function lessonAnimationKey(animation: LessonAnimation) {
   return animation.animationId;
@@ -66,13 +69,13 @@ function LessonFigure({
   citation,
   onOpenSource,
   animation = null,
-  onOpenAnimation
+  onRequestVideo
 }: {
   asset: ApiAsset;
   citation: LessonCitation | null;
   onOpenSource: () => void;
   animation?: LessonAnimation | null;
-  onOpenAnimation?: (animation: LessonAnimation, origin: HTMLButtonElement) => void;
+  onRequestVideo: (asset: ApiAsset, animation: LessonAnimation | null, origin: HTMLButtonElement) => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const image = backendAssetUrl(asset.image_url);
@@ -112,18 +115,17 @@ function LessonFigure({
           {sourceLabel ? <span aria-hidden="true"> · </span> : null}
           {sourceLabel ? <span>{sourceLabel}</span> : null}
         </span>
-        {animation && onOpenAnimation ? (
-          <button
-            className="lesson-figure-animation-button"
-            type="button"
-            aria-haspopup="dialog"
-            aria-controls="lesson-animation-dialog"
-            onClick={(event) => onOpenAnimation(animation, event.currentTarget)}
-          >
-            <CirclePlay size={15} aria-hidden="true" />
-            <span>{animation.triggerLabel}</span>
-          </button>
-        ) : null}
+        <button
+          className="lesson-figure-animation-button"
+          type="button"
+          aria-label={animation ? undefined : `看懂这张图：${asset.caption}`}
+          aria-haspopup="dialog"
+          aria-controls="lesson-video-confirm-dialog"
+          onClick={(event) => onRequestVideo(asset, animation, event.currentTarget)}
+        >
+          <CirclePlay size={15} aria-hidden="true" />
+          <span>{animation?.triggerLabel ?? "看懂这张图"}</span>
+        </button>
       </figcaption>
     </figure>
   );
@@ -153,6 +155,7 @@ function LessonSourceEntry({
 
 export function LessonScreen() {
   const bookcourseRepository = useBookCourseRepository();
+  const credits = useCredits();
   const {
     activeChapterId,
     generatedFlashcards,
@@ -160,7 +163,7 @@ export function LessonScreen() {
     generatedQuizzes,
     go,
     lessonBuildJobStatus,
-    openSheet,
+    openSourcePage,
     parsedAssets,
     parsedChapters,
     parsedChunks,
@@ -173,8 +176,16 @@ export function LessonScreen() {
     uploadedFile
   } = useAppContext();
   const [buildingLesson, setBuildingLesson] = useState(false);
+  const [pendingVideo, setPendingVideo] = useState<{ caption: string; animation: LessonAnimation | null } | null>(null);
+  const [videoCreditError, setVideoCreditError] = useState<string | null>(null);
   const [activeAnimation, setActiveAnimation] = useState<LessonAnimation | null>(null);
+  const [videoPreparing, setVideoPreparing] = useState(false);
+  const [videoPlaybackError, setVideoPlaybackError] = useState(false);
   const animationOriginRef = useRef<HTMLButtonElement | null>(null);
+  const videoReservationRef = useRef<string | null>(null);
+  const videoReadyRef = useRef(false);
+  const videoPreparationStartedRef = useRef(0);
+  const videoPreparationTimerRef = useRef<number | null>(null);
   const reducedMotion = useReducedMotion();
   const animationPresence = useMotionPresence<LessonAnimation>({
     requested: activeAnimation,
@@ -243,7 +254,7 @@ export function LessonScreen() {
   const primaryMotion = useLocalMotionItem(`lesson:${lessonMotionKey}:primary`);
 
   useEffect(() => {
-    setActiveLessonPage(0);
+    setActiveLessonPage(lessonPagePositions.get(lessonMotionKey) ?? 0);
     setLessonPageDirection("forward");
   }, [lessonMotionKey]);
 
@@ -281,14 +292,7 @@ export function LessonScreen() {
       sourceText: sourceText || undefined,
       from: "lesson"
     } as const;
-    openSheet({
-      type: "source",
-      title: blockTitle,
-      page: detailedCitationPageLabel(citation),
-      image: sourcePageImageUrl(activeUploadedFile.bookId, citation.page_start),
-      text: sourceText || undefined,
-      source
-    });
+    openSourcePage(source);
   }
 
   function openAssetSource(blockTitle: string, asset: ApiAsset, citation: LessonCitation | null) {
@@ -313,34 +317,100 @@ export function LessonScreen() {
       sourceText: sourceText || undefined,
       from: "lesson"
     } as const;
-    const page = typeof printedPage === "number"
-      ? `教材${sourcePageLabel(printedPage)}（PDF ${sourcePageLabel(asset.page)}）`
-      : `教材${sourcePageLabel(asset.page)}`;
-    openSheet({
-      type: "source",
-      title: asset.caption,
-      page,
-      image: sourcePageImageUrl(activeUploadedFile.bookId, asset.page),
-      text: sourceText || undefined,
-      source
-    });
+    openSourcePage(source);
   }
 
   function moveLessonPage(nextPage: number) {
     const boundedPage = Math.max(0, Math.min(readingSections.length, nextPage));
     if (boundedPage === activeLessonPage) return;
     setLessonPageDirection(boundedPage > activeLessonPage ? "forward" : "back");
+    lessonPagePositions.set(lessonMotionKey, boundedPage);
     setActiveLessonPage(boundedPage);
   }
 
-  function openLessonAnimation(animation: LessonAnimation, origin: HTMLButtonElement) {
+  function requestLessonVideo(asset: ApiAsset, animation: LessonAnimation | null, origin: HTMLButtonElement) {
     animationOriginRef.current = origin;
-    setActiveAnimation(animation);
+    setVideoCreditError(null);
+    setPendingVideo({ caption: asset.caption, animation });
   }
 
-  const closeLessonAnimation = useCallback(() => {
-    setActiveAnimation(null);
+  function confirmLessonVideo() {
+    const animation = pendingVideo?.animation;
+    if (!animation) return;
+    try {
+      videoReservationRef.current = credits.reserve("video");
+      videoReadyRef.current = false;
+      setVideoCreditError(null);
+      setPendingVideo(null);
+      videoPreparationStartedRef.current = performance.now();
+      setVideoPreparing(true);
+      setVideoPlaybackError(false);
+      setActiveAnimation(animation);
+    } catch (error) {
+      setVideoCreditError(error instanceof Error ? error.message : "积分不足，暂时无法生成视频。");
+    }
+  }
+
+  const cancelLessonVideo = useCallback(() => {
+    setPendingVideo(null);
+    setVideoCreditError(null);
   }, []);
+
+  const finishVideoPreparation = useCallback(() => {
+    if (videoPreparationTimerRef.current !== null) window.clearTimeout(videoPreparationTimerRef.current);
+    const remaining = Math.max(0, minimumVideoPreparationMs - (performance.now() - videoPreparationStartedRef.current));
+    videoPreparationTimerRef.current = window.setTimeout(() => {
+      videoPreparationTimerRef.current = null;
+      setVideoPreparing(false);
+    }, remaining);
+  }, []);
+
+  const completeLessonVideoCharge = useCallback(() => {
+    const reservationId = videoReservationRef.current;
+    if (!reservationId || videoReadyRef.current) return;
+    credits.complete(reservationId);
+    videoReadyRef.current = true;
+    finishVideoPreparation();
+  }, [credits.complete, finishVideoPreparation]);
+
+  const closeLessonAnimation = useCallback(() => {
+    if (videoPreparationTimerRef.current !== null) {
+      window.clearTimeout(videoPreparationTimerRef.current);
+      videoPreparationTimerRef.current = null;
+    }
+    const reservationId = videoReservationRef.current;
+    if (reservationId && !videoReadyRef.current) {
+      credits.refund(reservationId);
+    }
+    videoReservationRef.current = null;
+    videoReadyRef.current = false;
+    setVideoPreparing(false);
+    setVideoPlaybackError(false);
+    setActiveAnimation(null);
+  }, [credits.refund]);
+
+  const failLessonVideo = useCallback(() => {
+    const reservationId = videoReservationRef.current;
+    if (!reservationId) return;
+    credits.refund(reservationId);
+    videoReservationRef.current = null;
+    videoReadyRef.current = false;
+    setVideoPlaybackError(true);
+    finishVideoPreparation();
+    showToast("视频未能加载，本次积分已退还", "warning");
+  }, [credits.refund, finishVideoPreparation, showToast]);
+
+  useEffect(() => {
+    if (!videoPreparing) return;
+    const timeout = window.setTimeout(failLessonVideo, maximumVideoPreparationMs);
+    return () => window.clearTimeout(timeout);
+  }, [failLessonVideo, videoPreparing]);
+
+  useEffect(() => () => {
+    if (videoPreparationTimerRef.current !== null) window.clearTimeout(videoPreparationTimerRef.current);
+    const reservationId = videoReservationRef.current;
+    if (reservationId && !videoReadyRef.current) credits.refund(reservationId);
+  }, [credits.refund]);
 
   function handleLessonKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowLeft") {
@@ -523,7 +593,7 @@ export function LessonScreen() {
                                     citation={citation}
                                     onOpenSource={() => openAssetSource(activeSection.block.title, inlineAsset, citation)}
                                     animation={lessonAnimationForAsset(inlineAsset.asset_id)}
-                                    onOpenAnimation={openLessonAnimation}
+                                    onRequestVideo={requestLessonVideo}
                                   />
                                 ) : null}
                               </Fragment>
@@ -536,7 +606,7 @@ export function LessonScreen() {
                               citation={citation}
                               onOpenSource={() => openAssetSource(activeSection.block.title, asset, citation)}
                               animation={lessonAnimationForAsset(asset.asset_id)}
-                              onOpenAnimation={openLessonAnimation}
+                              onRequestVideo={requestLessonVideo}
                             />
                           ))}
                           {citation ? (
@@ -571,7 +641,7 @@ export function LessonScreen() {
                               citation={null}
                               onOpenSource={() => {}}
                               animation={lessonAnimationForAsset(lessonIntroductionAsset.asset_id)}
-                              onOpenAnimation={openLessonAnimation}
+                              onRequestVideo={requestLessonVideo}
                             />
                           ) : null}
                           {lesson.objectives.length > 0 ? (
@@ -597,13 +667,30 @@ export function LessonScreen() {
         </div>
       </div>
 
+      {pendingVideo && appShell ? createPortal(
+        <LessonVideoConfirmDialog
+          caption={pendingVideo.caption}
+          animation={pendingVideo.animation}
+          balance={credits.balance}
+          error={videoCreditError}
+          originRef={animationOriginRef}
+          onCancel={cancelLessonVideo}
+          onConfirm={confirmLessonVideo}
+        />,
+        appShell
+      ) : null}
+
       {animationPresence.rendered && appShell ? createPortal(
         <LessonAnimationDialog
           animation={animationPresence.rendered}
+          preparing={videoPreparing}
+          playbackError={videoPlaybackError}
           originRef={animationOriginRef}
           presenceId={animationPresence.presenceId}
           state={animationPresence.state}
           onClose={closeLessonAnimation}
+          onVideoReady={completeLessonVideoCharge}
+          onVideoError={failLessonVideo}
           onAnimationEnd={animationPresence.onAnimationEnd}
           onAnimationCancel={animationPresence.onAnimationCancel}
         />,

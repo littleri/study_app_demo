@@ -1,4 +1,4 @@
-export type StudyToolId = "source" | "assignment" | "flashcards" | "mistakes";
+export type StudyToolId = "source" | "assignment" | "flashcards" | "mistakes" | "notes";
 
 export type StudyToolDefinition = Readonly<{
   id: StudyToolId;
@@ -43,5 +43,10 @@ export const studyToolDefinitions: readonly StudyToolDefinition[] = [
     id: "mistakes",
     title: "错题集",
     description: "重做卡点题，追踪是否真正掌握"
+  },
+  {
+    id: "notes",
+    title: "学习笔记",
+    description: "查看文字、手写和语音记录"
   }
 ] as const;

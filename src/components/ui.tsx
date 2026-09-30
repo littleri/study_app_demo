@@ -38,8 +38,8 @@ import { getRuntimePlatform } from "../platform/nativeApp";
 import { getTextbookRetriever } from "../services/TextbookRetriever";
 import { getCitationSourceText } from "../screens/sheets/citationSource";
 import { communityBooks } from "../data/mockBook";
-import { getPublishedSourcePageImageUrl } from "../data/publishedSourcePages";
 import { answerCommunityCourseQuery } from "../screens/communityAssistant";
+import { creditCosts, useCredits } from "../features/credits/creditStore";
 
 gsap.registerPlugin(useGSAP);
 
@@ -298,7 +298,7 @@ export function PrimaryNav({
       screen: "home" as Screen,
       label: "首页",
       icon: Home,
-      active: active === "home" || active === "library"
+      active: active === "home" || active === "library" || active === "learningSet"
     },
     {
       screen: "study" as Screen,
@@ -631,7 +631,7 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" && active !== "communityBook" ? (
+        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "learningSetSetup" ? (
           <GlobalAIAssistant
             active={active}
             containerElement={appShellElement}
@@ -811,15 +811,6 @@ function getCitationPrintedPage(citation: Citation) {
   return Number.isFinite(labelPage) && labelPage > 0 ? labelPage : null;
 }
 
-function getCitationSheetPageLabel(citation: Citation) {
-  const printedPage = getCitationPrintedPage(citation);
-  if (!printedPage) return citation.location_label?.trim() || `PDF 第 ${citation.page} 页`;
-  const learnerLabel = `教材第 ${printedPage} 页`;
-  return printedPage !== citation.page
-    ? `${learnerLabel} · PDF 第 ${citation.page} 页`
-    : learnerLabel;
-}
-
 function getUniqueCitationPages(citations: Citation[]) {
   const seen = new Set<string>();
   return citations.filter((citation) => {
@@ -911,13 +902,14 @@ function GlobalAIAssistant({
   reducedMotion: boolean;
 }) {
   const bookcourseRepository = useBookCourseRepository();
+  const credits = useCredits();
   const {
     activeChapterId,
     courseSummaries,
     generatedLessons,
     go,
     loadedBookId,
-    openSheet,
+    openSourcePage,
     parsedChapters,
     selectCommunityBook,
     uploadedFile
@@ -980,6 +972,7 @@ function GlobalAIAssistant({
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [creditError, setCreditError] = useState<string | null>(null);
   const [orbPosition, setOrbPosition] = useState<OrbPosition>({
     side: "right",
     top: 0,
@@ -1040,24 +1033,17 @@ function GlobalAIAssistant({
     const title = citation.chapter_title || "教材原文";
     const sourceText = getCitationSourceText(citation);
     requestDialogClose();
-    openSheet({
-      type: "source",
+    openSourcePage({
+      bookId: ragBookId,
       title,
-      page: getCitationSheetPageLabel(citation),
-      image: getPublishedSourcePageImageUrl(ragBookId, citation.page),
-      text: sourceText || undefined,
-      source: {
-        bookId: ragBookId,
-        title,
-        pageStart: citation.page,
-        pageEnd: citation.page,
-        printedPageStart: printedPage,
-        printedPageEnd: printedPage,
-        sourceText: sourceText || undefined,
-        from: active
-      }
+      pageStart: citation.page,
+      pageEnd: citation.page,
+      printedPageStart: printedPage,
+      printedPageEnd: printedPage,
+      sourceText: sourceText || undefined,
+      from: active
     });
-  }, [active, openSheet, ragBookId, requestDialogClose]);
+  }, [active, openSourcePage, ragBookId, requestDialogClose]);
 
   useEffect(() => {
     const closeForNativeBack: EventListener = (event) => {
@@ -1085,6 +1071,7 @@ function GlobalAIAssistant({
     setInput("");
     setMessages([]);
     setLoading(false);
+    setCreditError(null);
   }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId]);
 
   useEffect(() => {
@@ -1215,6 +1202,14 @@ function GlobalAIAssistant({
     event.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
+    let reservationId: string;
+    try {
+      reservationId = credits.reserve("chat");
+      setCreditError(null);
+    } catch (error) {
+      setCreditError(error instanceof Error ? error.message : "积分不足，暂时无法提问。");
+      return;
+    }
     const history = messages.map((message) => ({
       content: message.text,
       role: message.role === "ai" ? "assistant" : "user"
@@ -1222,11 +1217,17 @@ function GlobalAIAssistant({
     setMessages((items) => [...items, { role: "user", text }]);
     setInput("");
     if (active === "community") {
-      const answer = answerCommunityCourseQuery(text);
-      setMessages((items) => [
-        ...items,
-        { courseIds: answer.courseIds, role: "ai", text: answer.text }
-      ]);
+      try {
+        const answer = answerCommunityCourseQuery(text);
+        credits.complete(reservationId);
+        setMessages((items) => [
+          ...items,
+          { courseIds: answer.courseIds, role: "ai", text: answer.text }
+        ]);
+      } catch (error) {
+        credits.refund(reservationId);
+        setCreditError(error instanceof Error ? error.message : "这次没有完成回答，积分已退还。");
+      }
       return;
     }
     setLoading(true);
@@ -1244,6 +1245,7 @@ function GlobalAIAssistant({
           key_concepts: activeLesson?.key_concepts.filter(Boolean).slice(0, 8) ?? []
         }
       });
+      credits.complete(reservationId);
       setMessages((items) => [
         ...items,
         {
@@ -1254,6 +1256,7 @@ function GlobalAIAssistant({
         }
       ]);
     } catch (error) {
+      credits.refund(reservationId);
       setMessages((items) => [
         ...items,
         {
@@ -1448,6 +1451,8 @@ function GlobalAIAssistant({
           originRef={dialogOriginRef}
           input={input}
           loading={loading}
+          creditBalance={credits.balance}
+          creditError={creditError}
           messages={messages}
           reducedMotion={reducedMotion}
           onOpenCitation={openCitationSource}
@@ -1507,6 +1512,8 @@ function AIAssistantDialog({
   originRef,
   input,
   loading,
+  creditBalance,
+  creditError,
   messages,
   reducedMotion,
   onOpenCitation,
@@ -1524,6 +1531,8 @@ function AIAssistantDialog({
   originRef: RefObject<HTMLButtonElement | null>;
   input: string;
   loading: boolean;
+  creditBalance: number;
+  creditError: string | null;
   messages: AiAssistantMessage[];
   reducedMotion: boolean;
   onOpenCitation: (citation: Citation) => void;
@@ -1751,6 +1760,7 @@ function AIAssistantDialog({
             <X size={18} aria-hidden="true" />
           </button>
         </div>
+        <p className={`ai-credit-summary ${creditError ? "error" : ""}`} role={creditError ? "alert" : undefined} aria-live="polite">{creditError ?? `剩余 ${creditBalance} 积分 · 每次提问消耗 ${creditCosts.chat} 积分`}</p>
         <div className="ai-dialog-scroll">
           <div className="ai-intro">
             <p>下拉查看历史对话</p>

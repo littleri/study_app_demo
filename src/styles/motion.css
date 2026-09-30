@@ -962,6 +962,52 @@
   }
 }
 
+/* The reader's region dialog: same presence contract as the other AI dialogs
+   (data-motion-state drives a named keyframe; the machine settles on end).
+   The enter/exit pair is a shared-element morph: the surface starts as the
+   circled rectangle — `--region-morph-*` carries the translate and scale that
+   land the dialog on that selection — and grows into its final box. */
+.source-region-ai[data-motion-state="entering"] {
+  animation: motion-region-ai-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.source-region-ai[data-motion-state="closing"] {
+  animation: motion-region-ai-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
+  pointer-events: none;
+}
+
+.source-region-ai[data-motion-state="idle"] {
+  animation: none;
+}
+
+@keyframes motion-region-ai-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--region-morph-x), var(--region-morph-y)) scale(var(--region-morph-scale-x), var(--region-morph-scale-y));
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+@keyframes motion-region-ai-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(var(--region-morph-x), var(--region-morph-y)) scale(var(--region-morph-scale-x), var(--region-morph-scale-y));
+  }
+}
+
 .ai-shared-surface,
 .ai-shared-origin-icon {
   position: absolute;
@@ -1125,6 +1171,33 @@
 
 .lesson-animation-surface[data-motion-state="idle"] {
   animation: none;
+}
+
+.lesson-animation-positioner[data-video-phase="revealing"] {
+  animation: lesson-video-player-reveal var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.lesson-video-loading-screen[data-video-phase="revealing"] {
+  animation: lesson-video-loading-recede var(--motion-duration-global) var(--motion-ease-global-exit) both;
+}
+
+.lesson-video-loading-screen[data-video-phase="revealing"] .lesson-video-loading-card {
+  animation: lesson-video-loading-card-recede var(--motion-duration-global) var(--motion-ease-global-exit) both;
+}
+
+@keyframes lesson-video-player-reveal {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes lesson-video-loading-recede {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes lesson-video-loading-card-recede {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-10px) scale(.97); }
 }
 
 @keyframes motion-dialog-lesson-animation-in {
@@ -2050,12 +2123,16 @@
   .sheet-scrim,
   .ai-overlay,
   .ai-overlay-scrim,
+  .source-region-ai,
   .ai-shared-surface,
   .ai-shared-origin-icon,
   .lesson-animation-scrim,
   .lesson-animation-surface,
   .lesson-animation-shared-surface,
   .lesson-animation-shared-origin,
+  .lesson-animation-positioner[data-video-phase="revealing"],
+  .lesson-video-loading-screen[data-video-phase="revealing"],
+  .lesson-video-loading-screen[data-video-phase="revealing"] .lesson-video-loading-card,
   .note-save-celebration-layer,
   .note-save-celebration-glow,
   .note-save-celebration-ring,

@@ -12,6 +12,7 @@ import "./styles/base.css";
 import "./styles/responsive.css";
 import "./styles/home.css";
 import "./styles/chapter-tools.css";
+import "./styles/study-notes.css";
 import "./styles/study.css";
 import "./styles/mistake-book.css";
 import "./styles/motion.css";
@@ -24,6 +25,7 @@ import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
 import "./styles/course-ready.css";
 import "./styles/profile.css";
+import "./styles/learning-sets.css";
 import "./styles/tablet.css";
 import "./styles/typography.css";
 

@@ -718,14 +718,23 @@ button:disabled {
   max-width: none;
 }
 
-/* Actual overlays may float, but use only the compact elevation token. */
-.sheet,
-.toast,
-.ai-overlay {
+/* Actual overlays may float. Dialogs share one silhouette — a white card with
+   no stroke and the dialog shadow — while a toast keeps the compact elevation. */
+.toast {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
   box-shadow: 0 4px 8px rgba(32, 38, 58, 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.sheet,
+.ai-overlay {
+  background: var(--color-surface);
+  border: 0;
+  border-radius: var(--dialog-radius);
+  box-shadow: var(--dialog-shadow);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }

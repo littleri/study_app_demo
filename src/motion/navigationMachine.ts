@@ -15,12 +15,12 @@ export type NavigationIntent =
   | { type: "source" }
   | { type: "replace"; screen: Screen };
 
-export function createInitialNavigation(): NavigationSnapshot {
+export function createInitialNavigation(initialScreen: Screen = "home"): NavigationSnapshot {
   return {
     direction: "replace",
     history: [],
     nonce: 0,
-    screen: "home"
+    screen: initialScreen
   };
 }
 

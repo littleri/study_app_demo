@@ -57,12 +57,11 @@ test.describe("lesson knowledge pagination", () => {
       await expect(sourceEntry).toHaveCSS("border-top-style", "none");
       await expect(sourceEntry).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await sourceEntry.click();
-      const sourceDialog = page.getByRole("dialog");
-      await expect(sourceDialog).toBeVisible();
-      await expect(sourceDialog).toContainText("查看原文");
-      await expect(sourceDialog.locator(".source-reference-sheet > .pill")).toBeVisible();
-      await sourceDialog.getByRole("button", { name: "关闭", exact: true }).click();
-      await expect(sourceDialog).toHaveCount(0);
+      await expect(page.locator(".source-reader-screen")).toBeVisible();
+      await expect(page.locator(".sheet[data-sheet-type='source']")).toHaveCount(0);
+      await expect(page.locator(".source-page-media img")).toBeVisible();
+      await page.locator(".header-bar .icon-button").click();
+      await expect(page.locator(".lesson-screen")).toBeVisible();
     };
     const pagerBounds = await pager.boundingBox();
     expect(pagerBounds).not.toBeNull();

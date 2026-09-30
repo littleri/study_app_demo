@@ -342,11 +342,32 @@ export type Citation = {
   source_metadata: Record<string, unknown>;
 };
 
+/**
+ * Pixels the reader circled on the textbook page.
+ *
+ * The reader crops the dashed rectangle and attaches it here, so a runtime that
+ * accepts image evidence receives exactly what the student selected. Text-only
+ * runtimes keep the page hint in `context.page_label` and ignore `data_url`.
+ */
+export type RagReferenceImage = {
+  data_url: string;
+  label: string;
+  page_label?: string | null;
+  /** Normalized inside the page image: 0–1 from its top-left corner. */
+  region?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+};
+
 export type RagQuery = {
   book_id: string;
   chapter_id?: string | null;
   question: string;
   history?: Array<Record<string, unknown>>;
+  reference_image?: RagReferenceImage;
   context?: {
     book_title?: string | null;
     chapter_title?: string | null;
