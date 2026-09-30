@@ -18,11 +18,11 @@ import {
   Card
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
-import { SkeletonReveal, useImageMotion, useLocalMotionItem, type LoadState } from "../motion";
+import { globalMotionFallbackMs, SkeletonReveal, useImageMotion, useLocalMotionItem, useMotionPresence, useReducedMotion, type LoadState } from "../motion";
 import { sourcePageImageUrl } from "./shared";
 import { InkAnnotationSurface } from "../features/studyNotes/InkAnnotationSurface";
 import { SourceRegionAiPanel, type RegionAiReference } from "../features/studyNotes/SourceRegionAiPanel";
-import { SourceTextNotePanel, type SourceTextNotePanelHandle } from "../features/studyNotes/SourceTextNotePanel";
+import { SourceTextNotePanel, sourceTextNoteAnimationNames, type SourceTextNotePanelHandle } from "../features/studyNotes/SourceTextNotePanel";
 import { SourceTextAnnotationLayer, type TextNoteLocation } from "../features/studyNotes/SourceTextAnnotationLayer";
 import { textNotePosition } from "../features/studyNotes/textAnnotations";
 import { captureRegionImage } from "../features/studyNotes/regionCapture";
@@ -36,11 +36,16 @@ import type { SourcePageTarget } from "../types/app";
 type ReaderNoteMode = "read" | "ink" | "text" | "ai";
 type TextNoteEditor = {
   key: string;
+  instanceId: number;
   anchor: NoteAnchor;
   existing?: TextStudyNote;
   location: TextNoteLocation;
   returnMode: "read" | "text";
 };
+
+function getTextEditorKey(editor: TextNoteEditor) {
+  return `${editor.key}:${editor.instanceId}`;
+}
 
 export function previousSourcePage(page: number) {
   return Math.max(1, Math.trunc(page) - 1);
@@ -77,6 +82,7 @@ export function SourceReaderScreen() {
   const [pageNotes, setPageNotes] = useState<StudyNote[]>([]);
   const [showPageNotes, setShowPageNotes] = useState(false);
   const [textEditor, setTextEditor] = useState<TextNoteEditor | null>(null);
+  const textEditorInstanceRef = useRef(0);
   const textPanelRef = useRef<SourceTextNotePanelHandle | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const switchingTextRef = useRef(false);
@@ -98,6 +104,15 @@ export function SourceReaderScreen() {
   const [fingerWrite, setFingerWrite] = useState(false);
   const [noteVersion, setNoteVersion] = useState(1);
   const [regionAsk, setRegionAsk] = useState<RegionAiReference | null>(null);
+  const reducedMotion = useReducedMotion();
+  const textEditorMotion = useMotionPresence<TextNoteEditor>({
+    requested: regionAsk ? null : textEditor,
+    getKey: getTextEditorKey,
+    reducedMotion,
+    motionNames: sourceTextNoteAnimationNames,
+    maxMotionMs: globalMotionFallbackMs
+  });
+  const renderedTextEditor = textEditorMotion.rendered;
   const [committedRegion, setCommittedRegion] = useState<PageRegion | null>(null);
   const [pipelinePhase, setPipelinePhase] = useState<NotePipelinePhase>("idle");
   const [recognizedText, setRecognizedText] = useState("");
@@ -155,6 +170,7 @@ export function SourceReaderScreen() {
       if (note?.kind === "text") {
         setTextEditor({
           key: note.id,
+          instanceId: ++textEditorInstanceRef.current,
           anchor: note.anchor ?? currentNoteAnchor(),
           existing: note,
           location: { position: note.position ?? { x: .5, y: .35 }, pageElement },
@@ -265,7 +281,7 @@ export function SourceReaderScreen() {
       setRegionAsk(null);
       setCommittedRegion(null);
       setShowPageNotes(false);
-      setTextEditor({ key: latestNote?.id ?? createStudyNoteId("text"), anchor: latestNote?.anchor ?? anchor, existing: latestNote, location, returnMode });
+      setTextEditor({ key: latestNote?.id ?? createStudyNoteId("text"), instanceId: ++textEditorInstanceRef.current, anchor: latestNote?.anchor ?? anchor, existing: latestNote, location, returnMode });
       setSelectedText("");
       setNoteMode("text");
       window.getSelection()?.removeAllRanges();
@@ -847,29 +863,30 @@ export function SourceReaderScreen() {
         onClosed={() => setCommittedRegion(null)}
       />
 
-      {textEditor && !regionAsk ? (
+      {renderedTextEditor ? (
           <SourceTextNotePanel
             ref={textPanelRef}
-            key={textEditor.key}
-            noteId={textEditor.key}
-            anchor={textEditor.anchor}
-            existing={textEditor.existing}
-            location={textEditor.location}
+            key={getTextEditorKey(renderedTextEditor)}
+            noteId={renderedTextEditor.key}
+            anchor={renderedTextEditor.anchor}
+            existing={renderedTextEditor.existing}
+            location={renderedTextEditor.location}
             workspaceRef={workspaceRef}
+            motion={textEditorMotion}
             onAskAi={(note) => {
-              const box = textEditor.location.pageElement.getBoundingClientRect();
-              setTextEditor({ ...textEditor, existing: note, key: note.id });
+              const box = renderedTextEditor.location.pageElement.getBoundingClientRect();
+              setTextEditor({ ...renderedTextEditor, existing: note, key: note.id, instanceId: ++textEditorInstanceRef.current });
               setRegionAsk({
                 kind: "text-note",
                 note,
                 label: `${heading.pageLabel} · 文字批注`,
-                origin: { left: box.left + textEditor.location.position.x * box.width - 12, top: box.top + textEditor.location.position.y * box.height - 12, width: 24, height: 24 }
+                origin: { left: box.left + renderedTextEditor.location.position.x * box.width - 12, top: box.top + renderedTextEditor.location.position.y * box.height - 12, width: 24, height: 24 }
               });
             }}
             onClose={() => {
               setTextEditor(null);
               setSelectedText("");
-              setNoteMode(textEditor.returnMode);
+              setNoteMode(renderedTextEditor.returnMode);
               workspaceRef.current?.querySelector<HTMLElement>(".source-page-frame")?.focus({ preventScroll: true });
             }}
           />

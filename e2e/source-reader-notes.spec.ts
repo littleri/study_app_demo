@@ -53,9 +53,123 @@ async function placeTextNote(page: Page, reader: Locator, x: number, y: number, 
   await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
   const editor = reader.getByRole("region", { name: "原文文字笔记" });
   await expect(editor.getByLabel("我的理解")).toBeFocused();
+  await expect(editor).toHaveAttribute("data-motion-state", "idle");
   await editor.getByLabel("我的理解").fill(body);
   return editor;
 }
+
+test.describe("text annotation popup motion", () => {
+  test.use({ reducedMotion: "no-preference" });
+
+  async function dispatchMotion(panel: Locator, type: "animationend" | "animationcancel", name: string) {
+    await panel.evaluate((element, event) => {
+      element.dispatchEvent(new AnimationEvent(event.type, { animationName: event.name, bubbles: true }));
+    }, { type, name });
+  }
+
+  test("keeps entry and exit generation-bound, grows from the annotation, and settles reduced motion directly", async ({ page }) => {
+    await page.setViewportSize({ width: 783, height: 1138 });
+    const { reader } = await openLessonSource(page);
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+    await page.addStyleTag({ content: ".source-text-note-popover { animation-play-state: paused !important; }" });
+    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+    const box = await target.boundingBox();
+    if (!box) throw new Error("The original page has no measurable annotation target");
+    const point = { x: box.x + box.width * .45, y: box.y + box.height * .4 };
+    await page.mouse.click(point.x, point.y);
+    const panel = reader.locator(".source-text-note-popover");
+    await expect(panel).toHaveAttribute("data-motion-state", "entering");
+    await expect(panel).toHaveCSS("animation-name", "motion-text-note-in");
+    await expect(panel).toHaveCSS("animation-duration", "0.35s");
+    await expect(panel.getByLabel("我的理解")).toBeFocused();
+    const origin = await panel.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const workspace = element.closest<HTMLElement>(".source-reader-workspace")!;
+      const area = workspace.getBoundingClientRect();
+      const scaleX = area.width / workspace.clientWidth;
+      const scaleY = area.height / workspace.clientHeight;
+      return {
+        x: area.left + (element.offsetLeft + Number.parseFloat(style.getPropertyValue("--text-note-morph-x")) + 12) * scaleX,
+        y: area.top + (element.offsetTop + Number.parseFloat(style.getPropertyValue("--text-note-morph-y")) + 12) * scaleY
+      };
+    });
+    expect(Math.abs(origin.x - point.x)).toBeLessThan(2);
+    expect(Math.abs(origin.y - point.y)).toBeLessThan(2);
+    await expect(panel).toHaveCSS("border-top-width", "0px");
+    await expect(panel).toHaveCSS("border-radius", "28px");
+    await expect(panel).not.toHaveCSS("box-shadow", "none");
+    await dispatchMotion(panel, "animationcancel", "motion-text-note-out");
+    await expect(panel).toHaveAttribute("data-motion-state", "entering");
+    await dispatchMotion(panel, "animationend", "motion-text-note-in");
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await panel.getByLabel("我的理解").fill("关闭前的最新批注也应保留。");
+    await panel.getByRole("button", { name: "完成", exact: true }).click();
+    await expect(panel).toHaveAttribute("data-motion-state", "closing");
+    await expect(panel).toHaveCSS("animation-name", "motion-text-note-out");
+    await expect(panel).toHaveAttribute("inert", "");
+    await expect(panel.locator("textarea")).toHaveValue("关闭前的最新批注也应保留。");
+    const closingPresence = Number(await panel.getAttribute("data-motion-presence"));
+    await dispatchMotion(panel, "animationcancel", "motion-text-note-in");
+    await expect(panel).toHaveAttribute("data-motion-state", "closing");
+    await reader.locator(".source-text-note-marker").click();
+    await expect(panel).toHaveAttribute("data-motion-state", "entering");
+    expect(Number(await panel.getAttribute("data-motion-presence"))).toBeGreaterThan(closingPresence);
+    await dispatchMotion(panel, "animationend", "motion-text-note-out");
+    await expect(panel).toHaveAttribute("data-motion-state", "entering");
+    await dispatchMotion(panel, "animationcancel", "motion-text-note-in");
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await panel.getByRole("button", { name: "关闭文字笔记" }).click();
+    await expect(panel).toHaveAttribute("data-motion-state", "closing");
+    await dispatchMotion(panel, "animationend", "motion-text-note-out");
+    await expect(panel).toHaveCount(0);
+    await reader.locator(".source-text-note-marker").click();
+    await expect(panel).toHaveAttribute("data-motion-state", "entering");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await expect(panel).toHaveCSS("animation-name", "none");
+    await panel.getByRole("button", { name: "关闭文字笔记" }).click();
+    await expect(panel).toHaveCount(0);
+    await reader.locator(".source-text-note-marker").click();
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await expect(panel).toHaveCSS("animation-name", "none");
+    await expect(panel.locator(".source-text-note-body")).toHaveText("关闭前的最新批注也应保留。");
+  });
+
+  test("finishes real popup animations on a phone and keeps the saved marker available", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { reader } = await openLessonSource(page);
+    await page.evaluate(() => {
+      const phases: Array<[string | undefined, string]> = [];
+      (window as unknown as { __textNoteMotion: typeof phases }).__textNoteMotion = phases;
+      new MutationObserver(() => {
+        const panel = document.querySelector<HTMLElement>(".source-text-note-popover");
+        if (panel) phases.push([panel.dataset.motionState, getComputedStyle(panel).animationName]);
+      }).observe(document.body, { attributes: true, attributeFilter: ["data-motion-state"], childList: true, subtree: true });
+    });
+    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    await placeTextNote(page, reader, .65, .42, "这里的同源染色体如何分离？");
+    const panel = reader.locator(".source-text-note-popover");
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await expect(panel).toHaveCSS("animation-name", "none");
+    await page.screenshot({ path: "output/text-note-popup-phone.png" });
+    await panel.getByRole("button", { name: "完成", exact: true }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
+    const phases = await page.evaluate(() => (window as unknown as { __textNoteMotion: Array<[string, string]> }).__textNoteMotion);
+    expect(phases).toContainEqual(["entering", "motion-text-note-in"]);
+    expect(phases).toContainEqual(["idle", "none"]);
+    expect(phases).toContainEqual(["closing", "motion-text-note-out"]);
+    await reader.locator(".source-text-note-marker").click();
+    await expect(panel).toHaveAttribute("data-motion-state", "idle");
+    await expect(panel.locator(".source-text-note-body")).toHaveText("这里的同源染色体如何分离？");
+    await page.screenshot({ path: "output/text-note-popup-phone-saved.png" });
+    await panel.getByRole("button", { name: "删除批注" }).click();
+    await expect(panel).toHaveCount(0);
+    await expect(reader.locator(".source-text-note-marker")).toHaveCount(0);
+  });
+});
 
 test("anchors selected text on the original page and reopens it for reading and editing", async ({ page }) => {
   await page.setViewportSize({ width: 761, height: 1138 });
@@ -177,6 +291,7 @@ test("keeps touch swipes distinct from taps and fits the editor at a phone page 
   });
   const editor = reader.getByRole("region", { name: "原文文字笔记" });
   await expect(editor.getByLabel("我的理解")).toBeFocused();
+  await expect(editor).toHaveAttribute("data-motion-state", "idle");
   const fit = await editor.evaluate((element) => {
     const box = element.getBoundingClientRect();
     const area = element.closest(".source-reader-workspace")!.getBoundingClientRect();

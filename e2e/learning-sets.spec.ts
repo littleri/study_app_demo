@@ -9,7 +9,7 @@ async function openActiveSet(page: import("playwright/test").Page) {
   return current;
 }
 
-async function createFirstSet(page: import("playwright/test").Page) {
+async function openFirstSetDirectory(page: import("playwright/test").Page) {
   await page.goto("/");
   const current = page.locator('.motion-screen-surface[data-motion-surface="current"]');
   await expect(current.getByRole("heading", { name: "我们怎么称呼你" })).toBeVisible();
@@ -51,11 +51,33 @@ async function createFirstSet(page: import("playwright/test").Page) {
     await current.getByRole("button", { name: index === 5 ? "完成问卷，查看课程目录" : "下一页" }).click();
   }
   await expect(current.getByRole("button", { name: "确认生成课程" })).toBeVisible();
+  return current;
+}
+
+async function createFirstSet(page: import("playwright/test").Page) {
+  const current = await openFirstSetDirectory(page);
   await page.goto("/");
   await expect(current.getByRole("heading", { name: "我的学习集" })).toHaveCount(0);
   await expect(current.getByRole("button", { name: "创建学习集" })).toBeVisible();
   return current;
 }
+
+test("keeps directory editing as an icon and removes the learning-set selector from generated course completion", async ({ page }) => {
+  await page.setViewportSize({ width: 783, height: 1138 });
+  const current = await openFirstSetDirectory(page);
+  const edit = current.locator(".toc-edit-button").first();
+  await expect(edit).toHaveText("");
+  await expect(edit.locator("svg")).toBeVisible();
+  await expect(edit).toHaveAttribute("aria-label", /^编辑 /);
+  await page.screenshot({ path: "output/chapter-confirm-icon-only.png" });
+  await current.getByRole("button", { name: "确认生成课程" }).click();
+  await expect(current.locator(".course-ready-screen")).toBeVisible({ timeout: 12_000 });
+  await expect(current.getByRole("button", { name: "进入学习", exact: true })).toBeEnabled();
+  await expect(current.getByRole("button", { name: "查看学习计划", exact: true })).toBeVisible();
+  await expect(current.locator(".course-ready-actions .learning-course-join-select")).toHaveCount(0);
+  await expect(current.locator(".course-ready-actions select")).toHaveCount(0);
+  await page.screenshot({ path: "output/course-ready-without-set-selector.png" });
+});
 
 test("first use creates a set and survives reload", async ({ page }) => {
   const current = await createFirstSet(page);

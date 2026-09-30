@@ -177,9 +177,3 @@
 .chapter-confirm-directory .toc-depth-3 > .toc-entry {
   padding-left: 0.5rem;
 }
-
-@media (max-width: 767px), (max-height: 599px) {
-  .chapter-confirm-directory .toc-edit-button > span {
-    display: none;
-  }
-}

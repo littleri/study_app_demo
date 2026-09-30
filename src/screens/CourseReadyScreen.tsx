@@ -8,7 +8,6 @@ import {
   Metric
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
-import { AddCourseToSetControl } from "../features/learningSets/HomeScreens";
 import {
   globalEmphasisMotionDurationMs,
   localMotionMaxMs,
@@ -298,7 +297,6 @@ export function CourseReadyScreen() {
         go("study");
       }}
       onViewPlan={() => go("plan")}
-      joinControl={<AddCourseToSetControl bookId={uploadedFile.bookId} />}
       ragChunkCount={parsedChunks?.length ?? 0}
       statusTitle="生成成功"
       focused

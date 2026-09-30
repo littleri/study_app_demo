@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from "react";
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type Ref, type RefObject } from "react";
 import { Check, MessageSquareText, Pencil, Sparkles, Trash2, X } from "lucide-react";
+import type { MotionAnimationEvent, MotionPresence } from "../../motion";
 import { deleteStudyNote, updateTextStudyNote } from "./repository";
 import type { NoteAnchor, TextStudyNote } from "./types";
 import type { TextNoteLocation } from "./SourceTextAnnotationLayer";
 
 export type SourceTextNotePanelHandle = { save: () => Promise<TextStudyNote | undefined> };
+export const sourceTextNoteAnimationNames = ["motion-text-note-in", "motion-text-note-out"] as const;
+
+type TextNoteMotion = Pick<MotionPresence<unknown>, "state" | "presenceId" | "onAnimationEnd" | "onAnimationCancel">;
 
 const saveError = "保存失败，内容仍保留在编辑区，请重试。";
 
@@ -14,6 +18,7 @@ export function SourceTextNotePanel({
   noteId,
   location,
   workspaceRef,
+  motion,
   ref,
   onAskAi,
   onClose
@@ -23,6 +28,7 @@ export function SourceTextNotePanel({
   noteId: string;
   location: TextNoteLocation;
   workspaceRef: RefObject<HTMLDivElement | null>;
+  motion: TextNoteMotion;
   ref?: Ref<SourceTextNotePanelHandle>;
   onAskAi: (note: TextStudyNote) => void;
   onClose: () => void;
@@ -46,7 +52,23 @@ export function SourceTextNotePanel({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(existing ? "已保存" : "自动保存");
   const [error, setError] = useState("");
-  const [placement, setPlacement] = useState({ left: 8, top: 8, width: 320, maxHeight: 400 });
+  const [placement, setPlacement] = useState({ left: 8, top: 8, width: 320, maxHeight: 400, morphX: 0, morphY: 0, scaleX: .94, scaleY: .94 });
+  const isClosing = motion.state === "closing";
+  const controlsDisabled = busy || isClosing;
+
+  const settleAnimation = (event: MotionAnimationEvent, settle: TextNoteMotion["onAnimationEnd"]) => {
+    const expected = motion.state === "entering" ? sourceTextNoteAnimationNames[0]
+      : isClosing ? sourceTextNoteAnimationNames[1] : null;
+    if (event.animationName === expected) settle(event);
+  };
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const handleCancel = (event: AnimationEvent) => settleAnimation(event, motion.onAnimationCancel);
+    panel.addEventListener("animationcancel", handleCancel);
+    return () => panel.removeEventListener("animationcancel", handleCancel);
+  });
 
   const persist = useCallback((content: string) => {
     if (!content.trim() && !lastSavedNoteRef.current) return Promise.resolve(undefined);
@@ -124,6 +146,7 @@ export function SourceTextNotePanel({
   }, [persist]);
 
   useEffect(() => {
+    if (isClosing) return;
     const handleBack = (event: Event) => {
       if (event.defaultPrevented) return;
       event.preventDefault();
@@ -131,21 +154,22 @@ export function SourceTextNotePanel({
     };
     window.addEventListener("bookcourse:native-back", handleBack);
     return () => window.removeEventListener("bookcourse:native-back", handleBack);
-  }, [requestClose]);
+  }, [isClosing, requestClose]);
 
   useEffect(() => {
+    if (isClosing) return;
     if (editing) inputRef.current?.focus({ preventScroll: true });
     else panelRef.current?.focus({ preventScroll: true });
-  }, [editing]);
+  }, [editing, isClosing, motion.presenceId]);
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
     const workspace = workspaceRef.current;
-    if (!panel || !workspace) return;
+    if (!panel || !workspace || isClosing) return;
     const update = () => {
       const area = workspace.getBoundingClientRect();
       const page = location.pageElement.getBoundingClientRect();
-      if (!area.width || !area.height) return;
+      if (!area.width || !area.height || !location.pageElement.isConnected) return;
       const scaleX = area.width / Math.max(1, workspace.clientWidth);
       const scaleY = area.height / Math.max(1, workspace.clientHeight);
       const x = (page.left + location.position.x * page.width - area.left) / scaleX;
@@ -159,8 +183,15 @@ export function SourceTextNotePanel({
       const left = Math.max(8, Math.min(workspace.clientWidth - width - 8, x + width + 20 <= workspace.clientWidth ? x + 16 : x - width - 16));
       const idealTop = y + height + 24 <= visibleBottom ? y + 20 : y - height - 20;
       const top = Math.max(visibleTop + 8, Math.min(visibleBottom - height - 8, idealTop));
+      // The same shared-element motion as the reader's AI popup, starting at
+      // the small annotation icon. Layout sizes stay stable during transforms.
+      const morphX = x - 12 - left;
+      const morphY = y - 12 - top;
+      const morphScaleX = 24 / Math.max(1, width);
+      const morphScaleY = 24 / Math.max(1, height);
       setPlacement((current) => current.left === left && current.top === top && current.width === width && current.maxHeight === maxHeight
-        ? current : { left, top, width, maxHeight });
+        && current.morphX === morphX && current.morphY === morphY && current.scaleX === morphScaleX && current.scaleY === morphScaleY
+        ? current : { left, top, width, maxHeight, morphX, morphY, scaleX: morphScaleX, scaleY: morphScaleY });
     };
     const observer = new ResizeObserver(update);
     observer.observe(workspace);
@@ -176,7 +207,7 @@ export function SourceTextNotePanel({
       window.visualViewport?.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("scroll", update);
     };
-  }, [location, workspaceRef]);
+  }, [isClosing, location, workspaceRef]);
 
   async function askAi() {
     if (closingRef.current || !body.trim()) return;
@@ -216,9 +247,23 @@ export function SourceTextNotePanel({
       ref={panelRef}
       className="source-inline-note-panel source-text-note-popover"
       aria-label="原文文字笔记"
+      aria-busy={controlsDisabled}
       tabIndex={-1}
+      inert={isClosing}
       data-editing={editing}
-      style={placement}
+      data-motion-state={motion.state}
+      data-motion-presence={motion.presenceId}
+      style={{
+        left: placement.left,
+        top: placement.top,
+        width: placement.width,
+        maxHeight: placement.maxHeight,
+        "--text-note-morph-x": `${placement.morphX}px`,
+        "--text-note-morph-y": `${placement.morphY}px`,
+        "--text-note-morph-scale-x": placement.scaleX,
+        "--text-note-morph-scale-y": placement.scaleY
+      } as CSSProperties}
+      onAnimationEnd={(event) => settleAnimation(event, motion.onAnimationEnd)}
       onKeyDown={(event) => {
         if (event.key === "Escape" || (editing && (event.metaKey || event.ctrlKey) && event.key === "Enter")) {
           event.preventDefault();
@@ -230,7 +275,7 @@ export function SourceTextNotePanel({
         <MessageSquareText size={17} aria-hidden="true" />
         <strong>文字批注</strong>
         <span role="status">{status}</span>
-        <button type="button" aria-label="关闭文字笔记" disabled={busy} onClick={() => void requestClose()}><X size={18} aria-hidden="true" /></button>
+        <button type="button" aria-label="关闭文字笔记" disabled={controlsDisabled} onClick={() => void requestClose()}><X size={18} aria-hidden="true" /></button>
       </header>
       <small>{anchor.chapterTitle ?? anchor.bookTitle ?? "教材原文"} · 第 {anchor.printedPageStart ?? anchor.pageStart} 页</small>
       {anchor.quote ? <blockquote>{anchor.quote}</blockquote> : null}
@@ -240,22 +285,22 @@ export function SourceTextNotePanel({
           <textarea
             ref={inputRef}
             value={body}
-            disabled={busy}
+            disabled={controlsDisabled}
             placeholder="在这里写下理解、疑问或联想…"
             onChange={(event) => { setBody(event.target.value); setStatus("未保存"); }}
           />
         </label>
       ) : <p className="source-text-note-body">{body}</p>}
       {error ? <p className="source-note-error" role="alert">{error}</p> : null}
-      {error ? <button className="source-note-retry" type="button" disabled={busy} onClick={() => void persist(bodyRef.current).catch(() => undefined)}>重试保存</button> : null}
+      {error ? <button className="source-note-retry" type="button" disabled={controlsDisabled} onClick={() => void persist(bodyRef.current).catch(() => undefined)}>重试保存</button> : null}
       <footer className="source-text-note-actions">
-        <button className="source-text-note-delete" type="button" aria-label="删除批注" disabled={busy} onClick={() => void remove()}><Trash2 size={17} aria-hidden="true" /></button>
+        <button className="source-text-note-delete" type="button" aria-label="删除批注" disabled={controlsDisabled} onClick={() => void remove()}><Trash2 size={17} aria-hidden="true" /></button>
         {editing ? (
-          <button type="button" disabled={busy} onClick={() => void requestClose()}><Check size={16} aria-hidden="true" />完成</button>
+          <button type="button" disabled={controlsDisabled} onClick={() => void requestClose()}><Check size={16} aria-hidden="true" />完成</button>
         ) : (
-          <button type="button" disabled={busy} onClick={() => setEditing(true)}><Pencil size={16} aria-hidden="true" />编辑批注</button>
+          <button type="button" disabled={controlsDisabled} onClick={() => setEditing(true)}><Pencil size={16} aria-hidden="true" />编辑批注</button>
         )}
-        <button className="source-text-note-ai" type="button" disabled={busy || !body.trim()} onClick={() => void askAi()}><Sparkles size={16} aria-hidden="true" />问 AI</button>
+        <button className="source-text-note-ai" type="button" disabled={controlsDisabled || !body.trim()} onClick={() => void askAi()}><Sparkles size={16} aria-hidden="true" />问 AI</button>
       </footer>
     </section>
   );

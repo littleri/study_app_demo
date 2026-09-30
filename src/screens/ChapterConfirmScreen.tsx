@@ -298,7 +298,6 @@ function ChapterDirectoryNode({
           onClick={() => onEdit(chapterId, evidenceByChapter.get(chapterId))}
         >
           <PencilLine size={14} aria-hidden="true" />
-          <span>编辑</span>
         </button>
       </div>
 

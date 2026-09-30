@@ -1173,6 +1173,49 @@
   animation: none;
 }
 
+/* Text annotations use the same timing, curves and shared-element expansion
+   as the reader's region dialog, with the annotation icon as their origin. */
+.source-text-note-popover[data-motion-state="entering"] {
+  animation: motion-text-note-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
+}
+
+.source-text-note-popover[data-motion-state="closing"] {
+  animation: motion-text-note-out var(--motion-duration-global) var(--motion-ease-global-exit) both;
+  pointer-events: none;
+}
+
+.source-text-note-popover[data-motion-state="idle"] {
+  animation: none;
+}
+
+@keyframes motion-text-note-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--text-note-morph-x), var(--text-note-morph-y)) scale(var(--text-note-morph-scale-x), var(--text-note-morph-scale-y));
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+}
+
+@keyframes motion-text-note-out {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1, 1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(var(--text-note-morph-x), var(--text-note-morph-y)) scale(var(--text-note-morph-scale-x), var(--text-note-morph-scale-y));
+  }
+}
+
 .lesson-animation-positioner[data-video-phase="revealing"] {
   animation: lesson-video-player-reveal var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
@@ -2124,6 +2167,7 @@
   .ai-overlay,
   .ai-overlay-scrim,
   .source-region-ai,
+  .source-text-note-popover,
   .ai-shared-surface,
   .ai-shared-origin-icon,
   .lesson-animation-scrim,
