@@ -169,7 +169,8 @@
   border-radius: 999px;
 }
 
-.parse-ready-actions {
+.community-detail-actions.parse-ready-actions {
+  grid-template-columns: minmax(0, 1fr);
   background: transparent;
 }
 
@@ -220,6 +221,22 @@
   .parse-ready-summary {
     margin-top: -2.5rem;
     padding-top: 9rem;
+  }
+}
+
+@media (max-width: 767px), (max-height: 599px) {
+  .parse-ready-summary {
+    padding-bottom: 1rem;
+  }
+
+  .community-detail-actions.parse-ready-actions {
+    position: static;
+    bottom: auto;
+    left: auto;
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 1rem var(--space-inline) calc(1rem + var(--safe-area-bottom));
+    transform: none;
   }
 }
 

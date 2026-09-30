@@ -38,6 +38,12 @@
   background: transparent;
 }
 
+.screen-content[data-screen="upload"] > .motion-screen-transition {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+}
+
 .screen-content[data-screen="upload"] > .motion-screen-transition,
 .screen-content[data-screen="upload"] .motion-screen-surface,
 .screen-content[data-screen="upload"] .upload-flow-screen {

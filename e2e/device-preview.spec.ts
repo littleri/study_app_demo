@@ -129,12 +129,12 @@ test.describe("device preview studio", () => {
     expect(statusBarGeometry.batteryCap?.width).toBeCloseTo(1.328, 1);
     expect(statusBarGeometry.batteryCap?.height).toBeCloseTo(4.075, 1);
     expect(statusBarGeometry.batteryLevel).toMatchObject({ y: 28, width: 21, height: 9 });
-    expect(statusBarGeometry.typography.fontFamily).toContain("SF Pro");
+    expect(statusBarGeometry.typography.fontFamily).toContain("Noto Sans SC");
     expect(statusBarGeometry.typography).toMatchObject({
-      fontSize: "17px",
-      fontWeight: "590",
-      lineHeight: "22px"
+      fontSize: "14px",
+      fontWeight: "590"
     });
+    expect(Number.parseFloat(statusBarGeometry.typography.lineHeight)).toBeCloseTo(16.8, 1);
 
     await page.getByTestId("device-preview-orientation-landscape").click();
     await expect.poll(async () => {
@@ -142,7 +142,8 @@ test.describe("device preview studio", () => {
       return frame ? await frame.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth })) : null;
     }).toEqual({ height: 402, width: 874 });
     await page.getByTestId("device-preview-device-ipad-pro-11").click();
-    await page.getByTestId("device-preview-orientation-portrait").click();
+    await expect(page.getByTestId("device-preview-orientation-portrait")).toHaveAttribute("aria-pressed", "true");
+    await expect(page).toHaveURL(/orientation=portrait/);
     await expect.poll(async () => {
       const frame = page.frames().find((candidate) => candidate.url().includes("embedded=device-preview"));
       return frame ? await frame.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth })) : null;
@@ -188,7 +189,7 @@ test.describe("device preview studio", () => {
     await expect(assistant.getByRole("textbox", { name: "向 AI 助手提问" })).toHaveValue("唯一设备状态文本");
     await expect.poll(() => innerMain.evaluate((element) => element.isConnected)).toBe(true);
     await expect(embeddedFrame.locator(".app-shell")).toHaveAttribute("data-device-layout", "pad");
-    await expect(embeddedFrame.locator("[data-testid='ios-status-bar']")).toBeHidden();
+    await expect(embeddedFrame.locator("[data-testid='ios-status-bar']")).toBeVisible();
     await expect(embeddedFrame.locator(".home-indicator")).toBeHidden();
     await expect(embeddedFrame.locator(".primary-nav")).toBeVisible();
     await expect(embeddedFrame.locator(".primary-nav .nav-item")).toHaveCount(4);
@@ -386,11 +387,85 @@ test.describe("device preview studio", () => {
     await expect(page.getByTestId("device-preview-frame")).toHaveAttribute("data-orientation", "landscape");
 
     await page.getByTestId("device-preview-device-ipad-pro-11").click();
-    await page.getByTestId("device-preview-orientation-portrait").click();
+    await expect(page.getByTestId("device-preview-orientation-portrait")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("device-preview-bezel")).toHaveCount(0);
     await expect(page.getByTestId("device-preview-hardware-controls")).toHaveCount(0);
     await expect(page.getByTestId("device-preview-dynamic-island")).toHaveCount(0);
+    await expect(page.getByTestId("device-preview-ipad-shell")).toBeVisible();
+    await expect(page.getByTestId("device-preview-ipad-camera")).toBeVisible();
     await expect(page.getByTestId("device-preview-frame")).toHaveAttribute("data-device", "ipad-pro-11");
+  });
+
+  test("renders the iPad shell around the same screen in portrait and landscape", async ({ page }) => {
+    await page.goto("/?preview=device-preview&device=ipad-pro-11&orientation=portrait&quality=fit");
+
+    const embeddedFrame = page.frameLocator("iframe.device-preview-iframe");
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toBeVisible();
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toHaveCSS("height", "24px");
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    await expect(embeddedFrame.locator(".ios-status-bar__time")).toHaveText("9:41");
+    await expect(embeddedFrame.locator(".ios-status-bar__cellular")).toBeVisible();
+    await expect(embeddedFrame.locator(".ios-status-bar__wifi")).toBeVisible();
+    await expect(embeddedFrame.locator(".ios-status-bar__battery")).toBeVisible();
+
+    const shell = page.getByTestId("device-preview-ipad-shell");
+    const camera = page.getByTestId("device-preview-ipad-camera");
+    const controls = page.getByTestId("device-preview-ipad-controls");
+    await expect(shell).toBeVisible();
+    await expect(camera).toBeVisible();
+    await expect(controls.locator(".device-preview-ipad-control")).toHaveCount(3);
+    await expect(shell).toHaveAttribute("aria-hidden", "true");
+    await expect(camera).toHaveAttribute("aria-hidden", "true");
+
+    const measure = () => page.evaluate(() => {
+      const area = document.querySelector<HTMLElement>("[data-testid='device-preview-canvas-area']");
+      const frame = document.querySelector<HTMLElement>("[data-testid='device-preview-frame']");
+      const shell = document.querySelector<HTMLElement>("[data-testid='device-preview-ipad-shell']");
+      const camera = document.querySelector<HTMLElement>("[data-testid='device-preview-ipad-camera']");
+      if (!area || !frame || !shell || !camera) return null;
+      const areaRect = area.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      const shellRect = shell.getBoundingClientRect();
+      const cameraRect = camera.getBoundingClientRect();
+      return {
+        area: { left: areaRect.left, right: areaRect.right, top: areaRect.top, bottom: areaRect.bottom },
+        frame: { left: frameRect.left, right: frameRect.right, top: frameRect.top, bottom: frameRect.bottom, width: frameRect.width, height: frameRect.height },
+        shell: { left: shellRect.left, right: shellRect.right, top: shellRect.top, bottom: shellRect.bottom, width: shellRect.width, height: shellRect.height },
+        camera: { x: cameraRect.left + cameraRect.width / 2, y: cameraRect.top + cameraRect.height / 2 }
+      };
+    });
+
+    await expect.poll(async () => (await measure())?.frame.width).toBeGreaterThan(500);
+    const portrait = await measure();
+    if (!portrait) throw new Error("iPad portrait shell did not mount");
+    const portraitScale = portrait.frame.width / 834;
+    expect(portrait.shell.width).toBeCloseTo(portrait.frame.width + 48 * portraitScale, 1);
+    expect(portrait.shell.height).toBeCloseTo(portrait.frame.height + 48 * portraitScale, 1);
+    expect(portrait.camera.x).toBeGreaterThan(portrait.frame.right);
+    expect(portrait.camera.y).toBeCloseTo((portrait.frame.top + portrait.frame.bottom) / 2, 0);
+    expect(portrait.shell.left).toBeGreaterThanOrEqual(portrait.area.left);
+    expect(portrait.shell.right).toBeLessThanOrEqual(portrait.area.right);
+    expect(portrait.shell.top).toBeGreaterThanOrEqual(portrait.area.top);
+    expect(portrait.shell.bottom).toBeLessThanOrEqual(portrait.area.bottom);
+
+    await page.getByTestId("device-preview-orientation-landscape").click();
+    await expect(shell).toBeVisible();
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toBeVisible();
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toHaveCSS("height", "24px");
+    await expect(embeddedFrame.getByTestId("ios-status-bar")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+    const landscape = await measure();
+    if (!landscape) throw new Error("iPad landscape shell did not mount");
+    expect(landscape.camera.y).toBeLessThan(landscape.frame.top);
+    expect(landscape.camera.x).toBeCloseTo((landscape.frame.left + landscape.frame.right) / 2, 0);
+    await expect.poll(async () => {
+      const frame = page.frames().find((candidate) => candidate.url().includes("embedded=device-preview"));
+      return frame ? await frame.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth })) : null;
+    }).toEqual({ height: 834, width: 1194 });
+
+    await page.goto("/?preview=device-preview&device=ipad-pro-11&orientation=landscape&quality=fit&chrome=0");
+    await expect(shell).toBeHidden();
+    await expect(camera).toBeHidden();
+    await expect(controls).toBeHidden();
   });
 
   test("keeps Fit inside the dynamic viewport and announces the final resized geometry", async ({ page }) => {

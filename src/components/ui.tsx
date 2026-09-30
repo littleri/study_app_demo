@@ -1,16 +1,24 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
   ArrowLeft,
   BookOpenCheck,
   Bot,
+  CalendarDays,
   CheckCircle2,
   ChevronRight,
+  ClipboardCheck,
   FileText,
   Home,
+  Layers3,
+  ListChecks,
   Loader2,
   MessageCircle,
+  NotebookPen,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
   SendHorizontal,
   Upload,
   User,
@@ -260,13 +268,31 @@ function DiscoveryCompassIcon({
   );
 }
 
-export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen) => void }) {
+export function PrimaryNav({
+  active,
+  expanded,
+  go,
+  onToggleExpanded
+}: {
+  active: Screen;
+  expanded: boolean;
+  go: (screen: Screen) => void;
+  onToggleExpanded: () => void;
+}) {
   const navRef = useRef<HTMLElement>(null);
   const selectionRef = useRef<HTMLSpanElement>(null);
   const previousActiveIndexRef = useRef<number | null>(null);
   const previousLayoutVersionRef = useRef(0);
+  const previousExpandedRef = useRef(expanded);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const reducedMotion = useReducedMotion();
+  const { courseSummaries, loadedBookId, openSheet, uploadedFile } = useAppContext();
+  const isStudyActive = active === "study" || active === "book";
+  const currentCourse = courseSummaries.find((course) => course.book_id === loadedBookId);
+  const currentCourseTitle = currentCourse?.title
+    ?? (uploadedFile?.bookId === loadedBookId ? uploadedFile.name : null)
+    ?? "尚未选择教材";
+  const hasCurrentCourse = Boolean(loadedBookId && (currentCourse || uploadedFile?.bookId === loadedBookId));
   const items = [
     {
       screen: "home" as Screen,
@@ -287,6 +313,13 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
       active: active === "community" || active === "communityBook" || active === "communityImport"
     },
     { screen: "profile" as Screen, label: "我的", icon: User, active: active === "profile" }
+  ];
+  const studyLinks = [
+    { screen: "plan" as Screen, label: "学习计划", icon: CalendarDays },
+    { screen: "flashcards" as Screen, label: "闪卡复习", icon: Layers3 },
+    { screen: "assignment" as Screen, label: "作业练习", icon: ClipboardCheck },
+    { screen: "mistakes" as Screen, label: "错题集", icon: ListChecks },
+    { screen: "notes" as Screen, label: "导学笔记", icon: NotebookPen }
   ];
   const activeIndex = Math.max(0, items.findIndex((item) => item.active));
 
@@ -312,7 +345,8 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
     const target = navigation?.querySelector<HTMLElement>(`[data-nav-index="${activeIndex}"]`);
     if (!navigation || !selection || !target) return;
 
-    const layoutChanged = previousLayoutVersionRef.current !== layoutVersion;
+    const layoutChanged = previousLayoutVersionRef.current !== layoutVersion
+      || previousExpandedRef.current !== expanded;
     const canAnimate = previousActiveIndexRef.current !== null
       && previousActiveIndexRef.current !== activeIndex
       && !layoutChanged
@@ -351,37 +385,91 @@ export function PrimaryNav({ active, go }: { active: Screen; go: (screen: Screen
 
     previousActiveIndexRef.current = activeIndex;
     previousLayoutVersionRef.current = layoutVersion;
-  }, { dependencies: [activeIndex, layoutVersion, reducedMotion], scope: navRef });
+    previousExpandedRef.current = expanded;
+  }, { dependencies: [activeIndex, expanded, layoutVersion, reducedMotion], scope: navRef });
 
   return (
     <nav
       ref={navRef}
       className="primary-nav glass-nav"
       data-active-index={activeIndex}
+      data-expanded={expanded ? "true" : "false"}
       data-lg-variant="prominent"
       aria-label="主导航"
     >
       <span ref={selectionRef} className="nav-selection" aria-hidden="true" />
+      <div className="nav-topbar">
+        <span className="nav-brand">
+          <span className="nav-brand-mark"><img src="/assets/brand/sidebar-cloud-icon.png" alt="" /></span>
+          <span className="nav-brand-name">BookCourse AI</span>
+        </span>
+        <button
+          className="nav-expand-toggle"
+          type="button"
+          aria-label={expanded ? "收起侧边栏" : "展开侧边栏"}
+          aria-expanded={expanded}
+          title={expanded ? "收起侧边栏" : "展开侧边栏"}
+          onClick={onToggleExpanded}
+        >
+          {expanded ? <PanelLeftClose size={20} aria-hidden="true" /> : <PanelLeftOpen size={20} aria-hidden="true" />}
+        </button>
+      </div>
       {items.map((item, index) => {
         const Icon = item.icon;
         return (
-          <button
-            key={item.screen}
-            className={`nav-item ${item.active ? "active" : ""} ${item.screen === "study" ? "nav-study" : ""}`}
-            type="button"
-            aria-current={item.active ? "page" : undefined}
-            data-nav-index={index}
-            data-motion-active={item.active ? "true" : "false"}
-            data-motion-nav-kind="standard"
-            onClick={() => go(item.screen)}
-          >
-            <span className="nav-icon">
-              <span className="nav-icon-motion">
-                <Icon size={22} aria-hidden="true" />
+          <Fragment key={item.screen}>
+            <button
+              className={`nav-item ${item.active ? "active" : ""} ${item.screen === "study" ? "nav-study" : ""}`}
+              type="button"
+              aria-label={item.label}
+              title={item.label}
+              aria-current={item.active ? "page" : undefined}
+              data-nav-index={index}
+              data-motion-active={item.active ? "true" : "false"}
+              data-motion-nav-kind="standard"
+              onClick={() => go(item.screen)}
+            >
+              <span className="nav-icon">
+                <span className="nav-icon-motion">
+                  <Icon size={22} aria-hidden="true" />
+                </span>
               </span>
-            </span>
-            <span className="nav-label">{item.label}</span>
-          </button>
+              <span className="nav-label">{item.label}</span>
+            </button>
+            {item.screen === "study" && expanded && isStudyActive ? (
+              <section className="nav-study-context" aria-label="当前课程与学习工具">
+                <div className="nav-course-row">
+                  <span className="nav-course-mark" aria-hidden="true"><BookOpenCheck size={19} /></span>
+                  <span className="nav-course-title" title={currentCourseTitle}>{currentCourseTitle}</span>
+                  <button
+                    className="nav-course-switch"
+                    type="button"
+                    aria-label={hasCurrentCourse ? `切换教材，当前课程：${currentCourseTitle}` : "选择教材"}
+                    title={hasCurrentCourse ? "切换教材" : "选择教材"}
+                    onClick={() => {
+                      if (courseSummaries.length > 0) openSheet({ type: "bookSwitcher" });
+                      else go("upload");
+                    }}
+                  >
+                    <RefreshCw size={17} aria-hidden="true" />
+                  </button>
+                </div>
+                {hasCurrentCourse ? (
+                  <div className="nav-study-links">
+                    {studyLinks.map((link) => {
+                      const LinkIcon = link.icon;
+                      return (
+                        <button className="nav-context-link" key={link.screen} type="button" onClick={() => go(link.screen)}>
+                          <LinkIcon size={17} aria-hidden="true" />
+                          <span>{link.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
+          </Fragment>
         );
       })}
     </nav>
@@ -430,8 +518,11 @@ export function AppShell({
   hideNav?: boolean;
 }) {
   const deviceLayout = useDeviceLayout();
+  const [navExpanded, setNavExpanded] = useState(false);
+  const isNavExpanded = deviceLayout === "pad" && navExpanded;
   const runtimePlatform = getRuntimePlatform();
   const isNativeAndroid = runtimePlatform === "android";
+  const isEmbeddedPreview = new URLSearchParams(window.location.search).get("embedded") === "device-preview";
   const mouseDragScroll = useMouseDragScroll({
     enableVerticalMomentum: !motionReduced && (active === "study" || active === "book" || active === "community"),
     momentumScopeKey: active
@@ -500,7 +591,7 @@ export function AppShell({
   // stable sibling of that replaceable layer so rapid boundary resizes never
   // create a window where the navigation element has been replaced.
   const deviceChrome = deviceLayout === "pad" ? (
-    <PadChrome />
+    <PadChrome>{isEmbeddedPreview && !isNativeAndroid ? <IosStatusBar /> : null}</PadChrome>
   ) : (
     <PhoneChrome>
       {isNativeAndroid ? null : (
@@ -521,6 +612,8 @@ export function AppShell({
         aria-label="BookCourse AI 应用"
         data-active-screen={active}
         data-device-layout={deviceLayout}
+        data-nav-expanded={isNavExpanded ? "true" : "false"}
+        data-embedded-preview={isEmbeddedPreview ? "true" : "false"}
         data-runtime-platform={runtimePlatform}
         data-motion-reduced={motionReduced ? "true" : "false"}
         data-mouse-dragging={mouseDragScroll.dragging ? "true" : "false"}
@@ -547,7 +640,14 @@ export function AppShell({
             reducedMotion={motionReduced}
           />
         ) : null}
-        {!hideNav ? <PrimaryNav active={active} go={go} /> : null}
+        {!hideNav ? (
+          <PrimaryNav
+            active={active}
+            expanded={isNavExpanded}
+            go={go}
+            onToggleExpanded={() => setNavExpanded((value) => !value)}
+          />
+        ) : null}
         {overlays}
       </div>
     </div>

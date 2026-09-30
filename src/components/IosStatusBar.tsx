@@ -3,7 +3,7 @@ type IosStatusBarProps = {
 };
 
 /**
- * A non-interactive iPhone status-bar simulation for the mobile demo shell.
+ * A non-interactive status-bar simulation for the device preview shell.
  * The values stay deterministic so screenshots and walkthroughs remain stable.
  */
 export function IosStatusBar({ style = "dark" }: IosStatusBarProps) {

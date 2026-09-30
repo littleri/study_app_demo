@@ -544,7 +544,7 @@ test.describe("community discovery", () => {
     expect(styles.selected.borderRadius).toBe("0px");
     expect(styles.selected.borderTopWidth).toBe("0px");
     expect(styles.selected.color).toBe("rgb(124, 58, 237)");
-    expect(styles.selected.fontSize).toBe("16.9px");
+    expect(styles.selected.fontSize).toBe("20px");
     expect(styles.selected.indicatorContent).toBe("none");
     expect(styles.selected.height).toBeGreaterThanOrEqual(43.5);
     expect(styles.categoryRail).toMatchObject({

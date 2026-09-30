@@ -695,10 +695,6 @@ export function ChapterConfirmScreen() {
     ? chapterDrafts[selectedChapter.chapter_id] ?? createChapterDraft(selectedChapter)
     : null;
 
-  function usesTabletChapterWorkspace() {
-    return window.matchMedia("(min-width: 768px) and (min-height: 600px)").matches;
-  }
-
   function publishDirectoryFeedback(kind: DirectoryFeedback["kind"], message: string) {
     feedbackSequenceRef.current += 1;
     setDirectoryFeedback({
@@ -715,9 +711,7 @@ export function ChapterConfirmScreen() {
       setSelectionFeedback({ chapterId, sequence: feedbackSequenceRef.current });
     }
     setSelectedChapterId(chapterId);
-    if (!usesTabletChapterWorkspace()) {
-      openSheet({ type: "editChapter", chapterId, evidence });
-    }
+    openSheet({ type: "editChapter", chapterId, evidence });
   }
 
   function saveChapterDraft(nextChapter: ApiChapter) {

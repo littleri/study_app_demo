@@ -43,12 +43,16 @@ export function DevicePreviewStudio() {
     () => getLogicalViewport(settings.device, settings.orientation),
     [settings.device, settings.orientation]
   );
+  const isIpad = settings.device === "ipad-pro-11";
+  // The iPad shell sits outside the logical screen. Leave room for that bleed
+  // when Fit is selected, without changing the embedded app's viewport.
+  const fitShellBleed = isIpad && settings.chrome ? 24 : 0;
   const fitScale = availableSize.width > 0 && availableSize.height > 0
     ? calculateFitScale(
       availableSize.width,
       availableSize.height,
-      logicalViewport.width,
-      logicalViewport.height
+      logicalViewport.width + fitShellBleed * 2,
+      logicalViewport.height + fitShellBleed * 2
     )
     : 1;
   const geometry = useMemo(
@@ -152,7 +156,10 @@ export function DevicePreviewStudio() {
   const updateSettings = useCallback((partial: Partial<PreviewSettings>) => {
     setSettings((current) => ({ ...current, ...partial }));
   }, []);
-  const handleDeviceChange = useCallback((device: DeviceId) => updateSettings({ device }), [updateSettings]);
+  const handleDeviceChange = useCallback((device: DeviceId) => updateSettings({
+    device,
+    orientation: DEFAULT_PREVIEW_SETTINGS.orientation
+  }), [updateSettings]);
   const handleOrientationChange = useCallback((orientation: Orientation) => updateSettings({ orientation }), [updateSettings]);
   const handleQualityChange = useCallback((quality: QualityId) => updateSettings({ quality }), [updateSettings]);
 
@@ -189,14 +196,14 @@ export function DevicePreviewStudio() {
       ) : null}
       <div ref={canvasAreaRef} className="device-preview-canvas-area" data-testid="device-preview-canvas-area">
         <div
-          className={`device-preview-canvas${isIphonePortrait ? " device-preview-canvas--iphone-17-pro" : ""}`}
+          className={`device-preview-canvas${isIphonePortrait ? " device-preview-canvas--iphone-17-pro" : ""}${isIpad ? " device-preview-canvas--ipad-pro-11" : ""}`}
           data-testid="device-preview-canvas"
           data-canvas-width={geometry.canvasWidth}
           data-canvas-height={geometry.canvasHeight}
           style={{ height: `${geometry.canvasHeight}px`, width: `${geometry.canvasWidth}px` }}
         >
           <div
-            className={`device-preview-frame${isIphonePortrait ? " device-preview-frame--iphone-17-pro" : ""}`}
+            className={`device-preview-frame${isIphonePortrait ? " device-preview-frame--iphone-17-pro" : ""}${isIpad ? " device-preview-frame--ipad-pro-11" : ""}`}
             data-testid="device-preview-frame"
             data-device={settings.device}
             data-orientation={settings.orientation}
@@ -210,6 +217,9 @@ export function DevicePreviewStudio() {
                 aria-hidden="true"
               />
             ) : null}
+            {isIpad ? (
+              <div className="device-preview-ipad-shell" data-testid="device-preview-ipad-shell" aria-hidden="true" />
+            ) : null}
             {isIphonePortrait ? (
               <div
                 className="device-preview-hardware-controls"
@@ -220,6 +230,13 @@ export function DevicePreviewStudio() {
                 <span className="device-preview-hardware-control device-preview-hardware-control--volume-up" data-hardware-control="volume-up" />
                 <span className="device-preview-hardware-control device-preview-hardware-control--volume-down" data-hardware-control="volume-down" />
                 <span className="device-preview-hardware-control device-preview-hardware-control--side" data-hardware-control="side" />
+              </div>
+            ) : null}
+            {isIpad ? (
+              <div className="device-preview-ipad-controls" data-testid="device-preview-ipad-controls" aria-hidden="true">
+                <span className="device-preview-ipad-control device-preview-ipad-control--power" />
+                <span className="device-preview-ipad-control device-preview-ipad-control--volume-up" />
+                <span className="device-preview-ipad-control device-preview-ipad-control--volume-down" />
               </div>
             ) : null}
             <div className="device-preview-screen-clip">
@@ -239,6 +256,9 @@ export function DevicePreviewStudio() {
                 data-dynamic-island="true"
                 aria-hidden="true"
               />
+            ) : null}
+            {isIpad ? (
+              <div className="device-preview-ipad-camera" data-testid="device-preview-ipad-camera" aria-hidden="true" />
             ) : null}
           </div>
         </div>

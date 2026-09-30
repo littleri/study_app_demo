@@ -136,7 +136,7 @@ textarea:focus-visible {
 .ios-status-bar__time {
   width: 37px;
   height: 22px;
-  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-family: var(--font-app);
   font-size: 17px;
   font-weight: 590;
   line-height: 22px;

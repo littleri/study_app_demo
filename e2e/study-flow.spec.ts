@@ -282,9 +282,10 @@ test.describe("study directory flow", () => {
         sectionPaddingTop: Number.parseFloat(sectionStyle.paddingTop)
       };
     });
-    expect(compactReadingMetrics.bodyFontSize).toBe(15);
-    expect(compactReadingMetrics.bodyLineHeight).toBeLessThanOrEqual(25);
-    expect(compactReadingMetrics.headingFontSize).toBe(18);
+    expect(compactReadingMetrics.bodyFontSize).toBe(20);
+    expect(compactReadingMetrics.bodyLineHeight).toBeGreaterThanOrEqual(24);
+    expect(compactReadingMetrics.bodyLineHeight).toBeLessThanOrEqual(30);
+    expect(compactReadingMetrics.headingFontSize).toBe(20);
     expect(compactReadingMetrics.sectionPaddingTop).toBe(22);
     expect(compactReadingMetrics.figureRatio).toBeLessThanOrEqual(0.93);
 

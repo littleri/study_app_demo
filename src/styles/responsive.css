@@ -141,8 +141,8 @@ body {
   }
 }
 
-/* Keep the established phone reading order (selected detail, then list) while
-   the iPad grid below still assigns the list to the master column. */
+/* Keep the established phone reading order (selected detail, then list).
+   The pad's single-column layout applies the same sequence in tablet.css. */
 @media (max-width: 767px), (max-height: 599px) {
   .notes-detail-panel {
     order: 1;

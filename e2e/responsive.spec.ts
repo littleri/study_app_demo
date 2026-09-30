@@ -360,6 +360,496 @@ async function expectAllControlsReachableInVisualViewport(page: Page, selector: 
 }
 
 test.describe("current DemoRepository responsive matrix", () => {
+  test("expands the tablet sidebar and switches the current study course", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "ipad-pro-11", "The iPad portrait project covers the sidebar interaction");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await gotoApp(page);
+
+    const shell = page.locator(".app-shell");
+    const nav = page.locator(".primary-nav");
+    const toggle = page.getByRole("button", { name: "展开侧边栏" });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    const collapsedWidth = (await nav.boundingBox())!.width;
+    expect(collapsedWidth).toBeCloseTo(88 * 2 / 3, 0);
+
+    await toggle.click();
+    await expect(shell).toHaveAttribute("data-nav-expanded", "true");
+    await expect(page.getByRole("button", { name: "收起侧边栏" })).toHaveAttribute("aria-expanded", "true");
+    for (const label of ["首页", "学习", "发现", "我的"]) {
+      await expect(nav.locator(`.nav-item[aria-label="${label}"] .nav-label`)).toBeVisible();
+    }
+
+    for (const viewport of [
+      { width: 834, height: 1194 },
+      { width: 1194, height: 834 },
+      { width: 768, height: 600 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect(shell).toHaveAttribute("data-device-layout", "pad");
+      const geometry = await page.evaluate(() => {
+        const rail = document.querySelector<HTMLElement>(".primary-nav")!;
+        const main = document.querySelector<HTMLElement>(".screen-content")!;
+        const railRect = rail.getBoundingClientRect();
+        return {
+          railRight: railRect.right,
+          railWidth: railRect.width,
+          mainLeftInset: Number.parseFloat(getComputedStyle(main).paddingLeft),
+          navClientHeight: rail.clientHeight,
+          navScrollHeight: rail.scrollHeight
+        };
+      });
+      expect(geometry.railWidth, `${viewport.width}x${viewport.height}: expanded rail is wider`).toBeGreaterThan(200);
+      expect(geometry.mainLeftInset, `${viewport.width}x${viewport.height}: content clears the rail`).toBeGreaterThan(geometry.railRight);
+      expect(geometry.navScrollHeight, `${viewport.width}x${viewport.height}: controls fit the rail`).toBeLessThanOrEqual(geometry.navClientHeight + 1);
+      await expectNoShellOverflow(page, `Expanded sidebar ${viewport.width}x${viewport.height}`);
+    }
+
+    await page.setViewportSize({ width: 834, height: 1194 });
+    await nav.locator(".nav-study").click();
+    await expect(page.locator(".nav-study-context")).toBeVisible();
+    await expect.poll(async () => page.locator(".nav-course-title").textContent()).not.toBe("尚未选择教材");
+    const previousCourse = await page.locator(".nav-course-title").textContent();
+    await expect(page.locator(".nav-context-link")).toHaveCount(5);
+    await page.locator(".nav-course-switch").click();
+    await expect(page.locator(".book-switcher-sheet")).toBeVisible();
+    await expect(page.locator(".book-switcher-row")).toHaveCount(2);
+    await page.locator(".book-switcher-row").nth(1).click();
+    await expect.poll(async () => page.locator(".nav-course-title").textContent()).not.toBe(previousCourse);
+
+    await page.locator(".nav-context-link").filter({ hasText: "学习计划" }).click();
+    await expect(page.locator('.screen-content[data-screen="plan"]')).toBeVisible();
+    await expect(nav).toHaveCount(0);
+    const hiddenRailWidth = await shell.evaluate((element) => Number.parseFloat(getComputedStyle(element).getPropertyValue("--nav-rail-width")));
+    expect(hiddenRailWidth, "hidden navigation does not reserve expanded width").toBeCloseTo(88 * 2 / 3, 0);
+    const focusedInsets = await page.locator(".screen-content").evaluate((main) => {
+      const style = getComputedStyle(main);
+      return [Number.parseFloat(style.paddingLeft), Number.parseFloat(style.paddingRight)];
+    });
+    expect(Math.abs(focusedInsets[0] - focusedInsets[1]), "focused pages stay centered after expanding the rail").toBeLessThanOrEqual(1);
+
+    await page.locator('.header-bar .icon-button[aria-label="返回"]').click();
+    await expect(nav).toHaveAttribute("data-expanded", "true");
+    await page.getByRole("button", { name: "收起侧边栏" }).click();
+    await expect(nav).toHaveAttribute("data-expanded", "false");
+    expect((await nav.boundingBox())!.width).toBeCloseTo(collapsedWidth, 0);
+    await expect(nav.locator(".nav-study-context")).toHaveCount(0);
+
+    await page.setViewportSize({ width: 402, height: 874 });
+    await expect(shell).toHaveAttribute("data-device-layout", "phone");
+    await expect(page.locator(".nav-expand-toggle")).toBeHidden();
+    await expect(nav.locator(".nav-item")).toHaveCount(4);
+  });
+
+  test("centers every focused tablet screen and keeps the upload sheet full width", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "ipad-pro-11", "One iPad viewport sweep covers focused screen geometry");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await gotoApp(page);
+
+    const focusedScreens = [
+      "upload", "parseReady", "processing", "chapterConfirm", "courseReady", "library",
+      "communityBook", "communityImport", "plan", "flashcards", "lesson", "assignment",
+      "diagnosis", "mistakes", "notes", "source", "export", "report"
+    ];
+
+    for (const viewport of [
+      { width: 834, height: 1194 },
+      { width: 1194, height: 834 },
+      { width: 780, height: 876 },
+      { width: 1440, height: 900 }
+    ]) {
+      await page.setViewportSize(viewport);
+      const focusedGeometry = await page.evaluate((screens) => {
+        const shell = document.querySelector<HTMLElement>(".app-shell")!;
+        const shellRect = shell.getBoundingClientRect();
+        const shellCenter = (shellRect.left + shellRect.right) / 2;
+        const values = screens.map((screen) => {
+          const main = document.createElement("main");
+          main.className = "screen-content with-header without-nav";
+          main.dataset.screen = screen;
+          shell.append(main);
+          const rect = main.getBoundingClientRect();
+          const style = getComputedStyle(main);
+          const left = Number.parseFloat(style.paddingLeft);
+          const right = Number.parseFloat(style.paddingRight);
+          const result = { screen, left, right, contentCenter: (rect.left + left + rect.right - right) / 2, shellCenter };
+          main.remove();
+          return result;
+        });
+        return values;
+      }, focusedScreens);
+
+      for (const item of focusedGeometry) {
+        expect(Math.abs(item.contentCenter - item.shellCenter), `${viewport.width}x${viewport.height}: ${item.screen} content is centered with ${item.left}px/${item.right}px padding`).toBeLessThanOrEqual(1);
+        expect(Math.abs(item.left - item.right), `${viewport.width}x${viewport.height}: ${item.screen} has balanced horizontal padding`).toBeLessThanOrEqual(1);
+      }
+    }
+
+    await page.setViewportSize({ width: 834, height: 1194 });
+    await page.locator('[data-home-global-action="upload"]').click();
+    await expect(page.locator(".upload-flow-screen")).toBeVisible();
+    await settleScreen(page);
+    for (const viewport of [
+      { width: 834, height: 1194 },
+      { width: 1194, height: 834 },
+      { width: 780, height: 876 },
+      { width: 1440, height: 900 }
+    ]) {
+      await page.setViewportSize(viewport);
+      const geometry = await page.evaluate(() => {
+        const rect = (selector: string) => document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        const shell = rect(".app-shell");
+        const sheet = rect(".upload-sheet-card");
+        const tile = rect(".upload-add-tile");
+        const action = rect(".upload-flow-primary > .button");
+        const title = rect(".header-title");
+        const center = (item: DOMRect) => (item.left + item.right) / 2;
+        return {
+          shellCenter: center(shell),
+          sheetLeft: sheet.left,
+          sheetRight: sheet.right,
+          shellLeft: shell.left,
+          shellRight: shell.right,
+          tileCenter: center(tile),
+          actionCenter: center(action),
+          titleCenter: center(title)
+        };
+      });
+      expect(Math.abs(geometry.sheetLeft - geometry.shellLeft), `${viewport.width}x${viewport.height}: sheet reaches left edge`).toBeLessThanOrEqual(1);
+      expect(Math.abs(geometry.sheetRight - geometry.shellRight), `${viewport.width}x${viewport.height}: sheet reaches right edge`).toBeLessThanOrEqual(1);
+      for (const key of ["tileCenter", "actionCenter", "titleCenter"] as const) {
+        expect(Math.abs(geometry[key] - geometry.shellCenter), `${viewport.width}x${viewport.height}: ${key} is centered`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test("centers tablet flashcards and assignment while preserving the phone card proportion", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "ipad-pro-11", "One iPad viewport sweep covers the focused tool pages");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 402, height: 874 });
+    await gotoApp(page);
+    await page.locator('.home-book-workspace .study-tool-card[data-tool="flashcards"]').click();
+    await expect(page.locator(".flashcard-screen")).toBeVisible();
+    await settleScreen(page);
+
+    const measureFlashcard = () => page.evaluate(() => {
+      const shell = document.querySelector<HTMLElement>(".app-shell")!.getBoundingClientRect();
+      const workspace = document.querySelector<HTMLElement>(".flashcard-workspace")!.getBoundingClientRect();
+      const card = document.querySelector<HTMLElement>(".memory-card-trigger")!.getBoundingClientRect();
+      return {
+        centerOffset: (workspace.left + workspace.right - shell.left - shell.right) / 2,
+        width: card.width,
+        height: card.height
+      };
+    });
+    const phoneCard = await measureFlashcard();
+    for (const viewport of [{ width: 834, height: 1194 }, { width: 1194, height: 834 }]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+      const card = await measureFlashcard();
+      expect(Math.abs(card.centerOffset), `${viewport.width}x${viewport.height}: flashcard workspace is centered`).toBeLessThanOrEqual(1);
+      expect(card.width, `${viewport.width}x${viewport.height}: flashcard grows for iPad`).toBeGreaterThan(phoneCard.width * 1.5);
+      expect(Math.abs(card.height / card.width - phoneCard.height / phoneCard.width), `${viewport.width}x${viewport.height}: phone card proportion`).toBeLessThan(0.12);
+      await expectNoShellOverflow(page, `${viewport.width}x${viewport.height}: flashcard`);
+    }
+
+    await page.setViewportSize({ width: 834, height: 1194 });
+    await gotoApp(page);
+    await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();
+    await expect(page.locator(".assignment-screen")).toBeVisible();
+    await settleScreen(page);
+    for (const viewport of [{ width: 834, height: 1194 }, { width: 1194, height: 834 }]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+      const layout = await page.evaluate(() => {
+        const shell = document.querySelector<HTMLElement>(".app-shell")!.getBoundingClientRect();
+        const workspace = document.querySelector<HTMLElement>(".assignment-practice-workspace")!.getBoundingClientRect();
+        const progress = document.querySelector<HTMLElement>(".assignment-progress-card")!.getBoundingClientRect();
+        const card = document.querySelector<HTMLElement>(".assignment-exercise-card")!.getBoundingClientRect();
+        return {
+          centerOffset: (workspace.left + workspace.right - shell.left - shell.right) / 2,
+          progressCenter: (progress.left + progress.right) / 2,
+          cardCenter: (card.left + card.right) / 2
+        };
+      });
+      expect(Math.abs(layout.centerOffset), `${viewport.width}x${viewport.height}: assignment workspace is centered`).toBeLessThanOrEqual(1);
+      expect(Math.abs(layout.progressCenter - layout.cardCenter), `${viewport.width}x${viewport.height}: assignment cards align`).toBeLessThanOrEqual(1);
+      await expectNoShellOverflow(page, `${viewport.width}x${viewport.height}: assignment`);
+    }
+
+    await advanceAssignmentToShortAnswer(page);
+    await page.locator(".assignment-card textarea").fill("同源染色体在减数第一次分裂后期分离。");
+    await page.locator(".assignment-primary-action .button").click();
+    await expect(page.locator(".diagnosis-screen")).toBeVisible();
+    await settleScreen(page);
+    const diagnosisOffset = await page.evaluate(() => {
+      const shell = document.querySelector<HTMLElement>(".app-shell")!.getBoundingClientRect();
+      const workspace = document.querySelector<HTMLElement>(".diagnosis-workspace")!.getBoundingClientRect();
+      return (workspace.left + workspace.right - shell.left - shell.right) / 2;
+    });
+    expect(Math.abs(diagnosisOffset), "diagnosis result is centered").toBeLessThanOrEqual(1);
+  });
+
+  test("docks the pad navigation and stacks home and study sections in phone order", async ({ page }, testInfo) => {
+    const project = getResponsiveProject(testInfo.project.name);
+    test.skip(expectedDeviceLayout(project.initialViewport) !== "pad", "Pad layout only");
+
+    await gotoApp(page);
+    await expect(page.locator(".home-book-workspace .study-tool-grid")).toBeVisible();
+    for (const viewport of [project.initialViewport, project.pairedViewport]) {
+      await page.setViewportSize(viewport);
+      const layout = await page.evaluate(() => {
+        const bounds = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) throw new Error(`Missing ${selector}`);
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height };
+        };
+        const nav = document.querySelector<HTMLElement>(".primary-nav");
+        if (!nav) throw new Error("Missing primary navigation");
+        const navStyle = getComputedStyle(nav);
+        return {
+          nav: bounds(".primary-nav"),
+          statusBar: bounds(".ios-status-bar"),
+          navBackground: navStyle.backgroundColor,
+          navRadius: navStyle.borderRadius,
+          navShadow: navStyle.boxShadow,
+          picker: bounds(".home-book-picker"),
+          workspace: bounds(".home-book-workspace"),
+          actions: bounds(".home-global-section"),
+          toolDisplay: getComputedStyle(document.querySelector<HTMLElement>(".home-book-workspace .study-tool-grid")!).display
+        };
+      });
+      expect(layout.nav.left).toBe(0);
+      expect(layout.nav.right).toBeCloseTo(88 * 2 / 3, 0);
+      expect(layout.nav.top).toBeCloseTo(24, 0);
+      expect(layout.nav.height).toBeCloseTo(viewport.height - 24, 0);
+      expect(layout.statusBar.left).toBe(0);
+      expect(layout.statusBar.right).toBeCloseTo(viewport.width, 0);
+      expect(layout.statusBar.top).toBe(0);
+      expect(layout.statusBar.height).toBeCloseTo(24, 0);
+      expect(layout.navBackground).toBe("rgb(25, 25, 27)");
+      expect(layout.navRadius).toBe("0px");
+      expect(layout.navShadow).toBe("none");
+      expect(layout.picker.left).toBeGreaterThanOrEqual(layout.nav.right);
+      expect(layout.workspace.top).toBeGreaterThanOrEqual(layout.picker.bottom);
+      expect(layout.actions.top).toBeGreaterThanOrEqual(layout.workspace.bottom);
+      expect(layout.toolDisplay).toBe("flex");
+      await expectNoShellOverflow(page, `${project.name} stacked pad home`);
+    }
+
+    await openStudy(page);
+    const studyLayout = await page.evaluate(() => {
+      const summary = document.querySelector<HTMLElement>(".study-plan-summary")!.getBoundingClientRect();
+      const directory = document.querySelector<HTMLElement>(".study-directory")!.getBoundingClientRect();
+      return { summaryBottom: summary.bottom, directoryTop: directory.top };
+    });
+    expect(studyLayout.directoryTop).toBeGreaterThanOrEqual(studyLayout.summaryBottom);
+
+    await page.locator('.primary-nav .nav-item[aria-label="我的"]').click();
+    await expect(page.locator(".profile-workspace")).toBeVisible();
+    await settleScreen(page);
+    const portrait = await page.locator(".profile-portrait-card").boundingBox();
+    const dashboard = await page.locator(".profile-dashboard-column").boundingBox();
+    expect(portrait).not.toBeNull();
+    expect(dashboard).not.toBeNull();
+    expect(dashboard!.y).toBeGreaterThanOrEqual(portrait!.y + portrait!.height);
+
+    await page.locator('.primary-nav .nav-item[aria-label="发现"]').click();
+    await expect(page.locator(".community-book-card").first()).toBeVisible();
+    await settleScreen(page);
+    const rail = await page.locator(".community-category-rail").boundingBox();
+    const nav = await page.locator(".primary-nav").boundingBox();
+    const shell = await page.locator(".app-shell").boundingBox();
+    expect(rail).not.toBeNull();
+    expect(nav).not.toBeNull();
+    expect(shell).not.toBeNull();
+    expect(Math.abs(rail!.x - (nav!.x + nav!.width))).toBeLessThanOrEqual(1);
+    expect(Math.abs(rail!.x + rail!.width - (shell!.x + shell!.width))).toBeLessThanOrEqual(1);
+    const communityCards = page.locator(".community-book-card");
+    if (await communityCards.count() > 1) {
+      const first = await communityCards.nth(0).boundingBox();
+      const second = await communityCards.nth(1).boundingBox();
+      expect(first).not.toBeNull();
+      expect(second).not.toBeNull();
+      expect(Math.abs(second!.y - first!.y)).toBeLessThanOrEqual(1);
+      expect(second!.x).toBeGreaterThanOrEqual(first!.x + first!.width);
+    }
+    const discoveryHeader = await page.evaluate(() => {
+      const main = document.querySelector<HTMLElement>('.screen-content[data-screen="community"]')!;
+      main.style.scrollBehavior = "auto";
+      const header = document.querySelector<HTMLElement>(".header-bar")!;
+      const controls = document.querySelector<HTMLElement>(".community-discovery-controls")!;
+      const card = document.querySelector(".community-book-card")!;
+      const titleRect = header.querySelector(".header-title")!.getBoundingClientRect();
+      main.scrollTop += card.getBoundingClientRect().top - titleRect.top + 24;
+      const headerRect = header.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const headerCover = getComputedStyle(header, "::before");
+      const controlsCover = getComputedStyle(controls, "::before");
+      return {
+        background: headerCover.backgroundColor,
+        left: headerRect.left + parseFloat(headerCover.left),
+        right: headerRect.right - parseFloat(headerCover.right),
+        top: headerRect.top + parseFloat(headerCover.top),
+        bottom: headerRect.bottom - parseFloat(headerCover.bottom),
+        controlsCoverTop: controls.getBoundingClientRect().top + parseFloat(controlsCover.top),
+        titleTop: titleRect.top,
+        titleBottom: titleRect.bottom,
+        cardTop: cardRect.top,
+        cardBottom: cardRect.bottom,
+        scrollTop: main.scrollTop,
+        maxScroll: main.scrollHeight - main.clientHeight
+      };
+    });
+    expect(discoveryHeader.background).toBe("rgb(246, 248, 251)");
+    expect(Math.abs(discoveryHeader.left - (nav!.x + nav!.width))).toBeLessThanOrEqual(1);
+    expect(Math.abs(discoveryHeader.right - (shell!.x + shell!.width))).toBeLessThanOrEqual(1);
+    expect(discoveryHeader.top).toBeLessThanOrEqual(shell!.y + 1);
+    expect(discoveryHeader.bottom).toBeGreaterThanOrEqual(discoveryHeader.controlsCoverTop);
+    if (discoveryHeader.cardTop < discoveryHeader.titleBottom) {
+      expect(discoveryHeader.cardBottom).toBeGreaterThan(discoveryHeader.titleTop);
+    } else {
+      expect(discoveryHeader.scrollTop).toBeCloseTo(discoveryHeader.maxScroll, 0);
+    }
+  });
+
+  test("fits tablet parse confirmation and keeps back and parse actions aligned", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "ipad-pro-11-landscape", "One WebKit viewport sweep covers the shared header");
+    test.setTimeout(60_000);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+
+    const expectLeftBack = async (label: string) => {
+      const geometry = await page.evaluate(() => {
+        const shell = document.querySelector<HTMLElement>(".app-shell")!.getBoundingClientRect();
+        const backControl = document.querySelector<HTMLElement>('.header-bar .icon-button[aria-label="返回"]')!;
+        const back = backControl.getBoundingClientRect();
+        const title = document.querySelector<HTMLElement>(".header-title")!.getBoundingClientRect();
+        const hit = document.elementFromPoint(back.left + back.width / 2, back.top + back.height / 2);
+        return {
+          backLeftInset: back.left - shell.left,
+          backCenter: back.left + back.width / 2,
+          backReachable: Boolean(hit && (hit === backControl || backControl.contains(hit))),
+          shellCenter: shell.left + shell.width / 2,
+          titleCenter: title.left + title.width / 2
+        };
+      });
+      expect(geometry.backLeftInset, `${label}: back control reaches the outer inset`).toBeLessThanOrEqual(33);
+      expect(geometry.backCenter, `${label}: back control is on the left`).toBeLessThan(geometry.shellCenter);
+      expect(geometry.backReachable, `${label}: back control can be clicked`).toBe(true);
+      expect(Math.abs(geometry.titleCenter - geometry.shellCenter), `${label}: title stays centered`).toBeLessThanOrEqual(1);
+    };
+
+    await page.setViewportSize({ width: 1194, height: 834 });
+    await gotoApp(page);
+    await openLibrary(page);
+    await expectLeftBack("Library");
+    await openStudy(page);
+    await openLesson(page);
+    await expectLeftBack("Lesson");
+
+    await gotoApp(page);
+    await page.locator('.primary-nav .nav-item[aria-label="发现"]').click();
+    await expect(page.locator(".community-book-card").first()).toBeVisible();
+    await page.locator(".community-book-card").first().click();
+    await expect(page.locator(".community-detail-screen")).toBeVisible();
+    await settleScreen(page);
+    await expectLeftBack("Community course");
+
+    await page.setViewportSize({ width: 780, height: 876 });
+    await gotoApp(page);
+    await page.locator('[data-home-global-action="upload"]').click();
+    await expect(page.locator(".upload-flow-screen")).toBeVisible();
+    await settleScreen(page);
+    await expectLeftBack("Upload");
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "人教版高中生物必修2遗传与进化.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4 responsive parse layout fixture")
+    });
+    await page.getByRole("button", { name: "上传并继续", exact: true }).click();
+    await expect(page.locator(".parse-ready-screen")).toBeVisible();
+    await settleScreen(page);
+
+    for (const viewport of [
+      { width: 780, height: 876 },
+      { width: 860, height: 1180 },
+      { width: 834, height: 1194 },
+      { width: 1194, height: 834 },
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 768, height: 600 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+      await expectLeftBack(`ParseReady ${viewport.width}x${viewport.height}`);
+      const layout = await page.evaluate(() => {
+        const bounds = (selector: string) => document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        const main = document.querySelector<HTMLElement>('.screen-content[data-screen="parseReady"]')!;
+        const shell = bounds(".app-shell");
+        const button = bounds(".parse-ready-actions .button");
+        return {
+          scrollHeight: main.scrollHeight,
+          clientHeight: main.clientHeight,
+          coverBottom: bounds(".parse-ready-visual .community-detail-cover").bottom,
+          ownerTop: bounds(".parse-ready-owner").top,
+          infoBottom: bounds(".parse-info-grid").bottom,
+          actionsTop: bounds(".parse-ready-actions").top,
+          buttonCenter: button.left + button.width / 2,
+          buttonBottom: button.bottom,
+          shellCenter: shell.left + shell.width / 2,
+          shellBottom: shell.bottom
+        };
+      });
+      expect(layout.scrollHeight, `${viewport.width}x${viewport.height}: no vertical scrolling`).toBeLessThanOrEqual(layout.clientHeight + 1);
+      expect(layout.coverBottom, `${viewport.width}x${viewport.height}: cover clears the status`).toBeLessThan(layout.ownerTop);
+      expect(layout.infoBottom + 8, `${viewport.width}x${viewport.height}: metrics clear the action`).toBeLessThanOrEqual(layout.actionsTop);
+      expect(Math.abs(layout.buttonCenter - layout.shellCenter), `${viewport.width}x${viewport.height}: action is centered`).toBeLessThanOrEqual(1);
+      expect(layout.buttonBottom, `${viewport.width}x${viewport.height}: action is fully visible`).toBeLessThanOrEqual(layout.shellBottom + 1);
+      await expectNoShellOverflow(page, `ParseReady ${viewport.width}x${viewport.height}`);
+    }
+
+    for (const viewport of [
+      { width: 430, height: 590 },
+      { width: 402, height: 681 },
+      { width: 402, height: 874 },
+      { width: 360, height: 640 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator(".app-shell")).toHaveAttribute("data-device-layout", "phone");
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
+      await expectLeftBack(`ParseReady phone ${viewport.width}x${viewport.height}`);
+      const layout = await page.evaluate(() => {
+        const main = document.querySelector<HTMLElement>('.screen-content[data-screen="parseReady"]')!;
+        main.style.scrollBehavior = "auto";
+        main.scrollTop = 0;
+        const rect = (selector: string) => document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+        const actions = document.querySelector<HTMLElement>(".parse-ready-actions")!;
+        const shell = rect(".app-shell");
+        const button = rect(".parse-ready-actions .button");
+        return {
+          position: getComputedStyle(actions).position,
+          infoBottom: rect(".parse-info-grid").bottom,
+          actionTop: rect(".parse-ready-actions").top,
+          buttonCenter: button.left + button.width / 2,
+          shellCenter: shell.left + shell.width / 2
+        };
+      });
+      expect(layout.position, `${viewport.width}x${viewport.height}: action follows the information`).toBe("static");
+      expect(layout.infoBottom + 8, `${viewport.width}x${viewport.height}: action does not cover the information`).toBeLessThanOrEqual(layout.actionTop);
+      expect(Math.abs(layout.buttonCenter - layout.shellCenter), `${viewport.width}x${viewport.height}: action is centered`).toBeLessThanOrEqual(1);
+      await expectReachable(page.locator(".parse-ready-actions .button"), `ParseReady phone ${viewport.width}x${viewport.height}`);
+    }
+  });
+
   test("keeps home, navigation, safe chrome, and primary actions usable in both mapped viewports", async ({ page }, testInfo) => {
     const project = getResponsiveProject(testInfo.project.name);
     await gotoApp(page);
@@ -675,7 +1165,7 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expect(lessonProgress).toHaveAttribute("aria-valuenow", String(lessonPageCount));
     await expect(page.getByRole("button", { name: "完成本节", exact: true })).toBeVisible();
     const finalLessonSelectors = [
-      ...knowledgePageSelectors,
+      ".lesson-source-link",
       ".lesson-floating-complete .button"
     ];
 
