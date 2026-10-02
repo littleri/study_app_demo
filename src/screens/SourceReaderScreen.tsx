@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Eraser,
   FileText,
@@ -21,6 +21,7 @@ import { useAppContext } from "../context/AppContext";
 import { globalMotionFallbackMs, SkeletonReveal, useImageMotion, useLocalMotionItem, useMotionPresence, useReducedMotion, type LoadState } from "../motion";
 import { sourcePageImageUrl } from "./shared";
 import { InkAnnotationSurface } from "../features/studyNotes/InkAnnotationSurface";
+import { highlighterBrushWidths, penBrushWidths } from "../features/studyNotes/ink";
 import { SourceRegionAiPanel, type RegionAiReference } from "../features/studyNotes/SourceRegionAiPanel";
 import { SourceTextNotePanel, sourceTextNoteAnimationNames, type SourceTextNotePanelHandle } from "../features/studyNotes/SourceTextNotePanel";
 import { SourceTextAnnotationLayer, type TextNoteLocation } from "../features/studyNotes/SourceTextAnnotationLayer";
@@ -32,6 +33,8 @@ import { resolveSourceReaderHeading } from "../features/studyNotes/sourceReaderH
 import { pageSwipeDirection, type PageSwipeDirection } from "../features/studyNotes/pageSwipe";
 import { noteAnchorFromSource, type InkStroke, type InkStudyNote, type InkTool, type NoteAnchor, type NotePipelinePhase, type StudyNote, type TextStudyNote } from "../features/studyNotes/types";
 import type { SourcePageTarget } from "../types/app";
+import { getLearningResourceFile } from "../features/courses/repository";
+import { readLocalSource, renderLocalSourcePage } from "../services/LocalSources";
 
 type ReaderNoteMode = "read" | "ink" | "text" | "ai";
 type TextNoteEditor = {
@@ -40,7 +43,6 @@ type TextNoteEditor = {
   anchor: NoteAnchor;
   existing?: TextStudyNote;
   location: TextNoteLocation;
-  returnMode: "read" | "text";
 };
 
 function getTextEditorKey(editor: TextNoteEditor) {
@@ -59,6 +61,7 @@ export function nextSourcePage(page: number, maxPage: number) {
 export function SourceReaderScreen() {
   const {
     activeChapterId,
+    courses,
     finishNoteCapture,
     go,
     noteCaptureIntent,
@@ -72,10 +75,28 @@ export function SourceReaderScreen() {
     uploadedFile
   } = useAppContext();
   const bookId = sourcePageTarget?.bookId ?? uploadedFile?.bookId ?? "";
+  const readerCourseId = sourcePageTarget?.courseId ?? courses.state.activeCourseId ?? undefined;
   const pageCount = parsedScanResult?.page_count ?? null;
   const targetStart = Math.max(1, sourcePageTarget?.pageStart ?? 1);
   const targetEnd = Math.max(targetStart, sourcePageTarget?.pageEnd ?? targetStart);
   const inlineCitationText = sourcePageTarget?.sourceText?.trim() ?? "";
+  const [localPage, setLocalPage] = useState<{ bookId: string; page: number; image: string | null; text: string; pageCount: number } | null>(null);
+  useEffect(() => {
+    if (!bookId.startsWith("book_local_")) return;
+    let active = true; let objectUrl: string | null = null;
+    void (async () => {
+      const source = await readLocalSource(bookId);
+      if (!source) return;
+      const file = await getLearningResourceFile(source.resourceId);
+      const text = source.chunks.filter((chunk) => chunk.page_start === currentPage).map((chunk) => chunk.text).join("\n");
+      const original = file && (source.scan.file_type === "pdf" && file.type !== "application/pdf" ? new Blob([file], { type: "application/pdf" }) : file);
+      const image = original ? await renderLocalSourcePage(original, currentPage) : null;
+      if (image?.startsWith("blob:")) objectUrl = image;
+      if (active) setLocalPage({ bookId, page: currentPage, image, text, pageCount: source.scan.page_count });
+      else if (objectUrl) URL.revokeObjectURL(objectUrl);
+    })().catch(() => { if (active) showToast("原文件暂时无法打开，请在课程资料中重新整理", "warning"); });
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [bookId, currentPage, showToast]);
   const [failedImageKey, setFailedImageKey] = useState<string | null>(null);
   const [noteMode, setNoteMode] = useState<ReaderNoteMode>(noteCaptureIntent?.kind === "ink" ? "ink" : noteCaptureIntent?.kind === "text" ? "text" : "read");
   const [selectedText, setSelectedText] = useState("");
@@ -100,7 +121,11 @@ export function SourceReaderScreen() {
   const [redoStack, setRedoStack] = useState<InkStroke[][]>([]);
   const [inkTool, setInkTool] = useState<InkTool | "eraser">("pen");
   const [inkColor, setInkColor] = useState("#7c3aed");
-  const [inkWidth, setInkWidth] = useState(0.006);
+  const [penWidth, setPenWidth] = useState<number>(penBrushWidths[1]);
+  const [highlighterWidth, setHighlighterWidth] = useState<number>(highlighterBrushWidths[0]);
+  const inkWidth = inkTool === "highlighter" ? highlighterWidth : penWidth;
+  const brushWidths = inkTool === "highlighter" ? highlighterBrushWidths : penBrushWidths;
+  const [pageDirection, setPageDirection] = useState<"forward" | "back">("forward");
   const [fingerWrite, setFingerWrite] = useState(false);
   const [noteVersion, setNoteVersion] = useState(1);
   const [regionAsk, setRegionAsk] = useState<RegionAiReference | null>(null);
@@ -123,16 +148,17 @@ export function SourceReaderScreen() {
   const annotationInteractive = annotationActive || regionAskActive;
   const currentPageKey = String(currentPage);
   const currentStrokes = pages[currentPageKey] ?? [];
-  const maxPage = Math.max(pageCount ?? targetEnd, targetEnd, 1);
+  const maxPage = Math.max(localPage?.bookId === bookId ? localPage.pageCount : pageCount ?? targetEnd, targetEnd, 1);
   const isOnTargetRange = currentPage >= targetStart && currentPage <= targetEnd;
-  const currentInlineCitationText = isOnTargetRange ? inlineCitationText : "";
+  const currentInlineCitationText = localPage?.bookId === bookId && localPage.page === currentPage ? localPage.text : isOnTargetRange ? inlineCitationText : "";
   // Only URLs committed to the tracked + SHA-256 publication manifest are
   // eligible. An unknown book/page never becomes a guessed static URL.
   const publishedImageUrl = bookId ? sourcePageImageUrl(bookId, currentPage) : undefined;
-  const imageUrl = publishedImageUrl ?? (currentPage === targetStart ? sourcePageTarget?.previewImageUrl : undefined);
+  const localImageUrl = localPage?.bookId === bookId && localPage.page === currentPage ? localPage.image : null;
+  const targetImageUrl = currentPage === targetStart ? sourcePageTarget?.previewImageUrl : undefined;
+  const imageUrl = publishedImageUrl || localImageUrl || targetImageUrl || undefined;
   const imageKey = `${bookId}:${currentPage}:${imageUrl ?? "unpublished"}`;
   const imageFailed = Boolean(imageUrl) && failedImageKey === imageKey;
-  const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content");
   const imageMotion = useImageMotion(imageUrl);
   const showInlineTextFallback = Boolean(currentInlineCitationText)
     && (!imageUrl || imageFailed || imageMotion.state === "failed");
@@ -141,6 +167,9 @@ export function SourceReaderScreen() {
     : imageMotion.state === "loading"
       ? "loading"
       : "ready";
+  const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content", { ready: sourceLoadState !== "loading" || showInlineTextFallback });
+  const pageTextNotes = pageNotes.filter((note): note is TextStudyNote => note.kind === "text" && note.anchor?.bookId === bookId && note.anchor.pageStart === currentPage);
+  const draftTextMarker = textEditor ? { id: textEditor.key, position: textEditor.location.position } : undefined;
 
   useEffect(() => {
     setCurrentPage(targetStart);
@@ -149,6 +178,7 @@ export function SourceReaderScreen() {
     setRegionAsk(null);
     setCommittedRegion(null);
     setTextEditor(null);
+    setPageDirection("forward");
     setNoteMode(noteCaptureIntent?.kind === "ink" ? "ink" : noteCaptureIntent?.kind === "text" ? "text" : "read");
   }, [sourcePageTarget]);
 
@@ -173,8 +203,7 @@ export function SourceReaderScreen() {
           instanceId: ++textEditorInstanceRef.current,
           anchor: note.anchor ?? currentNoteAnchor(),
           existing: note,
-          location: { position: note.position ?? { x: .5, y: .35 }, pageElement },
-          returnMode: "read"
+          location: { position: note.position ?? { x: .5, y: .35 }, pageElement }
         });
         setNoteMode("text");
       }
@@ -202,7 +231,7 @@ export function SourceReaderScreen() {
     const load = () => {
       void listStudyNotes().then((notes) => {
         if (!active) return;
-        setPageNotes(notes.filter((note) => note.anchor?.bookId === bookId && (
+        setPageNotes(notes.filter((note) => note.anchor?.bookId === bookId && (!note.anchor.courseId || note.anchor.courseId === readerCourseId) && (
           note.anchor.pageStart === currentPage
           || note.kind === "ink" && Boolean(note.pages[currentPageKey]?.length)
         )));
@@ -214,7 +243,7 @@ export function SourceReaderScreen() {
       active = false;
       window.removeEventListener("bookcourse:study-notes-changed", load);
     };
-  }, [bookId, currentPage, currentPageKey]);
+  }, [bookId, currentPage, currentPageKey, readerCourseId]);
 
   useEffect(() => {
     if (noteMode !== "read") return;
@@ -224,6 +253,7 @@ export function SourceReaderScreen() {
 
   function currentSourceTarget() {
     return {
+      courseId: readerCourseId,
       bookId,
       title: displayTitle,
       pageStart: currentPage,
@@ -245,7 +275,7 @@ export function SourceReaderScreen() {
   }
 
   function openInk(note?: StudyNote) {
-    if (!publishedImageUrl || imageFailed || sourceLoadState !== "ready") {
+    if (!imageUrl || imageFailed || sourceLoadState !== "ready") {
       showToast("当前页暂无可批注原图", "warning");
       return;
     }
@@ -270,18 +300,21 @@ export function SourceReaderScreen() {
     }
   }
 
-  async function openTextAt(location: TextNoteLocation, note?: TextStudyNote, returnMode: "read" | "text" = noteMode === "text" ? "text" : "read") {
+  async function openTextAt(location: TextNoteLocation, note?: TextStudyNote) {
     if (switchingTextRef.current || note && note.id === textEditor?.key) return;
+    if (textEditor) {
+      await textPanelRef.current?.close();
+      return;
+    }
     switchingTextRef.current = true;
     const anchor = note?.anchor ?? currentNoteAnchor();
     try {
-      if (!await flushTextEditor()) return;
       const stored = note ? await getStudyNote(note.id) : null;
       const latestNote = stored?.kind === "text" ? stored : note;
       setRegionAsk(null);
       setCommittedRegion(null);
       setShowPageNotes(false);
-      setTextEditor({ key: latestNote?.id ?? createStudyNoteId("text"), instanceId: ++textEditorInstanceRef.current, anchor: latestNote?.anchor ?? anchor, existing: latestNote, location, returnMode });
+      setTextEditor({ key: latestNote?.id ?? createStudyNoteId("text"), instanceId: ++textEditorInstanceRef.current, anchor: latestNote?.anchor ?? anchor, existing: latestNote, location });
       setSelectedText("");
       setNoteMode("text");
       window.getSelection()?.removeAllRanges();
@@ -301,7 +334,7 @@ export function SourceReaderScreen() {
       const position = note?.position ?? (selectionBox && selectionBox.width
         ? textNotePosition(selectionBox.right, selectionBox.bottom, pageElement.getBoundingClientRect())
         : { x: .5, y: .35 });
-      void openTextAt({ position, pageElement }, note, "read");
+      void openTextAt({ position, pageElement }, note);
       return;
     }
     setTextEditor(null);
@@ -314,7 +347,7 @@ export function SourceReaderScreen() {
       closeRegionAsk();
       return;
     }
-    if (!publishedImageUrl || imageFailed || sourceLoadState !== "ready") {
+    if (!imageUrl || imageFailed || sourceLoadState !== "ready") {
       showToast("当前页暂无可圈选的原文图", "warning");
       return;
     }
@@ -548,6 +581,7 @@ export function SourceReaderScreen() {
     setShowPageNotes(false);
     setRegionAsk(null);
     setCommittedRegion(null);
+    setPageDirection(next < currentPage ? "back" : "forward");
     setCurrentPage(next);
   }
 
@@ -635,9 +669,9 @@ export function SourceReaderScreen() {
         </div>
         <div className="ink-annotation-tools ink-tools-scroll" aria-label="手写批注工具">
           <div className="ink-tool-row" role="group" aria-label="笔工具">
-            <button type="button" aria-label="钢笔" aria-pressed={annotationActive && inkTool === "pen"} disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("pen")}><PenLine size={19} /></button>
-            <button type="button" aria-label="荧光笔" aria-pressed={annotationActive && inkTool === "highlighter"} disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("highlighter")}><Highlighter size={19} /></button>
-            <button type="button" aria-label="整笔擦除" aria-pressed={annotationActive && inkTool === "eraser"} disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("eraser")}><Eraser size={19} /></button>
+            <button type="button" aria-label="钢笔" aria-pressed={annotationActive && inkTool === "pen"} disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("pen")}><PenLine size={19} /></button>
+            <button type="button" aria-label="荧光笔" aria-pressed={annotationActive && inkTool === "highlighter"} disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("highlighter")}><Highlighter size={19} /></button>
+            <button type="button" aria-label="整笔擦除" aria-pressed={annotationActive && inkTool === "eraser"} disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"} onClick={() => selectInkTool("eraser")}><Eraser size={19} /></button>
           </div>
           <div className="ink-tool-row" role="group" aria-label="历史操作">
             <button type="button" aria-label="撤销" disabled={!annotationActive || undoStack.length === 0} onClick={undoInk}><Undo2 size={19} /></button>
@@ -658,20 +692,20 @@ export function SourceReaderScreen() {
                 type="button"
                 aria-label={`选择颜色 ${color}`}
                 aria-pressed={inkColor === color}
-                disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"}
+                disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"}
                 style={{ backgroundColor: color }}
                 onClick={() => chooseInkAppearance(() => setInkColor(color))}
               />
             ))}
           </div>
-          <div className="ink-width-row" role="group" aria-label="笔迹粗细">
-            {[0.004, 0.006, 0.01].map((size, index) => (
-              <button key={size} type="button" aria-label={["细", "中", "粗"][index]} aria-pressed={inkWidth === size} disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"} onClick={() => chooseInkAppearance(() => setInkWidth(size))}>
-                <span style={{ width: `${6 + index * 4}px`, height: `${6 + index * 4}px` }} />
+          <div className="ink-width-row" role="group" aria-label="笔迹粗细" data-brush-tool={inkTool}>
+            {brushWidths.map((size, index) => (
+              <button key={size} type="button" aria-label={["细", "中", "粗"][index]} aria-pressed={inkWidth === size} data-brush-width={size} disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"} onClick={() => chooseInkAppearance(() => inkTool === "highlighter" ? setHighlighterWidth(size) : setPenWidth(size))}>
+                <span style={{ width: `${(inkTool === "highlighter" ? 14 : 6) + index * 4}px`, height: `${(inkTool === "highlighter" ? 4 : 6) + index * 4}px` }} />
               </button>
             ))}
           </div>
-          <button className="finger-write-toggle" type="button" aria-label="手指书写" aria-pressed={fingerWrite} disabled={noteMode === "text" || !publishedImageUrl || sourceLoadState !== "ready"} onClick={() => chooseInkAppearance(() => setFingerWrite((value) => !value))}>
+          <button className="finger-write-toggle" type="button" aria-label="手指书写" aria-pressed={fingerWrite} disabled={noteMode === "text" || !imageUrl || sourceLoadState !== "ready"} onClick={() => chooseInkAppearance(() => setFingerWrite((value) => !value))}>
             <Hand size={18} /> <span>手指书写</span>
           </button>
         </div>
@@ -697,6 +731,8 @@ export function SourceReaderScreen() {
         {...pageMotion.attributes}
         className="source-page-frame"
         key={pageMotion.motionKey}
+        data-page-direction={pageDirection}
+        style={{ "--source-page-enter-x": pageDirection === "back" ? "calc(var(--motion-distance-medium) * -1)" : "var(--motion-distance-medium)" } as CSSProperties}
         tabIndex={0}
         aria-label={`${displayTitle}，${heading.pageLabel}，左右滑动翻页`}
         onPointerDown={(event) => {
@@ -745,8 +781,10 @@ export function SourceReaderScreen() {
               <SourceTextAnnotationLayer
                 activeNoteId={textEditor?.key}
                 enabled={!annotationInteractive && !regionAsk}
-                notes={pageNotes.filter((note): note is TextStudyNote => note.kind === "text")}
-                placing={noteMode === "text"}
+                notes={pageTextNotes}
+                draft={draftTextMarker}
+                onDraftActivate={() => textPanelRef.current?.focus()}
+                placing={noteMode === "text" && !renderedTextEditor}
                 onPlace={(location) => void openTextAt(location)}
                 onOpen={(note, location) => void openTextAt(location, note)}
               />
@@ -803,8 +841,10 @@ export function SourceReaderScreen() {
                     <SourceTextAnnotationLayer
                       activeNoteId={textEditor?.key}
                       enabled={!annotationInteractive && !regionAsk}
-                      notes={pageNotes.filter((note): note is TextStudyNote => note.kind === "text")}
-                      placing={noteMode === "text"}
+                      notes={pageTextNotes}
+                      draft={draftTextMarker}
+                      onDraftActivate={() => textPanelRef.current?.focus()}
+                      placing={noteMode === "text" && !renderedTextEditor}
                       onPlace={(location) => void openTextAt(location)}
                       onOpen={(note, location) => void openTextAt(location, note)}
                     />
@@ -886,7 +926,7 @@ export function SourceReaderScreen() {
             onClose={() => {
               setTextEditor(null);
               setSelectedText("");
-              setNoteMode(renderedTextEditor.returnMode);
+              setNoteMode("read");
               workspaceRef.current?.querySelector<HTMLElement>(".source-page-frame")?.focus({ preventScroll: true });
             }}
           />

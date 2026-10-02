@@ -9,13 +9,13 @@ import { useAppContext } from "../../context/AppContext";
 import { communityBooks } from "../../data/mockBook";
 import { useReducedMotion } from "../../motion";
 import {
-  courseResourceId,
+  sourceResourceId,
   dailyTimes,
   diagnosisQuestions,
   localResourceId,
   primaryGoals,
   toggleDiagnosisValue,
-  type SetDiagnosis
+  type CourseDiagnosis
 } from "./model";
 
 function FlowError({ message }: { message: string | null }) {
@@ -59,15 +59,15 @@ const diagnosisOptionIcons: Record<string, LucideIcon> = {
 };
 
 export function OnboardingScreen() {
-  const { learningSets, replaceScreen } = useAppContext();
-  const { onboardingDraft } = learningSets.state;
+  const { courses, replaceScreen } = useAppContext();
+  const { onboardingDraft } = courses.state;
   const [error, setError] = useState<string | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const step = Math.min(2, Math.max(0, onboardingDraft.step));
 
-  function update(patch: Parameters<typeof learningSets.updateOnboardingDraft>[0]) {
+  function update(patch: Parameters<typeof courses.updateOnboardingDraft>[0]) {
     try {
-      learningSets.updateOnboardingDraft(patch);
+      courses.updateOnboardingDraft(patch);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "偏好保存失败，请重试");
@@ -82,14 +82,14 @@ export function OnboardingScreen() {
         return;
       }
       if (step === 1) {
-        if (skip) learningSets.updateOnboardingDraft({ primaryGoal: null });
-        learningSets.updateOnboardingDraft({ step: 2 });
+        if (skip) courses.updateOnboardingDraft({ primaryGoal: null });
+        courses.updateOnboardingDraft({ step: 2 });
       } else if (step === 2) {
-        if (skip) learningSets.updateOnboardingDraft({ dailyTime: null });
-        learningSets.completeOnboarding();
+        if (skip) courses.updateOnboardingDraft({ dailyTime: null });
+        courses.completeOnboarding();
         replaceScreen("home");
       } else {
-        learningSets.updateOnboardingDraft({ step: 1 });
+        courses.updateOnboardingDraft({ step: 1 });
       }
       setError(null);
     } catch (cause) {
@@ -190,9 +190,9 @@ export function OnboardingScreen() {
   );
 }
 
-export function LearningSetSetupScreen() {
-  const { courseSummaries, learningSets, replaceScreen, selectCourse } = useAppContext();
-  const { draft, resources } = learningSets.state;
+export function CourseSetupScreen() {
+  const { sourceSummaries, courses, replaceScreen, selectSource, importCourseFile, selectCourse } = useAppContext();
+  const { draft, resources } = courses.state;
   const [error, setError] = useState<string | null>(null);
   const [savingFile, setSavingFile] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -222,15 +222,15 @@ export function LearningSetSetupScreen() {
         || document.activeElement instanceof HTMLSelectElement) return;
       event.preventDefault();
       if (!draft || draft.step < 0) {
-        replaceScreen(draft?.editingSetId ? "learningSet" : "upload");
+        replaceScreen(draft?.editingCourseId ? "courseDetail" : "upload");
         return;
       }
       try {
         if (draft.step === 0 && draft.uploadedCourse && draft.parseCompleted) {
           replaceScreen("processing");
         } else {
-          learningSets.updateDraft({ step: draft.step - 1 });
-          if (draft.step === 0 && !draft.editingSetId) replaceScreen("upload");
+          courses.updateDraft({ step: draft.step - 1 });
+          if (draft.step === 0 && !draft.editingCourseId) replaceScreen("upload");
         }
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "草稿保存失败，请重试");
@@ -238,18 +238,16 @@ export function LearningSetSetupScreen() {
     };
     window.addEventListener("bookcourse:native-back", onNativeBack);
     return () => window.removeEventListener("bookcourse:native-back", onNativeBack);
-  }, [draft, learningSets, replaceScreen]);
+  }, [draft, courses, replaceScreen]);
 
   useEffect(() => {
-    if (!draft || draft.editingSetId) return;
+    if (!draft || draft.editingCourseId) return;
     if (draft.uploadedCourse && !draft.parseCompleted) {
       replaceScreen(draft.parseJobId ? "processing" : "parseReady");
-    } else if (draft.step < 0) {
-      replaceScreen("upload");
     }
   }, [draft, replaceScreen]);
 
-  if (!draft) return <div className="learning-flow-loading">学习集草稿暂时不可用。<button type="button" onClick={() => replaceScreen("home")}>返回首页</button></div>;
+  if (!draft) return <div className="learning-flow-loading">课程草稿暂时不可用。<button type="button" onClick={() => replaceScreen("home")}>返回首页</button></div>;
   const activeDraft = draft;
   const question = step >= 0 ? diagnosisQuestions[step] : null;
   const QuestionIcon = question ? diagnosisQuestionIcons[question.key] : BookOpen;
@@ -264,9 +262,9 @@ export function LearningSetSetupScreen() {
     }, 1000);
   }
 
-  function update(patch: Parameters<typeof learningSets.updateDraft>[0]) {
+  function update(patch: Parameters<typeof courses.updateDraft>[0]) {
     try {
-      learningSets.updateDraft(patch);
+      courses.updateDraft(patch);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "草稿保存失败，请重试");
@@ -274,18 +272,18 @@ export function LearningSetSetupScreen() {
   }
 
   function previous() {
-    if (step < 0) replaceScreen(activeDraft.editingSetId ? "learningSet" : "upload");
+    if (step < 0) replaceScreen(activeDraft.editingCourseId ? "courseDetail" : "upload");
     else if (step === 0 && activeDraft.uploadedCourse && activeDraft.parseCompleted) replaceScreen("processing");
     else {
       update({ step: step - 1 });
-      if (step === 0 && !activeDraft.editingSetId) replaceScreen("upload");
+      if (step === 0 && !activeDraft.editingCourseId) replaceScreen("upload");
     }
   }
 
   async function next() {
     if (step < 0) {
       if (!activeDraft.name.trim()) {
-        setError("请填写学习集名称");
+        setError("请填写课程名称");
         nameRef.current?.focus();
         return;
       }
@@ -306,20 +304,21 @@ export function LearningSetSetupScreen() {
       return;
     }
     try {
-      const confirmParsedCourse = !activeDraft.editingSetId && Boolean(activeDraft.uploadedCourse);
+      const confirmParsedCourse = !activeDraft.editingCourseId && Boolean(activeDraft.uploadedCourse);
       if (confirmParsedCourse) {
         if (!activeDraft.parseCompleted || !activeDraft.uploadedCourse) {
           throw new Error("请先完成教材解析");
         }
         setCompleting(true);
-        const loaded = await selectCourse(activeDraft.uploadedCourse.bookId);
+        const loaded = await selectSource(activeDraft.uploadedCourse.bookId);
         if (!loaded) throw new Error("解析结果暂时无法打开，请稍后重试");
       }
-      learningSets.completeDraft();
-      replaceScreen(confirmParsedCourse ? "chapterConfirm" : "learningSet");
+      const completedId = courses.completeDraft();
+      if (!confirmParsedCourse) await selectCourse(completedId);
+      replaceScreen(confirmParsedCourse ? "chapterConfirm" : "courseDetail");
       setError(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "学习集保存失败，请重试");
+      setError(cause instanceof Error ? cause.message : "课程保存失败，请重试");
     } finally {
       setCompleting(false);
     }
@@ -338,7 +337,7 @@ export function LearningSetSetupScreen() {
     const answer = question.multiple
       ? toggleDiagnosisValue(Array.isArray(current) ? current : [], value)
       : value;
-    update({ diagnosis: { ...activeDraft.diagnosis, [key]: answer } as Partial<SetDiagnosis> });
+    update({ diagnosis: { ...activeDraft.diagnosis, [key]: answer } as Partial<CourseDiagnosis> });
   }
 
   async function addFiles(event: ChangeEvent<HTMLInputElement>) {
@@ -348,7 +347,7 @@ export function LearningSetSetupScreen() {
     setSavingFile(true);
     setError(null);
     try {
-      for (const file of files) await learningSets.addLocalFile(file);
+      for (const file of files) await importCourseFile(file);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "资料保存失败，请重试");
     } finally {
@@ -357,11 +356,11 @@ export function LearningSetSetupScreen() {
   }
 
   return (
-    <div className="learning-flow learning-set-flow">
+    <div className="learning-flow course-space-flow">
       <div className="learning-flow-top">
         <button className="learning-flow-back" type="button" onClick={previous} aria-label="上一步"><ArrowLeft size={21} /></button>
-        <span className="learning-flow-progress" aria-label={step < 0 ? "学习集基本信息" : `第 ${step + 1} 类，共 6 类`}>
-          {step < 0 ? <strong>创建学习集</strong> : <><strong>{step + 1}</strong><span>/6</span></>}
+        <span className="learning-flow-progress" aria-label={step < 0 ? "课程基本信息" : `第 ${step + 1} 类，共 6 类`}>
+          {step < 0 ? <strong>创建课程</strong> : <><strong>{step + 1}</strong><span>/6</span></>}
         </span>
         <span />
       </div>
@@ -370,24 +369,24 @@ export function LearningSetSetupScreen() {
         if (event.target === event.currentTarget) setPageMotion(null);
       }}>
       {step < 0 ? (
-        <div className="learning-set-details">
+        <div className="course-space-details">
           <span className="learning-flow-symbol"><BookOpen size={24} aria-hidden="true" /></span>
-          <h1>调整学习集</h1>
+          <h1>{draft.editingCourseId ? "调整课程" : "创建课程"}</h1>
           <p>把同一目标下的书籍和资料放在一起，再设定适合自己的学习方式。</p>
-          <label className="learning-flow-label" htmlFor="learning-set-name">学习集名称</label>
+          <label className="learning-flow-label" htmlFor="course-space-name">课程名称</label>
           <input
             ref={nameRef}
-            id="learning-set-name"
+            id="course-space-name"
             className="learning-flow-name"
             maxLength={40}
             placeholder="例如：期末生物复习"
             value={draft.name}
             onChange={(event) => update({ name: event.target.value })}
           />
-          <div className="learning-set-resource-heading"><h2>加入书籍资料</h2><span>至少一份</span></div>
-          <div className="learning-set-picker" role="group" aria-label="选择已有书籍资料">
-            {courseSummaries.map((course) => {
-              const resourceId = courseResourceId(course.book_id);
+          <div className="course-space-resource-heading"><h2>加入书籍资料</h2><span>至少一份</span></div>
+          <div className="course-space-picker" role="group" aria-label="选择已有书籍资料">
+            {sourceSummaries.filter((source) => !source.book_id.startsWith("book_local_")).map((course) => {
+              const resourceId = sourceResourceId(course.book_id);
               const selected = draft.resourceIds.includes(resourceId);
               const uploadedNow = draft.uploadedCourse?.bookId === course.book_id;
               return (
@@ -398,9 +397,9 @@ export function LearningSetSetupScreen() {
                 </button>
               );
             })}
-            {draft.resourceIds.filter((resourceId) => resourceId.startsWith("course:") && !courseSummaries.some((course) => courseResourceId(course.book_id) === resourceId)).map((resourceId) => {
-              const book = communityBooks.find((item) => courseResourceId(item.id) === resourceId);
-              const uploadedNow = draft.uploadedCourse && resourceId === courseResourceId(draft.uploadedCourse.bookId);
+            {draft.resourceIds.filter((resourceId) => resourceId.startsWith("source:") && !sourceSummaries.some((course) => sourceResourceId(course.book_id) === resourceId)).map((resourceId) => {
+              const book = communityBooks.find((item) => sourceResourceId(item.id) === resourceId);
+              const uploadedNow = draft.uploadedCourse && resourceId === sourceResourceId(draft.uploadedCourse.bookId);
               return <button className="learning-resource-option selected" type="button" key={resourceId} aria-pressed="true" disabled={Boolean(uploadedNow)} onClick={() => toggleResource(resourceId)}>
                 <BookOpen size={20} aria-hidden="true" /><span><strong>{book?.title ?? draft.uploadedCourse?.name ?? "已选择课程"}</strong><small>{uploadedNow ? "刚上传 · 完成问卷后继续生成课程" : "待整理"}</small></span><Check size={18} aria-hidden="true" />
               </button>;
@@ -411,7 +410,7 @@ export function LearningSetSetupScreen() {
               return (
                 <button className={`learning-resource-option ${selected ? "selected" : ""}`} type="button" key={resourceId} aria-pressed={selected} onClick={() => toggleResource(resourceId)}>
                   <FilePlus2 size={20} aria-hidden="true" />
-                  <span><strong>{resource.name}</strong><small>本地资料 · 待整理</small></span>
+                  <span><strong>{resource.name}</strong><small>本地资料 · {resource.status === "ready" ? "可开始学习" : resource.status === "error" ? "整理失败，可重试" : "待整理"}</small></span>
                   {selected ? <Check size={18} aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}
                 </button>
               );
@@ -449,8 +448,8 @@ export function LearningSetSetupScreen() {
 
       <div className="learning-flow-bottom">
         <FlowError message={error} />
-        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程目录…" : step === 5 ? draft.uploadedCourse ? "完成问卷，查看课程目录" : "完成，进入学习集" : "下一页"}</button>
-        {step < 0 ? <button className="learning-flow-skip" type="button" onClick={() => replaceScreen("learningSet")}>返回学习集，草稿已保存</button> : null}
+        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程目录…" : step === 5 ? draft.uploadedCourse ? "完成问卷，查看课程目录" : "完成，进入课程" : "下一页"}</button>
+        {step < 0 ? <button className="learning-flow-skip" type="button" onClick={() => replaceScreen("courseDetail")}>返回课程，草稿已保存</button> : null}
       </div>
     </div>
   );

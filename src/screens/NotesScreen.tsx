@@ -6,6 +6,7 @@ import { listStudyNotes } from "../features/studyNotes/repository";
 import { noteKindLabel, type NoteKind, type StudyNote } from "../features/studyNotes/types";
 import { useLocalMotionItem } from "../motion";
 import { sourcePageImageUrl, sourcePageLabel } from "./shared";
+import { courseSourceBookIds } from "../features/courses/model";
 
 type AiGuideNote = { id: string; title: string; body: string; label: string };
 type NotesView = "mine" | "guide";
@@ -24,7 +25,7 @@ function noteIcon(note: StudyNote) {
 }
 
 export function NotesScreen() {
-  const { activeChapterId, go, openSheet, parsedAssets, parsedChapters, parsedChunks, parsedScanResult, startNote, uploadedFile } = useAppContext();
+  const { activeChapterId, courses, go, openSheet, parsedAssets, parsedChapters, parsedChunks, parsedScanResult, startNote, uploadedFile } = useAppContext();
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<NotesView>("mine");
@@ -53,7 +54,9 @@ export function NotesScreen() {
     };
   }, []);
 
-  const filteredNotes = useMemo(() => notes.filter((note) => filter === "all" || note.kind === filter), [filter, notes]);
+  const activeCourse = courses.state.courses.find((course) => course.id === courses.state.activeCourseId);
+  const courseBookIds = courseSourceBookIds(activeCourse, courses.state.resources);
+  const filteredNotes = notes.filter((note) => (filter === "all" || note.kind === filter) && (!activeCourse || !note.anchor || (note.anchor.courseId ? note.anchor.courseId === activeCourse.id : courseBookIds.includes(note.anchor.bookId))));
   const guideNotes = useMemo<AiGuideNote[]>(() => uploadedFile ? [
     ...((parsedChunks ?? []).slice(0, 4).map((chunk) => ({
       id: `chunk:${chunk.chunk_id}`,
@@ -127,6 +130,7 @@ export function NotesScreen() {
 
   function reopenNote(note: StudyNote) {
     const source = note.anchor?.bookId && note.anchor.pageStart ? {
+      courseId: note.anchor.courseId,
       bookId: note.anchor.bookId,
       title: note.anchor.chapterTitle ?? note.anchor.bookTitle ?? note.title,
       pageStart: note.anchor.pageStart,

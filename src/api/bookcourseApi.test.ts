@@ -1,9 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { bookcourseApi } from "./bookcourseApi";
+import { DemoRepository } from "../services/DemoRepository";
 
 describe("demo repository boundary", () => {
+  it("excludes catalog entries without prepared sources from the course retrieval corpus", async () => {
+    const repository = new DemoRepository();
+    const readChunks = vi.spyOn(repository, "getChunks");
+    const response = await repository.queryRag({
+      course_id: "catalog:community_functions",
+      book_id: "catalog_high_school_math_required_2",
+      book_ids: ["catalog_high_school_math_required_2", "community_functions"],
+      question: "减数分裂与受精作用有什么关系？"
+    });
+    expect(readChunks).not.toHaveBeenCalledWith("community_functions");
+    expect(response.citations).toEqual([]);
+  });
+
   it("returns the fixed local courses without a network request", async () => {
-    const courses = await bookcourseApi.listCourses();
+    const courses = await bookcourseApi.listSources();
 
     expect(courses).toHaveLength(2);
     expect(courses[0]).toMatchObject({

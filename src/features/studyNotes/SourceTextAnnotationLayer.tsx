@@ -1,5 +1,8 @@
-import { useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MessageSquareText } from "lucide-react";
+import { useMotionPresence } from "../../motion/useMotionPresence";
+import { useReducedMotion } from "../../motion/useReducedMotion";
+import type { MotionAnimationEvent } from "../../motion/useMotionPresence";
 import { textNotePosition } from "./textAnnotations";
 import type { TextNotePosition, TextStudyNote } from "./types";
 
@@ -8,29 +11,124 @@ export type TextNoteLocation = {
   pageElement: HTMLElement;
 };
 
+export type TextNoteDraftMarker = { id: string; position: TextNotePosition };
+type TextNoteMarker = TextNoteDraftMarker & { note?: TextStudyNote };
+const markerAnimationNames = ["motion-text-note-marker-in", "motion-text-note-marker-out"] as const;
+const markerKey = (marker: TextNoteMarker) => marker.id;
+
+function SourceTextNoteMarker({ marker, present, active, reducedMotion, onOpen, onDraftActivate, onClosed }: {
+  marker: TextNoteMarker;
+  present: boolean;
+  active: boolean;
+  reducedMotion: boolean;
+  onOpen: (note: TextStudyNote, location: TextNoteLocation) => void;
+  onDraftActivate?: () => void;
+  onClosed: (id: string) => void;
+}) {
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const motion = useMotionPresence({ requested: present ? marker : null, getKey: markerKey, reducedMotion, motionNames: markerAnimationNames });
+  const expectedAnimation = motion.state === "entering" ? markerAnimationNames[0]
+    : motion.state === "closing" ? markerAnimationNames[1] : null;
+
+  const settleAnimation = (event: MotionAnimationEvent, settle: typeof motion.onAnimationEnd) => {
+    if (event.animationName === expectedAnimation) settle(event);
+  };
+
+  useEffect(() => {
+    const span = spanRef.current;
+    if (!span) return;
+    const handleCancel = (event: AnimationEvent) => settleAnimation(event, motion.onAnimationCancel);
+    span.addEventListener("animationcancel", handleCancel);
+    return () => span.removeEventListener("animationcancel", handleCancel);
+  });
+
+  useEffect(() => {
+    if (!present && !motion.rendered) onClosed(marker.id);
+  }, [marker.id, motion.rendered, onClosed, present]);
+
+  const rendered = motion.rendered;
+  if (!rendered) return null;
+  const closing = !present || motion.state === "closing";
+  return (
+    <button
+      className="source-text-note-marker"
+      type="button"
+      aria-label={rendered.note ? `查看文字批注：${rendered.note.body.slice(0, 32)}` : "正在编辑文字批注"}
+      aria-expanded={active}
+      aria-hidden={closing || undefined}
+      disabled={closing}
+      title={rendered.note?.body.slice(0, 80) ?? "正在编辑文字批注"}
+      data-note-id={rendered.id}
+      data-note-draft={!rendered.note}
+      data-motion-state={motion.state}
+      data-motion-presence={motion.presenceId}
+      style={{
+        left: `clamp(22px, ${rendered.position.x * 100}%, calc(100% - 22px))`,
+        top: `clamp(22px, ${rendered.position.y * 100}%, calc(100% - 22px))`
+      }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onPointerUp={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (rendered.note) onOpen(rendered.note, { position: rendered.position, pageElement: event.currentTarget.parentElement!.parentElement! });
+        else onDraftActivate?.();
+      }}
+    >
+      <span ref={spanRef} onAnimationEnd={(event) => settleAnimation(event, motion.onAnimationEnd)}>
+        <MessageSquareText size={15} aria-hidden="true" />
+      </span>
+    </button>
+  );
+}
+
 export function SourceTextAnnotationLayer({
   activeNoteId,
+  draft,
   enabled,
   notes,
   placing,
   onOpen,
+  onDraftActivate,
   onPlace
 }: {
   activeNoteId?: string;
+  draft?: TextNoteDraftMarker;
   enabled: boolean;
   notes: TextStudyNote[];
   placing: boolean;
   onOpen: (note: TextStudyNote, location: TextNoteLocation) => void;
+  onDraftActivate?: () => void;
   onPlace: (location: TextNoteLocation) => void;
 }) {
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const multiplePointersRef = useRef(false);
+  const reducedMotion = useReducedMotion();
+  const requested = useMemo<TextNoteMarker[]>(() => {
+    if (!enabled) return [];
+    const markers = notes.filter((note) => note.position && note.body.trim())
+      .map((note) => ({ id: note.id, position: note.position!, note }));
+    if (draft && !markers.some((marker) => marker.id === draft.id)) return [...markers, draft];
+    return markers;
+  }, [draft, enabled, notes]);
+  const requestedIds = new Set(requested.map(markerKey));
+  const requestedIdsRef = useRef(requestedIds);
+  requestedIdsRef.current = requestedIds;
+  const [retained, setRetained] = useState<TextNoteMarker[]>([]);
+  const markers = [...requested, ...retained.filter((marker) => !requestedIds.has(marker.id))];
 
-  if (!enabled) return null;
+  // Include new drafts in this render, and retain removed markers until their
+  // exit finishes. Saving a draft updates the same ID without replaying entry.
+  useLayoutEffect(() => {
+    const ids = new Set(requested.map(markerKey));
+    setRetained((previous) => [...requested, ...previous.filter((marker) => !ids.has(marker.id))]);
+  }, [requested]);
+  const onClosed = useCallback((id: string) => {
+    if (!requestedIdsRef.current.has(id)) setRetained((previous) => previous.filter((marker) => marker.id !== id));
+  }, []);
 
   return (
     <div className="source-text-annotation-layer">
-      {placing ? (
+      {enabled && placing ? (
         <button
           className="source-text-placement-target"
           type="button"
@@ -56,28 +154,17 @@ export function SourceTextAnnotationLayer({
           }}
         />
       ) : null}
-      {notes.filter((note) => note.position && note.body.trim()).map((note) => (
-        <button
-          className="source-text-note-marker"
-          type="button"
-          key={note.id}
-          aria-label={`查看文字批注：${note.body.slice(0, 32)}`}
-          aria-expanded={activeNoteId === note.id}
-          title={note.body.slice(0, 80)}
-          data-note-id={note.id}
-          style={{
-            left: `clamp(22px, ${note.position!.x * 100}%, calc(100% - 22px))`,
-            top: `clamp(22px, ${note.position!.y * 100}%, calc(100% - 22px))`
-          }}
-          onPointerDown={(event) => event.stopPropagation()}
-          onPointerUp={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpen(note, { position: note.position!, pageElement: event.currentTarget.parentElement!.parentElement! });
-          }}
-        >
-          <span><MessageSquareText size={15} aria-hidden="true" /></span>
-        </button>
+      {markers.map((marker) => (
+        <SourceTextNoteMarker
+          key={marker.id}
+          marker={marker}
+          present={requestedIds.has(marker.id)}
+          active={activeNoteId === marker.id}
+          reducedMotion={reducedMotion}
+          onOpen={onOpen}
+          onDraftActivate={onDraftActivate}
+          onClosed={onClosed}
+        />
       ))}
     </div>
   );

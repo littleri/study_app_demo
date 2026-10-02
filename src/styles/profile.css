@@ -427,7 +427,7 @@
   font-weight: 800;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 720px) {
   .profile-workspace {
     grid-template-columns: minmax(240px, 0.78fr) minmax(0, 1.22fr);
     align-items: start;

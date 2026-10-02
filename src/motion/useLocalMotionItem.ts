@@ -18,6 +18,8 @@ export type LocalMotionItemOptions = {
    * enter; a changed key still receives the normal local motion.
    */
   animateInitial?: boolean;
+  /** Wait for the actual content, rather than animate a loading placeholder. */
+  ready?: boolean;
 };
 
 const animationNameByKind: Record<LocalMotionItemKind, string> = {
@@ -33,23 +35,37 @@ const animationNameByKind: Record<LocalMotionItemKind, string> = {
 export function useLocalMotionItem(
   motionKey: string,
   kind: LocalMotionItemKind = "content",
-  { animateInitial = true }: LocalMotionItemOptions = {}
+  { animateInitial = true, ready = true }: LocalMotionItemOptions = {}
 ) {
   const reducedMotion = useReducedMotion();
   const activeKeyRef = useRef<string | null>(null);
-  const [state, setState] = useState<LocalMotionItemState>(() => reducedMotion || !animateInitial ? "idle" : "entering");
+  const pendingKeyRef = useRef<string | null>(null);
+  const [state, setState] = useState<LocalMotionItemState>(() => reducedMotion || !animateInitial || !ready ? "idle" : "entering");
   const animationName = animationNameByKind[kind];
 
   useLayoutEffect(() => {
     if (activeKeyRef.current !== motionKey) {
       const isInitialKey = activeKeyRef.current === null;
       activeKeyRef.current = motionKey;
-      setState(reducedMotion || (isInitialKey && !animateInitial) ? "idle" : "entering");
+      const shouldEnter = !reducedMotion && (!isInitialKey || animateInitial);
+      pendingKeyRef.current = shouldEnter && !ready ? motionKey : null;
+      setState(shouldEnter && ready ? "entering" : "idle");
       return;
     }
 
-    if (reducedMotion) setState("idle");
-  }, [animateInitial, motionKey, reducedMotion]);
+    if (reducedMotion) {
+      pendingKeyRef.current = null;
+      setState("idle");
+    } else if (!ready && state === "entering") {
+      // Image loaders can expose their new loading phase in a layout effect.
+      // Defer an entry scheduled for that same key until its content arrives.
+      pendingKeyRef.current = motionKey;
+      setState("idle");
+    } else if (ready && pendingKeyRef.current === motionKey) {
+      pendingKeyRef.current = null;
+      setState("entering");
+    }
+  }, [animateInitial, motionKey, ready, reducedMotion, state]);
 
   const onAnimationEnd = useCallback((event: AnimationEvent<HTMLElement>) => {
     if (event.target !== event.currentTarget) return;

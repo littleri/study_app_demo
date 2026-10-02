@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   ApiChapter,
-  CourseSummary,
+  CourseSourceSummary,
   ScanResult,
   StudyPlan
 } from "../types/api";
@@ -16,7 +16,7 @@ import {
   shouldClearLoadedCourseForDeletedBook,
   shouldClearRemoteSessionAfterRefresh,
   type LoadedCourseContext
-} from "./courseResourceIdentity";
+} from "./sourceResourceIdentity";
 
 function uploaded(bookId: string, origin: UploadedCourseFile["origin"] = "remote-course"): UploadedCourseFile {
   return {
@@ -29,7 +29,7 @@ function uploaded(bookId: string, origin: UploadedCourseFile["origin"] = "remote
   };
 }
 
-function summary(bookId: string): CourseSummary {
+function summary(bookId: string): CourseSourceSummary {
   return {
     book_id: bookId,
     title: `教材 ${bookId}`,

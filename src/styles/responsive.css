@@ -9,7 +9,7 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 719px) and (orientation: portrait) {
   :root {
     --status-bar-height: max(var(--ios-status-bar-height), env(safe-area-inset-top, 0px));
     --home-indicator-height: var(--ios-home-indicator-height);
@@ -143,7 +143,7 @@ body {
 
 /* Keep the established phone reading order (selected detail, then list).
    The pad's single-column layout applies the same sequence in tablet.css. */
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .notes-detail-panel {
     order: 1;
   }
@@ -157,7 +157,7 @@ body {
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   :root {
     --status-bar-height: 0px;
     --home-indicator-height: 0px;
@@ -373,7 +373,7 @@ body {
 /* The phone assistant is a bottom-anchored conversation surface. Keep this
    contract when the soft keyboard shortens the Android WebView below 600px;
    visual-viewport variables move the bottom edge above the keyboard. */
-@media (max-width: 767px) {
+@media (max-width: 719px) {
   .ai-overlay {
     top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--header-block-size));
     right: 0;
@@ -434,7 +434,7 @@ body {
   transform: none;
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .ai-overlay {
     top: calc(var(--overlay-visual-top) + var(--safe-area-top) + var(--space-layout));
     right: calc(var(--safe-area-right) + var(--space-inline));
@@ -716,13 +716,13 @@ body {
   );
 }
 
-@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+@media (max-width: 719px) and (min-height: 600px) and (orientation: portrait) {
   .screen-content[data-screen="chapterConfirm"] ~ .toast {
     bottom: calc(var(--overlay-visual-bottom) + var(--safe-area-bottom) + 1px);
   }
 }
 
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .toc-entry {
     grid-template-columns: var(--touch-target-min) minmax(0, 1fr) var(--touch-target-min);
     grid-template-rows: minmax(var(--touch-target-min), auto) auto;
@@ -775,7 +775,7 @@ body {
 
 /* On portrait phones the assistant docks on the right, so keep the chapter
    editor affordance on the clear side of each directory row. */
-@media (max-width: 767px) and (min-height: 600px) {
+@media (max-width: 719px) and (min-height: 600px) {
   .chapter-confirm-screen .toc-edit-button {
     grid-column: 1;
   }
@@ -786,7 +786,7 @@ body {
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .upload-flow-screen,
   .parse-flow-screen,
   .processing-flow-screen,
@@ -1222,7 +1222,7 @@ body {
   min-height: var(--touch-target-min);
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .ai-orb.ai-orb-mascot,
   .lesson-ai-entry {
     width: 4.25rem;
@@ -1552,7 +1552,7 @@ body {
   background: transparent;
 }
 
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 719px) and (orientation: portrait) {
   .screen-content[data-screen="assignment"] {
     padding-bottom: 0;
   }
@@ -1592,7 +1592,7 @@ body {
   width: 100%;
 }
 
-@media (max-width: 767px) and (min-height: 600px) and (orientation: portrait) {
+@media (max-width: 719px) and (min-height: 600px) and (orientation: portrait) {
   .assignment-primary-action {
     position: static;
     padding: 0;
@@ -1865,7 +1865,7 @@ body {
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .study-plan-workspace {
     grid-template-columns: minmax(352px, 0.92fr) minmax(0, 1.08fr);
     align-items: start;

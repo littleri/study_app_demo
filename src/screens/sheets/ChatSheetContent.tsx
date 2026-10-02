@@ -1,3 +1,5 @@
+import { courseRagScope } from "../../features/courses/selectors";
+import { useAppContext } from "../../context/AppContext";
 import { useEffect, useState } from "react";
 import type {
   ApiChapter
@@ -43,6 +45,8 @@ export function ChatSheetContent({
   uploadedFile: UploadedCourseFile | null;
 }) {
   const bookcourseRepository = useBookCourseRepository();
+  const { courses } = useAppContext();
+  const currentCourse = courses.state.courses.find((course) => course.id === courses.state.activeCourseId);
   const credits = useCredits();
   const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId) ?? parsedChapters?.[0] ?? null;
   const [question, setQuestion] = useState("");
@@ -88,6 +92,7 @@ export function ChatSheetContent({
     setError(null);
     try {
       const result = await bookcourseRepository.queryRag({
+        ...courseRagScope(courses.state, uploadedFile.bookId),
         book_id: uploadedFile.bookId,
         chapter_id: activeChapter?.chapter_id ?? null,
         history,
@@ -105,13 +110,13 @@ export function ChatSheetContent({
       credits.complete(reservationId);
       setMessages((items) => [...items, { role: "assistant", text: result.answer }]);
       setCitations(result.citations.slice(0, 3).map((item) => ({
-        bookId: uploadedFile.bookId,
+        bookId: item.book_id ?? String(item.source_metadata.book_id ?? uploadedFile.bookId),
         page: item.location_label || `第 ${item.page} 页`,
         pdfPage: item.page,
         quote: item.quote,
         pageText: getCitationSourceText(item),
         image: getExtractedCitationSourcePageImage(item.chunk_id, result.related_assets),
-        title: item.chapter_title
+        title: typeof item.source_metadata.filename === "string" ? `${item.source_metadata.filename} · ${item.chapter_title}` : item.chapter_title
       })));
     } catch (err) {
       credits.refund(reservationId);
@@ -125,7 +130,7 @@ export function ChatSheetContent({
     <div className="sheet-body chat-sheet">
       <div className="chat-sheet-transcript">
         <p className="chat-credit-summary" aria-live="polite">剩余 {credits.balance} 积分 · 每次提问消耗 {creditCosts.chat} 积分</p>
-        <Pill tone="sky">{uploadedFile ? `当前教材：《${uploadedFile.name}》` : "需要先上传教材"}</Pill>
+        <Pill tone="sky">{currentCourse ? `当前课程：《${currentCourse.name}》` : "请先选择课程"}</Pill>
         <Pill tone={hasDirectDeepSeekKey() ? "purple" : "sky"}>{getAiRuntimeLabel()}</Pill>
         {messages.length === 0 ? (
           <div className="chat-bubble ai" aria-live="polite">{intro}</div>
@@ -149,6 +154,7 @@ export function ChatSheetContent({
             image={citation.image}
             openLabel="查看教材原文"
             onOpen={() => openSourcePage({
+              courseId: currentCourse?.id,
               bookId: citation.bookId,
               title: citation.title,
               pageStart: citation.pdfPage,

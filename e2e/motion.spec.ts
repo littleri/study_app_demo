@@ -129,10 +129,7 @@ async function advanceAssignmentToShortAnswer(page: Page) {
 
 async function openStudy(page: Page) {
   await gotoApp(page);
-  await openLibrary(page);
-  const course = page.locator(".library-course-grid .course-space-card").first();
-  await expect(course).toBeVisible();
-  await course.locator(".button-row .button").click();
+  await page.getByRole("button", { name: "学习", exact: true }).click();
   await expect(page.locator(".book-course-screen")).toBeVisible({ timeout: 15_000 });
   await settleScreen(page);
 }
@@ -280,9 +277,10 @@ async function expectFocusWithin(page: Page, locator: Locator, label: string) {
 async function expectLocalEntry(locator: Locator, label: string) {
   await expect(locator, `${label}: local state enters`).toHaveAttribute("data-motion-item-state", "entering");
   const motion = await readAnimation(locator);
-  expect(motion.duration, `${label}: local base duration`).toBe("0.18s");
+  const pageSwitch = await locator.getAttribute("data-motion-item") === "source-page-content";
+  expect(motion.duration, `${label}: semantic entry duration`).toBe(pageSwitch ? "0.35s" : "0.18s");
   expect(motion.playState, `${label}: pause probe owns the phase`).toBe("paused");
-  expect(normalizeTimingFunction(motion.timing), `${label}: named local enter curve`).toBe(curves.localEnter);
+  expect(normalizeTimingFunction(motion.timing), `${label}: named enter curve`).toBe(pageSwitch ? curves.globalEnter : curves.localEnter);
   return motion.name.split(",")[0].trim();
 }
 

@@ -168,7 +168,7 @@
   max-height: 170px;
 }
 
-.app-shell .study-plan-summary .progress-wrap > span {
+.app-shell .study-plan-summary:not(.is-compact) .progress-wrap > span {
   max-height: 32px;
 }
 
@@ -182,7 +182,7 @@
   line-height: 1.35 !important;
 }
 
-@media (max-width: 767px) and (min-height: 741px) and (orientation: portrait) {
+@media (max-width: 719px) and (min-height: 741px) and (orientation: portrait) {
   .app-shell .parse-ready-visual .community-detail-cover,
   .app-shell .parse-ready-visual .community-detail-cover-fallback {
     width: min(54%, 15rem);
@@ -193,7 +193,7 @@
   }
 }
 
-@media (max-width: 767px) and (max-height: 740px) and (orientation: portrait) {
+@media (max-width: 719px) and (max-height: 740px) and (orientation: portrait) {
   .app-shell .parse-ready-visual .community-detail-cover,
   .app-shell .parse-ready-visual .community-detail-cover-fallback {
     top: 0;

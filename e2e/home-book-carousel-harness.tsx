@@ -17,8 +17,8 @@ import {
   shouldClearLoadedCourseForDeletedBook,
   shouldClearRemoteSessionAfterRefresh,
   type LoadedCourseContext
-} from "../src/screens/courseResourceIdentity";
-import type { ApiChapter, CourseSummary, JobStatusResponse, ScanResult, StudyPlan } from "../src/types/api";
+} from "../src/screens/sourceResourceIdentity";
+import type { ApiChapter, CourseSourceSummary, JobStatusResponse, ScanResult, StudyPlan } from "../src/types/api";
 import type { UploadedCourseFile } from "../src/types/app";
 import "../src/styles/tokens.css";
 import "../src/styles/base.css";
@@ -51,8 +51,8 @@ function summary(
   bookId: string,
   title: string,
   status: string,
-  overrides: Partial<CourseSummary> = {}
-): CourseSummary {
+  overrides: Partial<CourseSourceSummary> = {}
+): CourseSourceSummary {
   return {
     book_id: bookId,
     title,
@@ -68,7 +68,7 @@ function summary(
   };
 }
 
-const courseSummaries: CourseSummary[] = [
+const courseSummaries: CourseSourceSummary[] = [
   summary("book-a", "高中生物 必修二 遗传与进化", "ready", { page_count: 128, chapter_count: 7 }),
   summary("book-b", "这是一本用于验证窄屏省略和稳定换行的超长高中数学教材标题", "ready", { page_count: 146, chapter_count: 12 }),
   summary("book-c", "高中化学 必修一", "processing", { parse_job_status: "processing", parse_job_progress: 58 }),
@@ -294,7 +294,7 @@ function HarnessView() {
 
   window.__homeBookCarouselHarness = {
     applySuccessfulRefresh(bookIds) {
-      const summaries = bookIds.map((bookId) => ({ book_id: bookId })) as CourseSummary[];
+      const summaries = bookIds.map((bookId) => ({ book_id: bookId })) as CourseSourceSummary[];
       const activeSession = sessionBookId ? loadedContext.uploadedFile : null;
       if (shouldClearLoadedCourseAfterRefresh(loadedBookId, activeSession, summaries)) {
         setLoadedBookId(null);

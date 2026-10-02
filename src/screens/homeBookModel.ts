@@ -1,6 +1,6 @@
-import type { CourseSummary, JobStatusResponse } from "../types/api";
+import type { CourseSourceSummary, JobStatusResponse } from "../types/api";
 import type { UploadedCourseFile } from "../types/app";
-import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "../context/AppContext";
+import type { SourceSummariesLoadState, SourceSummariesReadyKind } from "../context/AppContext";
 
 export type HomeBookStatus =
   | "catalog"
@@ -38,7 +38,7 @@ export type HomeBookModel = Readonly<{
 }>;
 
 export type BuildHomeBookModelsInput = Readonly<{
-  courses: readonly CourseSummary[];
+  courses: readonly CourseSourceSummary[];
   uploadedFile: UploadedCourseFile | null;
   parseJobId: string | null;
   parseJobStatus: JobStatusResponse | null;
@@ -54,7 +54,7 @@ function clampProgress(progress: number | null | undefined): number {
   return Math.max(0, Math.min(100, Math.round(progress ?? 0)));
 }
 
-function normalizeRemoteStatus(course: CourseSummary): HomeBookStatus {
+function normalizeRemoteStatus(course: CourseSourceSummary): HomeBookStatus {
   if (course.parse_job_status === "failed") return "error";
   if (course.parse_job_status === "pending" || course.parse_job_status === "processing") {
     return "processing";
@@ -123,8 +123,8 @@ export function canOpenHomeBookOriginal(
 
 export function resolveHomeBookListState(input: Readonly<{
   bookCount: number;
-  loadState: CourseSummariesLoadState;
-  readyKind: CourseSummariesReadyKind;
+  loadState: SourceSummariesLoadState;
+  readyKind: SourceSummariesReadyKind;
 }>): HomeBookListState {
   if (input.bookCount > 0) return "content";
   if (input.loadState === "loading") return "loading";
@@ -165,7 +165,7 @@ export function buildHomeBookModels({
   parseJobStatus,
   catalogBooks = []
 }: BuildHomeBookModelsInput): HomeBookModel[] {
-  const uniqueCourses: CourseSummary[] = [];
+  const uniqueCourses: CourseSourceSummary[] = [];
   const seenBookIds = new Set<string>();
 
   for (const course of courses) {

@@ -147,6 +147,7 @@ export const supportedCourseMimeTypes = [
 ] as const;
 
 export const acceptedCourseFileTypes = [
+  ".txt", ".md", ".csv", "text/plain", "text/markdown", "text/csv",
   ...supportedCourseExtensions,
   ...supportedCourseMimeTypes
 ].join(",");
@@ -154,13 +155,13 @@ export const acceptedCourseFileTypes = [
 export function validateCourseFile(file: Pick<File, "name" | "size" | "type">) {
   const normalizedName = file.name.trim().toLowerCase();
   const normalizedType = file.type.trim().toLowerCase();
-  const hasSupportedExtension = supportedCourseExtensions.some((extension) => normalizedName.endsWith(extension));
+  const hasSupportedExtension = [...supportedCourseExtensions, ".txt", ".md", ".csv"].some((extension) => normalizedName.endsWith(extension));
   const hasSupportedMimeType = supportedCourseMimeTypes.some((type) => normalizedType === type);
 
   if (!file.name.trim()) return "请选择一个有文件名的学习资料";
   if (file.size <= 0) return "这个文件为空，请重新选择";
   if (!hasSupportedExtension && !hasSupportedMimeType) {
-    return "请选择 PDF、图片、Word、PowerPoint 或 Excel 文件";
+    return "请选择 PDF、图片、Office 或文本文件";
   }
   return null;
 }
@@ -300,7 +301,7 @@ export function ChapterEvidenceReasons({ evidenceId, reasons }: { evidenceId: st
   );
 }
 
-export function CourseSummariesSkeleton({ variant }: { variant: "compact" | "grid" }) {
+export function SourceSummariesSkeleton({ variant }: { variant: "compact" | "grid" }) {
   const count = variant === "compact" ? 2 : 3;
   return (
     <div className={`course-summary-skeleton course-summary-skeleton-${variant}`} aria-hidden="true">
@@ -316,7 +317,7 @@ export function CourseSummariesSkeleton({ variant }: { variant: "compact" | "gri
   );
 }
 
-export function CourseSummaryLoadError({
+export function CourseSourceSummaryLoadError({
   message,
   onRetry,
   refreshing

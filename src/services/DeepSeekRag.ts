@@ -338,6 +338,7 @@ export function createLocalCitation(
   const quote = createCitationExcerpt(chunk.text);
 
   return {
+    book_id: chunk.book_id,
     chapter_id: chunk.chapter_id,
     chapter_title: chapter?.source_title ?? "教材原文",
     page,
@@ -352,6 +353,7 @@ export function createLocalCitation(
       : "PDF 第 " + page + " 页",
     source_metadata: {
       ...metadata,
+      book_id: chunk.book_id,
       retrieval_quote: quote,
       // This is locally bundled corpus text, not model output. It gives the
       // source reader a usable offline page-text view when no released page
@@ -563,6 +565,8 @@ function toolReliableMatches(
     sources: rankedChunks.map((ranked, index) => ({
       retrieval_method: ranked.retrievalMethod ?? "on-device-keyword-rag",
       score: Number(ranked.score.toFixed(4)),
+      book_id: ranked.chunk.book_id,
+      filename: ranked.chunk.source_metadata?.filename ?? null,
       chunk_id: ranked.chunk.chunk_id,
       chapter_id: ranked.chunk.chapter_id,
       section_id: "section_id" in ranked.chunk && typeof ranked.chunk.section_id === "string"
@@ -597,13 +601,16 @@ async function rankToolChunks(
     limit: 5,
     reliableOnly: true
   });
-  return {
-    rankedChunks: response.hits.slice(0, LOCAL_TEXTBOOK_CONTEXT_LIMIT).map((hit) => ({
+  const eligibleBooks = new Set(corpus.chunks.map((chunk) => chunk.book_id));
+  const staticHits = response.hits.filter((hit) => eligibleBooks.has(hit.chunk.book_id)).map((hit) => ({
       chunk: hit.chunk,
       score: hit.score,
       retrievalMethod: response.method,
       reliabilityThreshold: response.minimum_evidence_threshold ?? undefined
-    })),
+    }));
+  const localHits = selectReliableLocalChunks(question, corpus.chunks.filter((chunk) => chunk.book_id.startsWith("book_local_")), chapterId);
+  return {
+    rankedChunks: [...staticHits, ...localHits].sort((a, b) => b.score - a.score).slice(0, LOCAL_TEXTBOOK_CONTEXT_LIMIT),
     method: response.method,
     errorCode: response.error_code ?? null
   };

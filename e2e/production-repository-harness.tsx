@@ -9,7 +9,7 @@ import type {
   ApiAsset,
   AssignmentSubmitRequest,
   AssignmentSubmitResponse,
-  CourseSummary,
+  CourseSourceSummary,
   DiagnosisResponse,
   MistakeRecord,
   StudyPlan,
@@ -107,12 +107,12 @@ class ProductionScenarioRepository extends DemoRepository {
     this.mistakesWait = null;
   }
 
-  override async listCourses(): Promise<CourseSummary[]> {
-    if (this.scenario === "course-loading") return new Promise<CourseSummary[]>(() => undefined);
+  override async listSources(): Promise<CourseSourceSummary[]> {
+    if (this.scenario === "course-loading") return new Promise<CourseSourceSummary[]>(() => undefined);
     if (this.scenario === "course-error") throw new Error("Controlled production course list failed");
     if (this.scenario === "empty") return [];
 
-    const [base] = await super.listCourses();
+    const [base] = await super.listSources();
     const courses = this.scenario === "library"
       ? [
           base,

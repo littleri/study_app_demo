@@ -2,7 +2,7 @@ import type {
   ApiAsset,
   ApiChapter,
   ApiChunk,
-  CourseSummary,
+  CourseSourceSummary,
   Flashcard,
   Lesson,
   QuizQuestion,
@@ -98,7 +98,7 @@ export const demoMathChapters: ApiChapter[] = [
   directoryEntry({ id: "math-c10-review", level: 2, title: "复习参考题 10", pageStart: 263, pageEnd: 264, parentId: "math-c10" })
 ];
 
-export const demoMathSummary: CourseSummary = {
+export const demoMathSummary: CourseSourceSummary = {
   book_id: demoMathBookId,
   title: "数学 必修 第二册",
   filename: "普通高中教科书 数学 必修 第二册 A版.pdf",

@@ -78,14 +78,14 @@ function workspaceDescription(book: HomeBookModel): string {
     case "uploaded":
       return "文件已经安全保存，但还没有开始整理。启动后可以在后台继续处理。";
     case "unknown":
-      return "暂时无法确认这本教材的处理状态。查看教材详情或重新上传，章节工具不会提前解锁。";
+      return "暂时无法确认这门课程的处理状态。查看教材详情或重新上传，章节工具不会提前解锁。";
   }
 }
 
 function statusActionLabel(book: HomeBookModel, hasLocalUploadSession: boolean): string {
   switch (book.status) {
     case "catalog":
-      return "导入这本教材";
+      return "导入这门课程";
     case "processing":
       return "查看整理详情";
     case "needs_review":
@@ -185,11 +185,11 @@ function StatusActions({
 function LoadingBookWorkspace({ book }: Readonly<{ book: HomeBookModel | null }>) {
   const announcement = book
     ? `正在准备《${book.title}》，学习操作暂不可用。`
-    : "正在加载教材列表，上传和学习操作暂不可用。";
+    : "正在加载课程列表，上传和学习操作暂不可用。";
   return (
     <section
       className="home-focus-panel home-book-workspace is-loading"
-      aria-label={book ? `正在切换到${book.title}` : "正在加载教材工作区"}
+      aria-label={book ? `正在切换到${book.title}` : "正在加载课程工作区"}
       aria-busy="true"
       data-book-id={book?.bookId}
       data-loaded="false"
@@ -295,14 +295,14 @@ export function SelectedBookWorkspace({
       <div className="home-workspace-copy">
         <span className="home-workspace-label">
           {statusIcon(book)}
-          {workspaceReady ? "这本书的下一步" : book.statusLabel}
+          {workspaceReady ? "这门课程的下一步" : book.statusLabel}
         </span>
         <p className="home-workspace-course" title={book.title}>{book.title}</p>
         <h2 id="home-workspace-title">
           {workspaceReady
             ? workspaceChapterTitle
             : readyLoadFailed
-              ? "暂时无法打开这本教材"
+              ? "暂时无法打开这门课程"
               : workspaceHeading(book)}
         </h2>
         {!workspaceReady ? (
@@ -353,6 +353,7 @@ export function SelectedBookWorkspace({
               <span>围绕当前章节继续练习与复习</span>
             </div>
             <ChapterToolCards
+              layout="rail"
               ariaLabel={`${workspaceChapterTitle}的本章工具`}
               chapterTitle={workspaceChapterTitle ?? book.title}
               onSelectTool={previewReady

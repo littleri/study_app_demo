@@ -46,7 +46,7 @@ test.describe("home book carousel", () => {
   });
 
   test("switches ready books with blur, keyboard semantics, and an atomic loading workspace", async ({ page }) => {
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const options = listbox.getByRole("option");
     await expect(options).toHaveCount(10);
     const first = options.nth(0);
@@ -104,7 +104,7 @@ test.describe("home book carousel", () => {
   });
 
   test("keeps non-ready books in summary mode without starting a full load", async ({ page }) => {
-    const options = page.getByRole("listbox", { name: "选择教材" }).getByRole("option");
+    const options = page.getByRole("listbox", { name: "选择课程" }).getByRole("option");
     await options.nth(2).click();
     await expect(options.nth(2)).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('.home-book-workspace[data-book-id="book-c"]')).toHaveClass(/is-processing/);
@@ -113,7 +113,7 @@ test.describe("home book carousel", () => {
   });
 
   test("renders mutually exclusive safe workspaces for every non-ready and unknown state", async ({ page }, testInfo) => {
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const cases = [
       { bookId: "book-c", state: "processing", heading: "正在整理教材", action: "查看整理详情" },
       { bookId: "book-e", state: "needs_review", heading: "课程目录等待确认", action: "确认课程目录" },
@@ -197,7 +197,7 @@ test.describe("home book carousel", () => {
 
   test("restores the previously loaded book when a candidate fails", async ({ page }) => {
     await page.evaluate(() => window.__homeBookCarouselHarness?.failNextSelection("book-b"));
-    const options = page.getByRole("listbox", { name: "选择教材" }).getByRole("option");
+    const options = page.getByRole("listbox", { name: "选择课程" }).getByRole("option");
     await options.nth(1).click();
     await expect(page.locator('.home-book-workspace[data-book-id="book-b"]')).toHaveAttribute("aria-busy", "true");
     await expect(options.nth(0)).toHaveAttribute("aria-selected", "true");
@@ -217,7 +217,7 @@ test.describe("home book carousel", () => {
       window.__homeBookCarouselHarness?.clearLoadedBook();
       window.__homeBookCarouselHarness?.failNextSelection("book-b");
     });
-    const options = page.getByRole("listbox", { name: "选择教材" }).getByRole("option");
+    const options = page.getByRole("listbox", { name: "选择课程" }).getByRole("option");
     await options.nth(1).click();
     await expect(page.locator('.home-book-workspace[data-book-id="book-b"]')).toHaveAttribute("aria-busy", "true");
     await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
@@ -346,7 +346,7 @@ test.describe("home book carousel", () => {
   });
 
   test("switches books with a mouse grab drag", async ({ page }) => {
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const options = listbox.getByRole("option");
     await listbox.evaluate((element) => {
       element.style.width = "320px";
@@ -395,7 +395,7 @@ test.describe("home book carousel", () => {
   });
 
   test("commits the nearest book after real scrolling and clamps Home/End boundaries", async ({ page }) => {
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const options = listbox.getByRole("option");
     await expect(listbox).toHaveCSS("scroll-snap-type", "x mandatory");
     await expect(options.first()).toHaveCSS("scroll-snap-align", "center");
@@ -424,7 +424,7 @@ test.describe("home book carousel", () => {
 
   test("centers books only on the horizontal axis without moving the page", async ({ page }) => {
     await page.setViewportSize({ width: 874, height: 402 });
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const options = listbox.getByRole("option");
     const first = options.first();
     const second = options.nth(1);
@@ -450,18 +450,18 @@ test.describe("home book carousel", () => {
     await expect(page.getByRole("button", { name: "上传第一本教材", exact: true })).toBeVisible();
 
     await page.evaluate(() => window.__homeBookCarouselHarness?.setMode("single"));
-    let listbox = page.getByRole("listbox", { name: "选择教材" });
+    let listbox = page.getByRole("listbox", { name: "选择课程" });
     await expect(listbox).toHaveClass(/is-single/);
     await expect(listbox.getByRole("option")).toHaveCount(1);
     await expect(listbox.getByRole("option")).toHaveAttribute("aria-selected", "true");
 
     await page.evaluate(() => window.__homeBookCarouselHarness?.setMode("two"));
-    listbox = page.getByRole("listbox", { name: "选择教材" });
+    listbox = page.getByRole("listbox", { name: "选择课程" });
     await expect(listbox.getByRole("option")).toHaveCount(2);
     await expect(listbox.getByRole("option").nth(1)).toHaveAttribute("aria-selected", "false");
 
     await page.evaluate(() => window.__homeBookCarouselHarness?.setMode("many"));
-    await expect(page.getByRole("listbox", { name: "选择教材" }).getByRole("option")).toHaveCount(10);
+    await expect(page.getByRole("listbox", { name: "选择课程" }).getByRole("option")).toHaveCount(10);
     await expect(page.getByText("1 / 10", { exact: true })).toBeVisible();
   });
 });
@@ -474,7 +474,7 @@ test.describe("default homepage visual regression", () => {
 
     const dashboard = page.locator(".home-dashboard");
     await expect(dashboard).toBeVisible();
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     await expect(listbox).toBeVisible();
     const bookOptions = listbox.getByRole("option");
     await expect(bookOptions).toHaveCount(8);
@@ -610,7 +610,7 @@ test.describe("default homepage visual regression", () => {
     await page.setViewportSize({ width: 434, height: 903 });
     await page.goto("/?embedded=device-preview");
 
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     await expect(listbox).toBeVisible();
     await expect.poll(() => listbox.evaluate((element) => {
       const selected = element.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
@@ -658,14 +658,14 @@ test.describe("default homepage visual regression", () => {
       .toBeLessThanOrEqual(2.7);
   });
 
-  test("keeps the greeting bar pinned and opens learning set creation from its primary action", async ({ page }, testInfo) => {
+  test("keeps the greeting bar pinned and opens course creation from its primary action", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "iphone-17-pro", "The browser annotation targets the iPhone portrait header.");
     await page.setViewportSize({ width: 434, height: 903 });
     await page.goto("/?embedded=device-preview");
 
     const header = page.locator(".home-topline");
     const screen = page.locator('.screen-content[data-screen="home"]');
-    const importAction = header.getByRole("button", { name: "创建学习集" });
+    const importAction = header.getByRole("button", { name: "创建课程" });
     await expect(importAction).toBeVisible();
     await expect(importAction).toHaveCSS("background-color", "rgb(124, 58, 237)");
 
@@ -781,7 +781,7 @@ test.describe("default homepage visual regression", () => {
 
   test("switches shelf books to real or subject-specific mock next steps and tools", async ({ page }) => {
     await page.goto("/?embedded=device-preview");
-    const listbox = page.getByRole("listbox", { name: "选择教材" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
     const mathBook = listbox.locator('[data-book-id="catalog_high_school_math_required_2"]');
     await mathBook.click();
     const mathWorkspace = page.locator('.home-book-workspace[data-book-id="catalog_high_school_math_required_2"]');

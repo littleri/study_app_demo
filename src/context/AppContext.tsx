@@ -3,7 +3,7 @@ import type {
   ApiAsset,
   ApiChapter,
   ApiChunk,
-  CourseSummary,
+  CourseSourceSummary,
   DiagnosisResponse,
   Flashcard,
   JobStatusResponse,
@@ -15,13 +15,13 @@ import type {
 } from "../types/api";
 import type { AppActions, SourcePageTarget, StudyLocation, UploadedCourseFile } from "../types/app";
 import type { NoteCaptureIntent } from "../features/studyNotes/types";
-import type { LearningSetController } from "../features/learningSets/repository";
+import type { CourseController } from "../features/courses/repository";
 
-export type CourseSummariesLoadState = "loading" | "ready" | "error";
-export type CourseSummariesReadyKind = "content" | "empty";
+export type SourceSummariesLoadState = "loading" | "ready" | "error";
+export type SourceSummariesReadyKind = "content" | "empty";
 
 export type AppContextValue = AppActions & {
-  learningSets: LearningSetController;
+  courses: CourseController;
   /** Enables local display-only shelf metadata in the bundled demo app. */
   demoShelfEnabled?: boolean;
   selectedUpload: boolean;
@@ -32,20 +32,20 @@ export type AppContextValue = AppActions & {
   setParseJobId: (value: string | null) => void;
   parseJobStatus: JobStatusResponse | null;
   setParseJobStatus: (value: JobStatusResponse | null) => void;
-  courseSummaries: CourseSummary[];
-  courseSummariesLoadState: CourseSummariesLoadState;
-  courseSummariesReadyKind: CourseSummariesReadyKind;
-  courseSummariesError: string | null;
-  courseSummariesRefreshing: boolean;
+  sourceSummaries: CourseSourceSummary[];
+  sourceSummariesLoadState: SourceSummariesLoadState;
+  sourceSummariesReadyKind: SourceSummariesReadyKind;
+  sourceSummariesError: string | null;
+  sourceSummariesRefreshing: boolean;
   loadedBookId: string | null;
   clearLoadedCourse: (expectedBookId?: string) => boolean;
   clearCourseSession: (expectedBookId?: string) => boolean;
   pendingBookId: string | null;
-  courseSelectionLoadingId: string | null;
+  sourceSelectionLoadingId: string | null;
   selectedCommunityBookId: string;
   selectCommunityBook: (bookId: string) => void;
-  cancelCourseSelection: () => void;
-  refreshCourses: () => Promise<void>;
+  cancelSourceSelection: () => void;
+  refreshSources: () => Promise<void>;
   parsedScanResult: ScanResult | null;
   setParsedScanResult: (value: ScanResult | null) => void;
   parsedChapters: ApiChapter[] | null;

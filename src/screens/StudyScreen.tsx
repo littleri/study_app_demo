@@ -23,11 +23,14 @@ import type { ChapterTreeNode } from "../utils/chapterStructure";
 import { courseCoverImageUrl, liveBookTitle, sourcePageLabel } from "./shared";
 import { studyToolDefinitions, type StudyToolId } from "./studyTools";
 import { calculateChapterProgress } from "./studyProgress";
-import { hasCompleteLoadedCourseContext } from "./courseResourceIdentity";
+import { hasCompleteLoadedCourseContext } from "./sourceResourceIdentity";
 import { buildStudyDirectory, normalizeStudyLocation } from "./studyDirectory";
 import { currentStudyPlanTask, mergeFrontEndMockStudyTasks } from "./studyPlanPresentation";
-import { preferredToolIds } from "../features/learningSets/recommendations";
-import { courseResourceId } from "../features/learningSets/model";
+import { preferredToolIds } from "../features/courses/recommendations";
+import { bookIdFromResourceId } from "../features/courses/model";
+import { courseLocationKey, courseSources, courseProgress } from "../features/courses/selectors";
+import { useCoursePlans } from "../features/courses/useCoursePlans";
+import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 
 const curatedBiologyBookId = "book_biology_2";
 
@@ -66,10 +69,10 @@ function getChapterNodeIds(node: ChapterTreeNode): string[] {
 }
 
 function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
-  const { go, learningSets, openSheet, setActiveChapterId, uploadedFile } = useAppContext();
-  const activeSet = learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId
-    && uploadedFile && item.resourceIds.includes(courseResourceId(uploadedFile.bookId)));
-  const toolOrder = activeSet ? preferredToolIds(activeSet.diagnosis) : undefined;
+  const { go, courses, setActiveChapterId, uploadedFile } = useAppContext();
+  const activeCourseProfile = courses.state.courses.find((item) => item.id === courses.state.activeCourseId
+    && uploadedFile && item.resourceIds.some((id) => bookIdFromResourceId(id, courses.state.resources) === uploadedFile.bookId));
+  const toolOrder = activeCourseProfile ? preferredToolIds(activeCourseProfile.diagnosis) : undefined;
   const primaryTool = studyToolDefinitions.find((tool) => tool.id === "source");
 
   function openTool(toolId: StudyToolId) {
@@ -101,10 +104,9 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
           <ChevronRight size={17} aria-hidden="true" />
         </button>
       </div>
-      {activeSet?.diagnosis.aids.includes("chat") || activeSet?.diagnosis.aids.includes("video") ? (
+      {activeCourseProfile?.diagnosis.aids.includes("video") ? (
         <div className="study-personal-aids" aria-label="偏好的学习辅助">
-          {activeSet.diagnosis.aids.includes("chat") ? <button type="button" onClick={() => openSheet({ type: "chat" })}>优先问 AI 讲解</button> : null}
-          {activeSet.diagnosis.aids.includes("video") ? <button type="button" onClick={() => openTool("source")}>查看已有图示与动画 · 视频待提供</button> : null}
+          <button type="button" onClick={() => openTool("source")}>查看已有图示与动画 · 视频待提供</button>
         </div>
       ) : null}
       <ChapterToolCards chapterTitle={chapter.source_title} onSelectTool={openTool} orderedToolIds={toolOrder} />
@@ -353,10 +355,10 @@ function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
       <span className="study-empty-icon" aria-hidden="true">
         {kind === "empty" ? <Upload size={26} /> : <LibraryBig size={26} />}
       </span>
-      <h2>{kind === "empty" ? "开始你的第一门课程" : "教材还在准备中"}</h2>
+      <h2>{kind === "empty" ? "开始你的第一门课程" : "课程资料还在准备中"}</h2>
       <p>{kind === "empty" ? "添加教材后，这里会按原书目录整理章节和每个小节的学习入口。" : "你可以查看解析进度，或先选择另一门已经就绪的课程。"}</p>
-      <Button onClick={() => go(kind === "empty" ? "upload" : "library")}>
-        {kind === "empty" ? "添加教材" : "查看课程状态"}
+      <Button onClick={() => go("library")}>
+        {kind === "empty" ? "创建课程" : "查看课程资料"}
       </Button>
     </section>
   );
@@ -364,20 +366,21 @@ function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
 
 export function StudyScreen() {
   const {
-    courseSelectionLoadingId,
-    courseSummaries,
-    courseSummariesLoadState,
+    sourceSelectionLoadingId,
+    sourceSummaries,
+    sourceSummariesLoadState,
     currentStudyPlan,
     generatedFlashcards,
     generatedLessons,
     generatedQuizzes,
     loadedBookId,
-    learningSets,
+    courses,
     openSheet,
     parsedAssets,
     parsedChapters,
     parsedChunks,
     parsedScanResult,
+    selectSource,
     selectCourse,
     setActiveChapterId,
     studyLocations,
@@ -386,6 +389,17 @@ export function StudyScreen() {
     go
   } = useAppContext();
   const [attemptedBookId, setAttemptedBookId] = useState<string | null>(null);
+  const activeCourse = courses.state.courses.find((course) => course.id === courses.state.activeCourseId);
+  const sources = courseSources(activeCourse, courses.state.resources, sourceSummaries);
+  const sourceKey = sources.map((source) => `${source.bookId}:${source.status}`).join("|");
+  const repository = useBookCourseRepository();
+  const [directories, setDirectories] = useState<Map<string, ApiChapter[]>>(new Map());
+  const { plans } = useCoursePlans(activeCourse?.id);
+  useEffect(() => {
+    let active = true;
+    void Promise.all(sources.filter((source) => source.bookId && source.status === "ready").map(async (source) => [source.bookId!, await repository.getChapters(source.bookId!).catch(() => [])] as const)).then((results) => { if (active) setDirectories(new Map(results)); });
+    return () => { active = false; };
+  }, [sourceKey, repository]);
   const [planCompact, setPlanCompact] = useState(false);
   const planCompactRef = useRef(false);
   const studyScreenRef = useRef<HTMLDivElement | null>(null);
@@ -405,11 +419,12 @@ export function StudyScreen() {
   const chapterTree = useMemo(() => buildStudyDirectory(activeChapters ?? []), [activeChapters]);
   const currentBookId = hasLoadedCourse ? loadedBookId : null;
   const defaultLocation = useMemo(() => getDefaultLocation(activeChapters ?? []), [activeChapters]);
-  const location = currentBookId ? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
+  const locationKey = currentBookId ? courseLocationKey(activeCourse?.id, currentBookId) : "";
+  const location = currentBookId ? studyLocations[locationKey] ?? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
 
   useEffect(() => {
     if (!currentBookId || !activeChapters?.length) return;
-    const savedLocation = studyLocations[currentBookId];
+    const savedLocation = studyLocations[locationKey] ?? studyLocations[currentBookId];
     const normalizedLocation = normalizeStudyLocation(chapterTree, savedLocation);
     if (
       savedLocation?.expandedChapterId === normalizedLocation.expandedChapterId
@@ -420,14 +435,11 @@ export function StudyScreen() {
   }, [activeChapters, chapterTree, currentBookId, setActiveChapterId, studyLocations, updateStudyLocation]);
 
   useEffect(() => {
-    if (uploadedFile) return;
-    const activeSet = learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId);
-    const readyCourse = courseSummaries.find((course) => course.status === "ready" && activeSet?.resourceIds.includes(courseResourceId(course.book_id)))
-      ?? courseSummaries.find((course) => course.status === "ready");
-    if (!readyCourse || attemptedBookId === readyCourse.book_id || courseSelectionLoadingId) return;
-    setAttemptedBookId(readyCourse.book_id);
-    void selectCourse(readyCourse.book_id);
-  }, [attemptedBookId, courseSelectionLoadingId, courseSummaries, learningSets.state.activeSetId, learningSets.state.sets, parsedChapters, selectCourse, uploadedFile]);
+    if (!activeCourse || sourceSelectionLoadingId || attemptedBookId === activeCourse.id) return;
+    if (uploadedFile && sources.some((source) => source.bookId === uploadedFile.bookId)) return;
+    setAttemptedBookId(activeCourse.id);
+    void selectCourse(activeCourse.id);
+  }, [attemptedBookId, sourceSelectionLoadingId, sourceSummaries, courses.state.activeCourseId, courses.state.courses, parsedChapters, selectSource, uploadedFile]);
 
   useEffect(() => {
     const scroller = studyScreenRef.current?.closest<HTMLElement>(".screen-content");
@@ -460,7 +472,7 @@ export function StudyScreen() {
       scroller.removeEventListener("scroll", schedulePlanStateUpdate);
       if (updateFrame !== null) window.cancelAnimationFrame(updateFrame);
     };
-  }, [courseSelectionLoadingId, courseSummariesLoadState, currentBookId, parsedChapters?.length]);
+  }, [sourceSelectionLoadingId, sourceSummariesLoadState, currentBookId, parsedChapters?.length]);
 
   const studyTasks = useMemo(() => mergeFrontEndMockStudyTasks(
     currentStudyPlan?.tasks ?? [],
@@ -473,7 +485,7 @@ export function StudyScreen() {
   const chapterProgresses = chapterTree.map((node) => (
     calculateChapterProgress(studyTasks, getChapterNodeIds(node))
   ));
-  const planProgress = usesCuratedBiologyProgress && chapterProgresses.length > 0
+  const planProgress = sources.length > 1 ? courseProgress([...plans.values()]) : usesCuratedBiologyProgress && chapterProgresses.length > 0
     ? Math.round(chapterProgresses.reduce((sum, progress) => sum + progress, 0) / chapterProgresses.length)
     : totalTasks > 0
       ? Math.round((completedTasks / totalTasks) * 100)
@@ -519,7 +531,7 @@ export function StudyScreen() {
     if (nextSectionId) setActiveChapterId(nextSectionId);
   }
 
-  if (courseSummariesLoadState === "loading" || courseSelectionLoadingId) {
+  if (sourceSummariesLoadState === "loading" || sourceSelectionLoadingId) {
     return (
       <div className="study-screen book-course-screen" aria-busy="true">
         <div className="study-loading-bar" />
@@ -535,39 +547,34 @@ export function StudyScreen() {
     return (
       <div className="study-screen book-course-screen">
         <header className="study-book-bar study-book-bar-empty">
-          <div>
+          <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
             <span className="study-book-cover-placeholder"><LibraryBig size={19} aria-hidden="true" /></span>
-            <span><small>当前教材</small><strong>尚未选择</strong></span>
-          </div>
-          <button type="button" className="study-add-button" onClick={() => go("upload")}>
-            <Plus size={18} aria-hidden="true" />添加
+            <span><small>当前课程</small><strong>{activeCourse?.name ?? "尚未选择"}</strong></span>
+            <ChevronDown size={19} aria-hidden="true" />
+          </button>
+          <button type="button" className="study-add-button" onClick={() => { if (activeCourse) openSheet({ type: "addMaterials", courseId: activeCourse.id }); else { courses.startDraft(); go("courseSetup"); } }}>
+            <Plus size={18} aria-hidden="true" />{activeCourse ? "添加资料" : "创建课程"}
           </button>
         </header>
-        <StudyEmptyState kind={courseSummaries.length === 0 ? "empty" : "unavailable"} />
+        <StudyEmptyState kind={sourceSummaries.length === 0 ? "empty" : "unavailable"} />
       </div>
     );
   }
 
   return (
     <div ref={studyScreenRef} className="study-screen book-course-screen">
-      {learningSets.state.sets.length > 0 ? (
-        <div className="study-active-set-link">
-          <span>学习集：{learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId)?.name ?? "选择学习集"}</span>
-          <button type="button" onClick={() => go("learningSet")}>查看学习集 <ChevronRight size={15} aria-hidden="true" /></button>
-        </div>
-      ) : null}
       <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
         <header className="study-book-bar">
           <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
             <img src={courseCoverImageUrl(uploadedFile.bookId)} alt="" />
             <span>
-              <small>当前教材</small>
-              <strong>{bookTitle}</strong>
+              <small>当前课程</small>
+              <strong>{activeCourse?.name ?? bookTitle}</strong>
             </span>
             <ChevronDown size={19} aria-hidden="true" />
           </button>
-          <button type="button" className="study-add-button" onClick={() => go("upload")}>
-            <Plus size={18} aria-hidden="true" />添加
+          <button type="button" className="study-add-button" onClick={() => activeCourse && openSheet({ type: "addMaterials", courseId: activeCourse.id })}>
+            <Plus size={18} aria-hidden="true" />添加资料
           </button>
         </header>
 
@@ -600,9 +607,10 @@ export function StudyScreen() {
 
       <section className="study-directory" aria-labelledby="study-directory-title">
         <div className="study-directory-heading">
-          <h2 id="study-directory-title">教材目录</h2>
+          <h2 id="study-directory-title">课程目录</h2>
           <span>{chapterTree.length} 章 · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} 节</span>
         </div>
+        <div className="course-source-heading"><strong>{bookTitle}</strong><button type="button" onClick={() => go("courseDetail")}>管理资料 <ChevronRight size={16} /></button></div>
         <div className="study-chapter-list">
           {chapterTree.map((node, index) => (
             <StudyChapter
@@ -617,6 +625,10 @@ export function StudyScreen() {
             />
           ))}
         </div>
+        {sources.filter((source) => source.bookId !== currentBookId).map((source) => <section className="course-source-group" key={source.id} aria-label={source.name}>
+          <div className="course-source-heading"><strong>{source.name}</strong><small>{source.status === "ready" ? "课程资料" : source.local?.error ?? "正在准备"}</small></div>
+          {(directories.get(source.bookId ?? "") ?? []).filter((chapter) => chapter.level === 1).map((chapter) => <button className="course-source-chapter" type="button" key={chapter.chapter_id} onClick={() => { if (source.bookId) void selectSource(source.bookId, activeCourse?.id).then((opened) => { if (opened) { updateStudyLocation(source.bookId!, { expandedChapterId: chapter.chapter_id, expandedSectionId: null }); setActiveChapterId(chapter.chapter_id); } }); }}><span>{chapter.source_title}</span><small>{sourcePageLabel(chapter.page_start, chapter.page_end)}</small><ChevronRight size={18} /></button>)}
+        </section>)}
       </section>
     </div>
   );

@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AppProvider, type AppContextValue, type CourseSummariesLoadState, type CourseSummariesReadyKind } from "../src/context/AppContext";
+import { AppProvider, type AppContextValue, type SourceSummariesLoadState, type SourceSummariesReadyKind } from "../src/context/AppContext";
+import { defaultCourseDiagnosis, emptyCourseState } from "../src/features/courses/model";
 import { HomeScreen } from "../src/screens/HomeScreen";
-import type { ApiChapter, CourseSummary, ScanResult, StudyPlan, StudyTask } from "../src/types/api";
+import type { ApiChapter, CourseSourceSummary, ScanResult, StudyPlan, StudyTask } from "../src/types/api";
 import type { Screen, UploadedCourseFile } from "../src/types/app";
 import "../src/styles/tokens.css";
 import "../src/styles/base.css";
@@ -32,7 +33,7 @@ declare global {
   }
 }
 
-function course(bookId: string, title: string): CourseSummary {
+function course(bookId: string, title: string): CourseSourceSummary {
   return {
     book_id: bookId,
     title,
@@ -51,7 +52,7 @@ const readyCourses = [
   course("book-a", "已加载的生物教材"),
   course("book-b", "即将被删除的失败教材")
 ];
-const reviewCourse: CourseSummary = {
+const reviewCourse: CourseSourceSummary = {
   ...course("book-review", "需要确认目录的物理教材"),
   status: "needs_review"
 };
@@ -120,12 +121,12 @@ function HarnessView() {
     : reviewMode
       ? [reviewCourse]
       : [];
-  const loadState: CourseSummariesLoadState = mode === "loading"
+  const loadState: SourceSummariesLoadState = mode === "loading"
     ? "loading"
     : mode === "error"
       ? "error"
       : "ready";
-  const readyKind: CourseSummariesReadyKind = courses.length > 0 ? "content" : "empty";
+  const readyKind: SourceSummariesReadyKind = courses.length > 0 ? "content" : "empty";
   const scan = selectionMode ? ({ book_id: "book-a" } as ScanResult) : null;
   const plan = selectionMode ? ({
     user_id: "state-harness-user",
@@ -148,6 +149,7 @@ function HarnessView() {
   }
 
   async function selectCourse(bookId: string) {
+    bookId = bookId.replace(/^parent:/, "");
     if (bookId === "book-review") return mode === "review-success";
     if (bookId === "book-a") return true;
     setPendingBookId(bookId);
@@ -157,12 +159,17 @@ function HarnessView() {
   }
 
   const value = {
-    cancelCourseSelection: () => setPendingBookId(null),
-    courseSummaries: courses,
-    courseSummariesError: mode === "error" ? "Failed to fetch state harness" : null,
-    courseSummariesLoadState: loadState,
-    courseSummariesReadyKind: readyKind,
-    courseSummariesRefreshing: refreshing,
+    courses: {
+      state: { ...emptyCourseState(), activeCourseId: courses[0] ? `parent:${courses[0].book_id}` : null,
+        courses: courses.map((source) => ({ id: `parent:${source.book_id}`, name: source.title, resourceIds: [`source:${source.book_id}`], diagnosis: defaultCourseDiagnosis(), createdAt: 1, updatedAt: 1 })) },
+      startDraft: () => undefined
+    },
+    cancelSourceSelection: () => setPendingBookId(null),
+    sourceSummaries: courses,
+    sourceSummariesError: mode === "error" ? "Failed to fetch state harness" : null,
+    sourceSummariesLoadState: loadState,
+    sourceSummariesReadyKind: readyKind,
+    sourceSummariesRefreshing: refreshing,
     currentStudyPlan: plan,
     generatedFlashcards: selectionMode ? [] : null,
     generatedLessons: selectionMode ? [] : null,
@@ -177,7 +184,7 @@ function HarnessView() {
     parsedChunks: selectionMode ? [] : null,
     parsedScanResult: scan,
     pendingBookId,
-    refreshCourses,
+    refreshSources: refreshCourses,
     selectCourse,
     setActiveChapterId: () => undefined,
     studyLocations: selectionMode ? {

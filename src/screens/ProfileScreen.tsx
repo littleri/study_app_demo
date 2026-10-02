@@ -14,9 +14,11 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useLocalMotionItem } from "../motion";
-import type { CourseSummary, StudyTask } from "../types/api";
-import type { UploadedCourseFile } from "../types/app";
-import { dailyTimes, primaryGoals, type DailyTime, type PrimaryGoal } from "../features/learningSets/model";
+import type { StudyTask } from "../types/api";
+
+import { courseSourceBookIds, dailyTimes, primaryGoals, type DailyTime, type PrimaryGoal } from "../features/courses/model";
+import { useCoursePlans } from "../features/courses/useCoursePlans";
+import { courseProgress } from "../features/courses/selectors";
 import { creditCosts, useCredits } from "../features/credits/creditStore";
 
 type ProfileCourse = {
@@ -26,45 +28,6 @@ type ProfileCourse = {
   status: string;
   progress: number | null;
 };
-
-function courseStatusLabel(course: CourseSummary) {
-  if (course.status === "ready") return "可继续学习";
-  if (course.status === "needs_review") return "目录待确认";
-  if (course.status === "processing" || course.parse_job_status === "processing") return "正在生成课程";
-  if (course.status === "error" || course.parse_job_status === "failed") return "需要处理";
-  return "等待开始";
-}
-
-function formatCourseTitle(filename: string) {
-  return filename.replace(/\.[^.]+$/, "") || filename;
-}
-
-function buildProfileCourses(
-  courseSummaries: CourseSummary[],
-  uploadedFile: UploadedCourseFile | null,
-  planBookId: string | null,
-  planProgress: number | null
-): ProfileCourse[] {
-  const courses = courseSummaries.map((course) => ({
-    id: course.book_id,
-    title: course.title,
-    meta: course.chapter_count > 0 ? `${course.chapter_count} 个章节` : `${course.page_count} 页教材`,
-    status: courseStatusLabel(course),
-    progress: course.book_id === planBookId ? planProgress : null
-  }));
-
-  if (uploadedFile && !courses.some((course) => course.id === uploadedFile.bookId)) {
-    courses.unshift({
-      id: uploadedFile.bookId,
-      title: formatCourseTitle(uploadedFile.name),
-      meta: uploadedFile.origin === "remote-course" ? "课程内容已同步" : "新导入教材",
-      status: uploadedFile.origin === "remote-course" ? "可继续学习" : "等待生成课程",
-      progress: uploadedFile.bookId === planBookId ? planProgress : null
-    });
-  }
-
-  return courses.slice(0, 2);
-}
 
 function ProfilePortrait({ onClick }: { onClick: () => void }) {
   return (
@@ -104,15 +67,18 @@ function TodayTaskRow({ task, onClick }: { task: StudyTask; onClick: () => void 
 export function ProfileScreen() {
   const credits = useCredits();
   const {
-    courseSummaries,
+    selectCourse,
     currentStudyPlan,
     go,
-    learningSets,
+    courses,
     showToast,
     uploadedFile
   } = useAppContext();
-  const preferences = learningSets.state.preferences;
-  const activeSet = learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId);
+  const preferences = courses.state.preferences;
+  const activeCourseProfile = courses.state.courses.find((item) => item.id === courses.state.activeCourseId);
+  const { plans } = useCoursePlans();
+  const plansForCourse = (course: typeof activeCourseProfile) => courseSourceBookIds(course, courses.state.resources)
+    .flatMap((bookId) => plans.get(bookId) ?? []);
   const [editingPreferences, setEditingPreferences] = useState(false);
   const [nameDraft, setNameDraft] = useState(preferences?.displayName ?? "");
   const [goalDraft, setGoalDraft] = useState<PrimaryGoal | null>(preferences?.primaryGoal ?? null);
@@ -127,7 +93,7 @@ export function ProfileScreen() {
 
   function savePreferences() {
     try {
-      learningSets.updatePreferences({ displayName: nameDraft, primaryGoal: goalDraft, dailyTime: timeDraft });
+      courses.updatePreferences({ displayName: nameDraft, primaryGoal: goalDraft, dailyTime: timeDraft });
       setEditingPreferences(false);
       showToast("学习偏好已保存");
     } catch (error) {
@@ -135,24 +101,22 @@ export function ProfileScreen() {
     }
   }
 
-  function switchLearningSet(setId: string) {
+  function switchCourse(courseId: string) {
     try {
-      learningSets.setActiveSet(setId);
+      void selectCourse(courseId);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "切换学习集失败", "warning");
+      showToast(error instanceof Error ? error.message : "切换课程失败", "warning");
     }
   }
-  const tasks = currentStudyPlan?.tasks ?? [];
+  const tasks = plansForCourse(activeCourseProfile).flatMap((plan) => plan.tasks);
   const pendingTasks = tasks.filter((task) => task.status !== "done");
   const completedTaskCount = tasks.length - pendingTasks.length;
   const planProgress = tasks.length > 0 ? Math.round((completedTaskCount / tasks.length) * 100) : null;
   const visibleTasks = (pendingTasks.length > 0 ? pendingTasks : tasks).slice(0, 2);
-  const profileCourses = buildProfileCourses(
-    courseSummaries,
-    uploadedFile,
-    currentStudyPlan?.book_id ?? null,
-    planProgress
-  );
+  const profileCourses: ProfileCourse[] = courses.state.courses.slice(0, 2).map((course) => {
+    const coursePlans = plansForCourse(course);
+    return { id: course.id, title: course.name, meta: `${course.resourceIds.length} 份资料`, status: course.id === courses.state.activeCourseId ? "当前课程" : "可切换课程", progress: coursePlans.length ? courseProgress(coursePlans) : null };
+  });
   const profileMotion = useLocalMotionItem(
     `profile:${uploadedFile?.bookId ?? "guest"}:${currentStudyPlan ? "loaded" : "baseline"}`
   );
@@ -175,10 +139,10 @@ export function ProfileScreen() {
           {preferences ? <div className="profile-learning-summary">
             <strong>{preferences.displayName}</strong>
             <span>{primaryGoals.find((item) => item.value === preferences.primaryGoal)?.label ?? "系统学习"} · 每日建议 {dailyTimes.find((item) => item.value === preferences.dailyTime)?.minutes ?? 45} 分钟</span>
-            {learningSets.state.sets.length > 1 && activeSet ? <select className="profile-learning-set-picker" aria-label="切换学习集" value={activeSet.id} onChange={(event) => switchLearningSet(event.target.value)}>
-              {learningSets.state.sets.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {courses.state.courses.length > 1 && activeCourseProfile ? <select className="profile-course-space-picker" aria-label="切换课程" value={activeCourseProfile.id} onChange={(event) => switchCourse(event.target.value)}>
+              {courses.state.courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select> : null}
-            {activeSet ? <button className="profile-learning-set-link" type="button" onClick={() => go("learningSet")}>查看当前学习集：{activeSet.name}</button> : null}
+            {activeCourseProfile ? <button className="profile-course-space-link" type="button" onClick={() => go("courseDetail")}>查看当前课程：{activeCourseProfile.name}</button> : null}
           </div> : null}
           {editingPreferences ? <form className="profile-learning-form" onSubmit={(event) => { event.preventDefault(); savePreferences(); }}>
             <label htmlFor="profile-learning-name">称呼</label>

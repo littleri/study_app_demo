@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { StudyPlan, StudyTask } from "../../types/api";
 import {
-  buildLearningSetRecommendations,
+  buildCourseRecommendations,
   preferredToolIds,
   reviewIntervalDays
 } from "./recommendations";
-import type { LearningSet, LearnerPreferences } from "./model";
+import type { Course, LearnerPreferences } from "./model";
 
-const baseSet: LearningSet = {
+const baseSet: Course = {
   id: "set-1",
   name: "期末复习",
   resourceIds: ["course:book-a", "course:book-b", "local:file-c"],
@@ -38,11 +38,11 @@ function plan(bookId: string, tasks: StudyTask[]): StudyPlan {
   return { user_id: "local_user", book_id: bookId, days: 14, daily_minutes: 30, tasks };
 }
 
-describe("learning set recommendations", () => {
+describe("course recommendations", () => {
   it("selects existing pending tasks within the global budget without changing source plans", () => {
     const originalA = plan("book-a", [task("a-1", "核心概念", "课程", 25), task("a-2", "复习闪卡", "闪卡复习", 10, "done")]);
     const originalB = plan("book-b", [task("b-1", "诊断练习", "练习", 18)]);
-    const result = buildLearningSetRecommendations(baseSet, preferences, new Map([["book-a", originalA], ["book-b", originalB]]));
+    const result = buildCourseRecommendations(baseSet, preferences, new Map([["book-a", originalA], ["book-b", originalB]]));
     expect(result.budget).toBe(20);
     expect(result.recommendations[0].taskId).toBe("b-1");
     expect(result.recommendations.every((item) => item.taskId !== "a-2")).toBe(true);
@@ -57,7 +57,7 @@ describe("learning set recommendations", () => {
       ...baseSet,
       diagnosis: { ...baseSet.diagnosis, urgency: "relaxed" as const, reviews: ["free" as const] }
     };
-    const result = buildLearningSetRecommendations(relaxed, { ...preferences, dailyTime: null }, new Map());
+    const result = buildCourseRecommendations(relaxed, { ...preferences, dailyTime: null }, new Map());
     expect(result.budget).toBe(45);
     expect(result.reviewDays).toBeNull();
     expect(reviewIntervalDays(baseSet.diagnosis)).toBe(1);
@@ -69,7 +69,7 @@ describe("learning set recommendations", () => {
     const second = plan("book-b", [task("b-1", "概念导读", "课程", 12)]);
     const plans = new Map([["book-a", first], ["book-b", second]]);
     for (const [dailyTime, budget] of [["under30", 20], ["30to60", 45], ["1to2h", 90], ["over2h", 120]] as const) {
-      const result = buildLearningSetRecommendations(baseSet, { ...preferences, dailyTime }, plans);
+      const result = buildCourseRecommendations(baseSet, { ...preferences, dailyTime }, plans);
       expect(result.budget).toBe(budget);
       expect(result.recommendations[0].bookId).toBe("book-a");
     }

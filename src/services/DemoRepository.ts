@@ -1,8 +1,10 @@
+import { listLocalSources, readLocalSource, saveLocalSource } from "./LocalSources";
 import demoStateJson from "../data/generated/demo-state.json";
 import { hasDirectDeepSeekKey } from "../config/deepseek";
 import {
   askDeepSeekWithLocalRag,
   collectChapterScopeIds,
+  selectReliableLocalChunks,
   createLocalCitation
 } from "./DeepSeekRag";
 import { getTextbookRetriever } from "./TextbookRetriever";
@@ -24,7 +26,7 @@ import type {
   ApiChunk,
   AssignmentSubmitRequest,
   AssignmentSubmitResponse,
-  CourseSummary,
+  CourseSourceSummary,
   DiagnosisResponse,
   Flashcard,
   ImageGenerationJobResponse,
@@ -101,6 +103,15 @@ type DemoJob = {
 
 const seed = demoStateJson as unknown as DemoState;
 const demoDelay = Math.max(0, Number(import.meta.env.VITE_DEMO_DELAY_MS ?? 80));
+const sourcePlansKey = "bookcourse.source-plans.v1";
+
+function storedSourcePlans(): Record<string, StudyPlan> {
+  try { return typeof window === "undefined" ? {} : JSON.parse(window.localStorage.getItem(sourcePlansKey) ?? "{}"); }
+  catch { return {}; }
+}
+function persistSourcePlan(plan: StudyPlan) {
+  if (typeof window !== "undefined") window.localStorage.setItem(sourcePlansKey, JSON.stringify({ ...storedSourcePlans(), [plan.book_id]: plan }));
+}
 
 function wait() {
   return new Promise<void>((resolve) => globalThis.setTimeout(resolve, demoDelay));
@@ -263,7 +274,7 @@ export class DemoRepository {
     return { status: "ok", service: "study-app-demo" };
   }
 
-  async listCourses(): Promise<CourseSummary[]> {
+  async listSources(): Promise<CourseSourceSummary[]> {
     await wait();
     const { book } = this.state;
     return [{
@@ -287,7 +298,7 @@ export class DemoRepository {
       parse_job_message: "MinerU 结构化课程已就绪",
       parse_job_error: null,
       updated_at: 1785638400
-    }, clone(demoMathSummary)];
+    }, clone(demoMathSummary), ...(await listLocalSources()).map((source) => source.summary)];
   }
 
   async deleteCourse(_bookId: string) {
@@ -335,12 +346,18 @@ export class DemoRepository {
   }
 
   async getScanResult(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone(local.scan);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathScan);
     return clone(this.state.scan);
   }
 
   async getChapters(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone(local.chapters);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathChapters);
     return clone(this.state.chapters);
@@ -404,6 +421,9 @@ export class DemoRepository {
   }
 
   async getChunks(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone(local.chunks);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathChunks);
     return clone(this.state.chunks);
@@ -455,6 +475,9 @@ export class DemoRepository {
   }
 
   async getLessons(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone(local.lessons);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathLessons);
     return clone(this.state.lessons);
@@ -474,6 +497,9 @@ export class DemoRepository {
   }
 
   async getFlashcards(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathFlashcards);
     return clone(this.state.flashcards);
@@ -486,12 +512,18 @@ export class DemoRepository {
   }
 
   async getQuizzes(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathQuizzes);
     return clone(this.state.quizzes);
   }
 
   async getAssets(bookId: string) {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathAssets);
     return clone(this.state.assets);
@@ -535,7 +567,26 @@ export class DemoRepository {
   }
 
   async queryRag(payload: RagQuery): Promise<RagResponse> {
-    const supportsCompleteStaticRag = payload.book_id === this.state.book.id;
+    const requestedBookIds = [...new Set(payload.book_ids?.length ? payload.book_ids : [payload.book_id])];
+    const availableBookIds = new Set((await this.listSources())
+      .filter((source) => source.status === "ready" || source.status === "needs_review")
+      .map((source) => source.book_id));
+    const bookIds = requestedBookIds.filter((bookId) => availableBookIds.has(bookId));
+    if (bookIds.length > 1 || bookIds.some((bookId) => bookId.startsWith("book_local_"))) {
+      const sources = await Promise.all(bookIds.map(async (bookId) => ({ bookId, chapters: await this.getChapters(bookId), chunks: await this.getChunks(bookId), assets: await this.getAssets(bookId) })));
+      const chapters = sources.flatMap((source) => source.chapters);
+      const chunks = sources.flatMap((source) => source.chunks);
+      const assets = sources.flatMap((source) => source.assets);
+      if (hasDirectDeepSeekKey()) return askDeepSeekWithLocalRag(payload, { chapters, chunks, assets, textbookRetriever: bookIds.includes(this.state.book.id) ? getTextbookRetriever() : undefined });
+      const localHits = selectReliableLocalChunks(payload.question, chunks.filter((chunk) => chunk.book_id.startsWith("book_local_")), payload.chapter_id);
+      if (bookIds.includes(this.state.book.id) && canUseBundledTextbookIndex()) {
+        const retrieved = await getTextbookRetriever().search({ query: payload.question, chapterId: payload.chapter_id, chapterScopeIds: collectChapterScopeIds(chapters, payload.chapter_id), limit: 3, reliableOnly: true });
+        for (const hit of retrieved.hits) if (bookIds.includes(hit.chunk.book_id)) localHits.push({ chunk: hit.chunk, score: hit.score, retrievalMethod: retrieved.method });
+      }
+      const citations = localHits.sort((a, b) => b.score - a.score).slice(0, 3).map((hit) => createLocalCitation(hit, chapters));
+      return { answer: citations.length ? citations.map((citation) => `资料原文：${citation.quote}`).join("\n\n") : "当前课程资料中没有找到足够可靠的依据。可以换一种提问方式，或补充相关资料。", citations, related_assets: [], confidence: citations.length ? "high" : "low", retrieval: { attempted: true, status: citations.length ? "hit" : "no_match", method: "course-sources", hit_count: citations.length } };
+    }
+    const supportsCompleteStaticRag = bookIds.includes(payload.book_id) && payload.book_id === this.state.book.id;
     // The complete static corpus currently exists only for biology. Do not
     // fall through to a biology fixture for math or an unknown book just
     // because a question happens to contain words such as “例” or “第二次”.
@@ -682,6 +733,11 @@ export class DemoRepository {
   }
 
   async getStudyPlan(bookId: string, userId = "local_user") {
+    const local = await readLocalSource(bookId);
+    if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
+    if (local) return structuredClone({ ...local.plan, user_id: userId });
+    const stored = storedSourcePlans()[bookId];
+    if (stored?.book_id === bookId && Array.isArray(stored.tasks)) return { ...clone(stored), user_id: userId };
     await wait();
     if (bookId === demoMathBookId) return { ...clone(demoMathStudyPlan), user_id: userId };
     return { ...clone(this.state.studyPlan), user_id: userId };
@@ -689,10 +745,20 @@ export class DemoRepository {
 
   async patchStudyTask(taskId: string, payload: StudyTaskUpdate): Promise<StudyTask> {
     await wait();
-    const task = this.state.studyPlan.tasks.find((item) => item.task_id === taskId);
-    if (!task) throw new Error("学习任务不存在");
-    Object.assign(task, payload);
-    return clone(task);
+    for (const local of await listLocalSources()) {
+      const task = local.plan.tasks.find((item) => item.task_id === taskId);
+      if (task) { Object.assign(task, payload); await saveLocalSource(local); return clone(task); }
+    }
+    for (const bookId of [this.state.book.id, demoMathBookId]) {
+      const plan = await this.getStudyPlan(bookId);
+      const task = plan.tasks.find((item) => item.task_id === taskId);
+      if (!task) continue;
+      Object.assign(task, payload);
+      persistSourcePlan(plan);
+      if (bookId === this.state.book.id) this.state.studyPlan = clone(plan);
+      return clone(task);
+    }
+    throw new Error("学习任务不存在");
   }
 
   async getLearningState(userId: string): Promise<LearningState> {

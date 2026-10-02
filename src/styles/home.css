@@ -733,6 +733,19 @@
   scroll-padding-inline: 12px;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
+  scroll-behavior: auto;
+  user-select: none;
+  cursor: grab;
+}
+
+.home-book-workspace .study-tool-grid.is-dragging,
+.home-book-workspace .study-tool-grid.is-settling {
+  scroll-snap-type: none;
+}
+
+.home-book-workspace .study-tool-grid.is-dragging,
+.home-book-workspace .study-tool-grid.is-dragging .study-tool-card {
+  cursor: grabbing;
 }
 
 .home-book-workspace .study-tool-grid::-webkit-scrollbar {
@@ -744,6 +757,14 @@
   min-height: 134px;
   flex: 0 0 clamp(132px, 44%, 154px);
   scroll-snap-align: start;
+}
+
+/* The rail itself moves. Lifting/repainting individual cards while it scrolls
+   makes pointer dragging feel uneven and creates sticky hover on touch. */
+.home-book-workspace .study-tool-card:not(:disabled):hover,
+.home-book-workspace .study-tool-card:not(:disabled):active {
+  transform: none;
+  box-shadow: 0 4px 8px rgba(32, 38, 58, .12);
 }
 
 .home-book-workspace .study-tool-cover {
@@ -1122,7 +1143,7 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .home-dashboard {
     grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
     column-gap: 28px;

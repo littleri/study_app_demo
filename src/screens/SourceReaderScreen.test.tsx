@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { emptyCourseState } from "../features/courses/model";
 import {
   SourceReaderScreen,
   nextSourcePage,
@@ -74,6 +75,7 @@ function renderSourceReader({
   bookId?: string;
 }) {
   contextMock.mockReturnValue({
+    courses: { state: { ...emptyCourseState(), activeCourseId: "course-test" } },
     back: vi.fn(),
     go: vi.fn(),
     parsedChapters: chapters.map((chapter, index) => ({

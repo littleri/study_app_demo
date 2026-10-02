@@ -1,6 +1,6 @@
 import { env } from "node:process";
 import type { Page, Route } from "playwright/test";
-import type { ApiAsset, ApiChapter, CourseSummary, Flashcard, QuizQuestion, StudyTask } from "../../src/types/api";
+import type { ApiAsset, ApiChapter, CourseSourceSummary, Flashcard, QuizQuestion, StudyTask } from "../../src/types/api";
 
 type ApiRequest = {
   body: unknown;
@@ -38,7 +38,7 @@ export type BookCourseApiFixture = {
   consoleErrors: string[];
   pageErrors: string[];
   lastStageFourConfirmationResponse: ApiChapter[] | null;
-  appendPreparedCourse: () => CourseSummary;
+  appendPreparedCourse: () => CourseSourceSummary;
   setPreparedImageMode: (mode: StageFiveImageMode) => void;
   usePreparedCourse: () => void;
   useStageFiveFlow: (options?: { imageMode?: StageFiveImageMode }) => void;
@@ -86,7 +86,7 @@ const stageThreeCourse = {
   updated_at: 1
 };
 
-const stageFiveLibraryCourses: CourseSummary[] = [
+const stageFiveLibraryCourses: CourseSourceSummary[] = [
   stageThreeCourse,
   {
     ...stageThreeCourse,
@@ -587,7 +587,7 @@ function stageFourCurrentChapters(state: StageFourFlowState) {
 }
 
 type PreparedCourseState = {
-  courses: CourseSummary[];
+  courses: CourseSourceSummary[];
   imageMode: StageFiveImageMode;
   nextCourseIndex: number;
 };
@@ -601,7 +601,7 @@ function resetPreparedCourseState(state: PreparedCourseState, imageMode: Prepare
 function appendPreparedCourse(state: PreparedCourseState) {
   state.nextCourseIndex += 1;
   const index = state.nextCourseIndex;
-  const course: CourseSummary = {
+  const course: CourseSourceSummary = {
     ...stageThreeCourse,
     book_id: `book_stage4a_arriving_${index}`,
     title: `Stage 4A arriving course ${index}`,

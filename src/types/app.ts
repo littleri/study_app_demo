@@ -4,8 +4,8 @@ import type { NoteCaptureIntent } from "../features/studyNotes/types";
 export type Screen =
   | "home"
   | "onboarding"
-  | "learningSetSetup"
-  | "learningSet"
+  | "courseSetup"
+  | "courseDetail"
   | "upload"
   | "parseReady"
   | "processing"
@@ -52,6 +52,7 @@ export type SheetState =
     }
   | { type: "editChapter"; chapterId: string; evidence?: ChapterEvidence }
   | { type: "bookSwitcher" }
+  | { type: "addMaterials"; courseId: string }
   | null;
 
 export type ToastTone = "success" | "info" | "warning";
@@ -76,6 +77,7 @@ export type UploadedCourseFile = {
 };
 
 export type SourcePageTarget = {
+  courseId?: string;
   bookId: string;
   title: string;
   pageStart: number;
@@ -122,6 +124,8 @@ export type AppActions = {
   openSheet: (sheet: SheetState) => void;
   closeSheet: () => void;
   showToast: (text: string, tone?: ToastTone) => void;
-  selectCourse: (bookId: string) => Promise<boolean>;
+  selectSource: (bookId: string, courseId?: string) => Promise<boolean>;
+  selectCourse: (courseId: string) => Promise<boolean>;
+  importCourseFile: (file: File, courseId?: string) => Promise<void>;
   updateStudyLocation: (bookId: string, location: Partial<StudyLocation>) => void;
 };

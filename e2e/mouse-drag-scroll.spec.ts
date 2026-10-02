@@ -34,7 +34,7 @@ test.describe("global mouse drag scrolling", () => {
     await expect(page.locator('.screen-content[data-screen="library"]')).toBeVisible();
   });
 
-  test("automatically drags horizontal overflow that has no bespoke gesture", async ({ page }, testInfo) => {
+  test("lets the chapter tool rail own horizontal dragging without activating page dragging", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "iphone-17-pro", "The gesture is covered once at the phone viewport.");
     await page.setViewportSize({ width: 402, height: 681 });
     await page.goto("/?embedded=device-preview");
@@ -52,11 +52,13 @@ test.describe("global mouse drag scrolling", () => {
     await page.mouse.move(startX, startY);
     await page.mouse.down();
     await page.mouse.move(startX - 90, startY, { steps: 8 });
-    await expect(page.locator(".app-shell")).toHaveAttribute("data-mouse-dragging", "true");
+    await expect(toolGrid).toHaveClass(/is-dragging/);
+    await expect(page.locator(".app-shell")).toHaveAttribute("data-mouse-dragging", "false");
     await expect.poll(() => toolGrid.evaluate((element) => Math.round(element.scrollLeft))).toBeGreaterThan(40);
     await page.mouse.up();
 
     await expect(page.locator('.screen-content[data-screen="home"]')).toBeVisible();
+    await expect(toolGrid).not.toHaveClass(/is-dragging|is-settling/);
     await expect(page.locator(".app-shell")).toHaveAttribute("data-mouse-dragging", "false");
   });
 

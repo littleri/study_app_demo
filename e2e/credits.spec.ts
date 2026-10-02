@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 test("AI questions spend persistent credits and block requests when the balance is empty", async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 874 });
   await page.goto("/?embedded=device-preview");
-  await expect(page.getByRole("listbox", { name: "选择教材" })).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
   await page.getByRole("button", { name: "发现", exact: true }).click();
   await page.locator(".ai-orb").click();
   const dialog = page.getByRole("dialog", { name: "AI 导学助手" });
@@ -15,7 +15,7 @@ test("AI questions spend persistent credits and block requests when the balance 
   await expect(dialog.locator(".ai-message.ai").last()).toBeVisible();
 
   await page.reload();
-  await expect(page.getByRole("listbox", { name: "选择教材" })).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
   await page.getByRole("button", { name: "我的", exact: true }).click();
   await expect(page.getByRole("heading", { name: "我的积分" })).toBeVisible();
   await expect(page.locator(".profile-credits-card")).toContainText("99积分");
@@ -30,7 +30,7 @@ test("AI questions spend persistent credits and block requests when the balance 
     localStorage.setItem("bookcourse.credits.v1", JSON.stringify(state));
   });
   await page.reload();
-  await expect(page.getByRole("listbox", { name: "选择教材" })).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
   await page.locator(".ai-orb").click();
   const emptyDialog = page.getByRole("dialog", { name: "AI 导学助手" });
   await emptyDialog.getByRole("textbox", { name: "向 AI 助手提问" }).fill("再问一个问题");
@@ -45,7 +45,7 @@ test("video confirmation shows its cost and keeps an insufficient balance unchan
   });
   await page.setViewportSize({ width: 402, height: 874 });
   await page.goto("/?embedded=device-preview");
-  await expect(page.getByRole("listbox", { name: "选择教材" })).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
   await page.getByRole("button", { name: "学习", exact: true }).click();
   const chapter = page.getByRole("button", { name: /第 2 章 基因和染色体的关系/ });
   if (await chapter.getAttribute("aria-expanded") !== "true") await chapter.click();

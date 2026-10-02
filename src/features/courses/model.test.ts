@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { isCompleteDiagnosis, toggleDiagnosisValue, type SetDiagnosis } from "./model";
+import { isCompleteDiagnosis, toggleDiagnosisValue, type CourseDiagnosis } from "./model";
 
-const diagnosis: SetDiagnosis = {
+const diagnosis: CourseDiagnosis = {
   urgency: "steady",
   timePattern: "block",
   goals: ["systematic"],
@@ -10,7 +10,7 @@ const diagnosis: SetDiagnosis = {
   reviews: ["periodic"]
 };
 
-describe("learning set diagnosis", () => {
+describe("course diagnosis", () => {
   it("requires an answer in all six categories", () => {
     expect(isCompleteDiagnosis(diagnosis)).toBe(true);
     expect(isCompleteDiagnosis({ ...diagnosis, aids: [] })).toBe(false);

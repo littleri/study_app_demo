@@ -2,7 +2,7 @@ import type {
   ApiAsset,
   ApiChapter,
   ApiChunk,
-  CourseSummary,
+  CourseSourceSummary,
   Flashcard,
   Lesson,
   QuizQuestion,
@@ -68,7 +68,7 @@ function isUnsyncedLocalUpload(uploadedFile: UploadedCourseFile | null, bookId: 
 export function shouldClearLoadedCourseAfterRefresh(
   loadedBookId: string | null,
   uploadedFile: UploadedCourseFile | null,
-  summaries: CourseSummary[]
+  summaries: CourseSourceSummary[]
 ) {
   if (!loadedBookId || summaries.some((course) => course.book_id === loadedBookId)) return false;
   return !isUnsyncedLocalUpload(uploadedFile, loadedBookId);
@@ -76,7 +76,7 @@ export function shouldClearLoadedCourseAfterRefresh(
 
 export function shouldClearRemoteSessionAfterRefresh(
   uploadedFile: UploadedCourseFile | null,
-  summaries: CourseSummary[]
+  summaries: CourseSourceSummary[]
 ) {
   return Boolean(
     uploadedFile
@@ -126,7 +126,7 @@ export function resolveProgressOpenMode(
 
 export function resolveLatestCourseTitle(
   uploadedFile: UploadedCourseFile | null,
-  summaries: CourseSummary[]
+  summaries: CourseSourceSummary[]
 ) {
   const uploadedIsCurrent = Boolean(
     uploadedFile

@@ -290,7 +290,7 @@
   font-weight: 800;
 }
 
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 719px) and (orientation: portrait) {
   .app-shell[data-active-screen="upload"] {
     --upload-sheet-top: calc(var(--safe-area-top) + 58px);
   }

@@ -1,3 +1,5 @@
+import { courseRagScope } from "../features/courses/selectors";
+import { useAppContext } from "../context/AppContext";
 import { useState } from "react";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import type { RagQuery, RagResponse } from "../types/api";
@@ -11,6 +13,7 @@ export type RagMessage = {
 
 export function useRagQuery() {
   const bookcourseRepository = useBookCourseRepository();
+  const { courses } = useAppContext();
   const [response, setResponse] = useState<RagResponse | null>(null);
   const [messages, setMessages] = useState<RagMessage[]>([]);
   const [lastQuery, setLastQuery] = useState<RagQuery | null>(null);
@@ -28,7 +31,7 @@ export function useRagQuery() {
     const userMessage = { id: `q_${Date.now()}`, role: "user" as const, text: payload.question };
     setMessages((items) => [...items, userMessage]);
     try {
-      const result = await bookcourseRepository.queryRag(payload);
+      const result = await bookcourseRepository.queryRag({ ...payload, ...courseRagScope(courses.state, payload.book_id) });
       setResponse(result);
       setMessages((items) => [
         ...items,

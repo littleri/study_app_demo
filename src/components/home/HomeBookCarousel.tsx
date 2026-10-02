@@ -209,25 +209,26 @@ export function HomeBookCarousel({
   }
 
   const selectedBook = books[selectedIndex] ?? null;
+  if (listState === "error") return null;
 
   return (
     <section className="home-book-picker" aria-labelledby="home-book-picker-title">
       <div className="home-book-picker-heading">
         <div>
-          <h2 id="home-book-picker-title">我的教材</h2>
-          <span>{books.length > 0 ? `共 ${books.length} 本` : "从原书开始学习"}</span>
+          <h2 id="home-book-picker-title">我的课程</h2>
+          <span>{books.length > 0 ? `共 ${books.length} 门` : "从原书开始学习"}</span>
         </div>
         {books.length > 0 ? (
           <button type="button" onClick={onOpenLibrary}>
-            全部教材 <ArrowRight size={15} aria-hidden="true" />
+            全部课程 <ArrowRight size={15} aria-hidden="true" />
           </button>
         ) : null}
       </div>
 
       {listState === "loading" ? (
-        <div className="home-book-carousel-skeleton" aria-label="正在加载教材" aria-busy="true">
+        <div className="home-book-carousel-skeleton" aria-label="正在加载课程" aria-busy="true">
           <p className="home-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
-            正在加载教材列表，上传和学习操作暂不可用。
+            正在加载课程列表，上传和学习操作暂不可用。
           </p>
           <span />
           <span />
@@ -237,11 +238,11 @@ export function HomeBookCarousel({
         <div className="home-book-empty">
           <span aria-hidden="true"><BookOpenText size={24} /></span>
           <div>
-            <strong>还没有教材</strong>
-            <small>上传教材后，可以从原书位置继续学习。</small>
+            <strong>还没有课程</strong>
+            <small>添加课程资料后，可以从原书位置继续学习。</small>
           </div>
           <button type="button" onClick={onAddBook}>
-            <Plus size={17} aria-hidden="true" />上传第一本教材
+            <Plus size={17} aria-hidden="true" />创建第一门课程
           </button>
         </div>
       ) : listState === "content" ? (
@@ -251,7 +252,7 @@ export function HomeBookCarousel({
             className={`home-book-carousel ${books.length === 1 ? "is-single" : ""}`}
             data-mouse-drag-scroll="self"
             role="listbox"
-            aria-label="选择教材"
+            aria-label="选择课程"
             aria-orientation="horizontal"
             onKeyDown={handleKeyDown}
             onPointerCancel={(event) => finishPointerDrag(event, false)}
@@ -274,7 +275,7 @@ export function HomeBookCarousel({
                   type="button"
                   role="option"
                   aria-selected={selected}
-                  aria-label={`${book.title}，第 ${index + 1} 本，共 ${books.length} 本，${book.statusLabel}${selected ? "，当前选中，点击进入课程详情" : "，点击切换到这本教材"}`}
+                  aria-label={`${book.title}，第 ${index + 1} 门，共 ${books.length} 门，${book.statusLabel}${selected ? "，当前选中，点击进入课程详情" : "，点击切换到这门课程"}`}
                   tabIndex={selected ? 0 : -1}
                   onClick={() => handleBookClick(book.bookId)}
                 >

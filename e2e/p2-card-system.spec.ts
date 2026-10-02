@@ -128,7 +128,7 @@ async function openLibrary(page: Page, bookCourseApi: BookCourseApiFixture) {
   await page.goto("/?embedded=device-preview");
   await clickAfterMotionAndScrollSettle(
     page,
-    page.getByRole("button", { name: "全部教材", exact: true }),
+    page.getByRole("button", { name: "全部课程", exact: true }),
     "open Library from Home"
   );
   await expect(page.locator(".library-course-grid")).toBeVisible();

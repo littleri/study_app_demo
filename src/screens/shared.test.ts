@@ -11,12 +11,12 @@ import {
 
 
 describe("stage 5 upload format contract", () => {
-  it("matches the backend extension whitelist and excludes legacy Office", () => {
+  it("supports original documents and local text imports, and excludes legacy Office", () => {
     expect([...supportedCourseExtensions]).toEqual([
       ".pdf", ".png", ".jpg", ".jpeg", ".jp2", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".docx", ".pptx", ".xlsx"
     ]);
     const acceptedExtensions = acceptedCourseFileTypes.split(",").filter((item) => item.startsWith("."));
-    expect(acceptedExtensions).toEqual([...supportedCourseExtensions]);
+    expect(acceptedExtensions).toEqual([".txt", ".md", ".csv", ...supportedCourseExtensions]);
     expect(acceptedExtensions).not.toContain(".doc");
     expect(acceptedExtensions).not.toContain(".ppt");
     expect(acceptedExtensions).not.toContain(".xls");

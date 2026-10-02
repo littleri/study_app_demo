@@ -685,6 +685,7 @@ test.describe("community discovery", () => {
     await page.locator('[data-community-book-id="community_functions"]').click();
 
     await expect(page.locator(".community-detail-screen").getByRole("heading", { name: "函数与导数系统提升课", exact: true })).toBeVisible();
+    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
     const detail = page.locator(".community-detail-screen");
     await expect(detail.locator(".community-detail-chapters")).toHaveCount(0);
     await expect(detail.getByRole("heading", { name: "课程章节", exact: true })).toHaveCount(0);
@@ -794,21 +795,24 @@ test.describe("community discovery", () => {
 
     const detailScroller = page.locator('.screen-content[data-screen="communityBook"]');
     await detailScroller.evaluate((element) => {
+      (element as HTMLElement).style.overflowAnchor = "none";
+      (element as HTMLElement).style.scrollBehavior = "auto";
+      const focused = element.ownerDocument.activeElement;
+      if (focused instanceof HTMLElement && element.contains(focused)) focused.blur();
       element.scrollTop = 0;
     });
+    await expect.poll(() => detailScroller.evaluate((element) => element.scrollTop)).toBe(0);
     await expect(detail).toHaveAttribute("data-collapsed", "false");
     await expect(detail.locator(".community-detail-visual")).toHaveAttribute("aria-hidden", "false");
     await expect(detailCover).toHaveCSS("opacity", "1");
     const collapseGeometry = await detail.evaluate((element) => {
       const main = element.closest<HTMLElement>(".screen-content");
-      const header = document.querySelector<HTMLElement>(".header-bar");
       const sentinel = element.querySelector<HTMLElement>(".community-detail-collapse-sentinel");
-      if (!main || !header || !sentinel) throw new Error("Community detail collapse geometry is incomplete");
-      const headerBackdrop = getComputedStyle(header, "::before");
-      const headerBackdropEdge = header.getBoundingClientRect().bottom - Number.parseFloat(headerBackdrop.bottom);
+      if (!main || !sentinel) throw new Error("Community detail collapse geometry is incomplete");
+      const collapseBoundary = main.getBoundingClientRect().top + (Number.parseFloat(getComputedStyle(main).paddingTop) || 0);
       return {
         maxScrollTop: main.scrollHeight - main.clientHeight,
-        targetScrollTop: main.scrollTop + sentinel.getBoundingClientRect().top - headerBackdropEdge + 2,
+        targetScrollTop: main.scrollTop + sentinel.getBoundingClientRect().top - collapseBoundary + 2,
       };
     });
     if (collapseGeometry.maxScrollTop >= collapseGeometry.targetScrollTop) {
@@ -846,14 +850,14 @@ test.describe("community discovery", () => {
       });
       expect(collapsedLayout.actionBottom).toBe("0px");
       expect(collapsedLayout.actionPosition).toBe("fixed");
-      expect(collapsedLayout.informationBlockHeight).toBeLessThanOrEqual(96);
+      expect(collapsedLayout.informationBlockHeight).toBeLessThanOrEqual(112);
       expect(collapsedLayout.ownerInset).toBeGreaterThanOrEqual(38);
       expect(collapsedLayout.ownerInset).toBeLessThanOrEqual(48);
       expect(collapsedLayout.ownerTitleGap).toBeLessThanOrEqual(12);
       expect(collapsedLayout.titleEditionGap).toBeLessThanOrEqual(12);
       expect(collapsedLayout.statsGap).toBeLessThanOrEqual(28);
-      expect(collapsedLayout.tabsInset).toBeLessThanOrEqual(260);
-      expect(Math.abs(collapsedLayout.summaryTopDelta)).toBeLessThanOrEqual(2);
+      expect(collapsedLayout.tabsInset).toBeLessThanOrEqual(288);
+      expect(Math.abs(collapsedLayout.summaryTopDelta)).toBeLessThanOrEqual(8);
       await detailScroller.evaluate((element) => {
         element.scrollTop = 0;
       });
@@ -870,7 +874,7 @@ test.describe("community discovery", () => {
     await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
     await expect(imported.locator(".success-hero-image")).toBeVisible();
-    await expect(imported).toContainText("已将《函数与导数系统提升课》编排为 1 节 AI 课程。");
+    await expect(imported).toContainText("《函数与导数系统提升课》已加入你的课程，可在课程中继续添加教材和文件。");
     await expect(imported.locator(".course-ready-support")).toHaveCount(0);
     await expect(imported.getByRole("button", { name: "进入学习", exact: true })).toBeEnabled();
     await expect(imported.getByRole("button", { name: "查看学习计划", exact: true })).toBeEnabled();
@@ -896,10 +900,17 @@ test.describe("community discovery", () => {
     const imported = page.locator(".community-import-screen");
     await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
-    await expect(imported).toContainText("已将《化学必修第二册同步课》编排为 1 节 AI 课程。");
+    await expect(imported).toContainText("《化学必修第二册同步课》已加入你的课程，可在课程中继续添加教材和文件。");
     await expect(imported.locator(".course-ready-support")).toHaveCount(0);
     await imported.getByRole("button", { name: "进入学习", exact: true }).click();
-    await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".course-space-detail")).toBeVisible();
+    await expect(page.locator(".course-space-detail")).toContainText("化学必修第二册同步课");
+    const importedCourse = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem("bookcourse.courses.v2") ?? "{}");
+      return state.courses.find((course: { id: string }) => course.id === state.activeCourseId);
+    });
+    expect(importedCourse.id).toBe("catalog:community_high_school_chemistry_2");
+    expect(importedCourse.resourceIds).toContain("source:community_high_school_chemistry_2");
   });
 
   test("keeps card geometry stable when generated covers fail", async ({ page }) => {

@@ -3,14 +3,15 @@ import {
   bookIdFromResourceId,
   dailyMinuteBudget,
   type LearnerPreferences,
-  type LearningSet,
+  type Course,
   type PrimaryGoal,
-  type SetDiagnosis
+  type CourseDiagnosis
+  , type CourseResource
 } from "./model";
 
 export type RecommendationKind = "lesson" | "practice" | "mistakes" | "flashcards" | "notes" | "visual";
 
-export type SetRecommendation = {
+export type CourseRecommendation = {
   bookId: string;
   taskId: string;
   chapterId: string | null;
@@ -33,7 +34,7 @@ function taskKind(task: StudyTask): RecommendationKind {
   return "lesson";
 }
 
-const goalPriority: Record<SetDiagnosis["goals"][number], RecommendationKind[]> = {
+const goalPriority: Record<CourseDiagnosis["goals"][number], RecommendationKind[]> = {
   systematic: ["lesson", "practice", "flashcards"],
   exam: ["practice", "mistakes", "flashcards"],
   professional: ["lesson", "visual", "practice"],
@@ -48,7 +49,7 @@ const globalGoalPriority: Record<PrimaryGoal, RecommendationKind[]> = {
   interest: ["lesson", "visual", "notes"]
 };
 
-function rankKind(kind: RecommendationKind, diagnosis: SetDiagnosis, globalGoal: PrimaryGoal) {
+function rankKind(kind: RecommendationKind, diagnosis: CourseDiagnosis, globalGoal: PrimaryGoal) {
   let score = 0;
   const globalPosition = globalGoalPriority[globalGoal].indexOf(kind);
   if (globalPosition >= 0) score += 3 - globalPosition;
@@ -73,14 +74,14 @@ function rankKind(kind: RecommendationKind, diagnosis: SetDiagnosis, globalGoal:
   return score;
 }
 
-function reasonFor(kind: RecommendationKind, diagnosis: SetDiagnosis) {
+function reasonFor(kind: RecommendationKind, diagnosis: CourseDiagnosis) {
   if (diagnosis.urgency === "urgent" && (kind === "practice" || kind === "mistakes")) return "紧迫学习：先抓练习和薄弱点";
   if (diagnosis.goals.includes("exam") && kind === "practice") return "应试备考：优先练习";
   if (diagnosis.goals.includes("gaps") && kind === "mistakes") return "查漏补缺：先看卡点";
   if (diagnosis.contentFoci.includes("notes") && kind === "notes") return "内容侧重：整理笔记";
   if (diagnosis.reviews.includes("periodic") && kind === "flashcards") return "复习偏好：定期回忆";
   if (diagnosis.urgency === "relaxed") return "按轻松节奏继续学习";
-  return "根据学习集目标推荐";
+  return "根据课程目标推荐";
 }
 
 function splitMinutes(minutes: number, fragmented: boolean) {
@@ -90,12 +91,12 @@ function splitMinutes(minutes: number, fragmented: boolean) {
   return Array.from({ length: count }, (_, index) => base + (index < minutes % count ? 1 : 0));
 }
 
-export function reviewIntervalDays(diagnosis: SetDiagnosis) {
+export function reviewIntervalDays(diagnosis: CourseDiagnosis) {
   if (diagnosis.reviews.includes("free")) return null;
   return diagnosis.urgency === "urgent" ? 1 : diagnosis.urgency === "steady" ? 3 : 7;
 }
 
-export function preferredToolIds(diagnosis: SetDiagnosis): Array<"assignment" | "flashcards" | "mistakes" | "notes"> {
+export function preferredToolIds(diagnosis: CourseDiagnosis): Array<"assignment" | "flashcards" | "mistakes" | "notes"> {
   const order: Array<"assignment" | "flashcards" | "mistakes" | "notes"> = [];
   const add = (value: typeof order[number]) => { if (!order.includes(value)) order.push(value); };
   for (const goal of diagnosis.goals) {
@@ -121,26 +122,27 @@ export function preferredToolIds(diagnosis: SetDiagnosis): Array<"assignment" | 
   return order;
 }
 
-export function buildLearningSetRecommendations(
-  learningSet: LearningSet,
+export function buildCourseRecommendations(
+  course: Course,
   preferences: LearnerPreferences | null,
-  plans: ReadonlyMap<string, StudyPlan>
-): { budget: number; recommendations: SetRecommendation[]; reviewDays: number | null } {
+  plans: ReadonlyMap<string, StudyPlan>,
+  resources: readonly CourseResource[] = []
+): { budget: number; recommendations: CourseRecommendation[]; reviewDays: number | null } {
   const budget = dailyMinuteBudget(preferences);
   const globalGoal = preferences?.primaryGoal ?? "systematic";
   const ranked: Array<{ bookId: string; task: StudyTask; bookOrder: number; taskOrder: number; score: number; kind: RecommendationKind }> = [];
-  learningSet.resourceIds.forEach((resourceId, bookOrder) => {
-    const bookId = bookIdFromResourceId(resourceId);
+  course.resourceIds.forEach((resourceId, bookOrder) => {
+    const bookId = bookIdFromResourceId(resourceId, resources);
     if (!bookId) return;
     plans.get(bookId)?.tasks.forEach((task, taskOrder) => {
       if (task.status === "done") return;
       const kind = taskKind(task);
-      ranked.push({ bookId, task, bookOrder, taskOrder, kind, score: rankKind(kind, learningSet.diagnosis, globalGoal) });
+      ranked.push({ bookId, task, bookOrder, taskOrder, kind, score: rankKind(kind, course.diagnosis, globalGoal) });
     });
   });
   ranked.sort((a, b) => b.score - a.score || a.bookOrder - b.bookOrder || a.task.day - b.task.day || a.taskOrder - b.taskOrder);
   let remaining = budget;
-  const recommendations: SetRecommendation[] = [];
+  const recommendations: CourseRecommendation[] = [];
   for (const candidate of ranked) {
     if (remaining < 5) break;
     const minutes = Math.min(Math.max(5, candidate.task.minutes), remaining);
@@ -154,9 +156,9 @@ export function buildLearningSetRecommendations(
       kind: candidate.kind,
       minutes,
       originalMinutes: candidate.task.minutes,
-      segments: splitMinutes(minutes, learningSet.diagnosis.timePattern === "fragmented"),
-      reason: reasonFor(candidate.kind, learningSet.diagnosis)
+      segments: splitMinutes(minutes, course.diagnosis.timePattern === "fragmented"),
+      reason: reasonFor(candidate.kind, course.diagnosis)
     });
   }
-  return { budget, recommendations, reviewDays: reviewIntervalDays(learningSet.diagnosis) };
+  return { budget, recommendations, reviewDays: reviewIntervalDays(course.diagnosis) };
 }

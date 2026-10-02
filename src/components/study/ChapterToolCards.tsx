@@ -1,5 +1,6 @@
 import { type ComponentType } from "react";
 import { BookX, ChevronRight, ClipboardCheck, Layers3, NotebookPen } from "lucide-react";
+import { useHorizontalDragScroll } from "./useHorizontalDragScroll";
 import {
   type ChapterToolPreviewContent,
   studyToolDefinitions,
@@ -15,6 +16,7 @@ export type ChapterToolCardsProps = Readonly<{
   ariaLabel?: string;
   previewContent?: ChapterToolPreviewContent;
   orderedToolIds?: readonly ChapterToolId[];
+  layout?: "grid" | "rail";
 }>;
 
 const toolIcons: Record<
@@ -38,8 +40,10 @@ export function ChapterToolCards({
   onSelectTool,
   ariaLabel = "本节辅助工具",
   previewContent,
-  orderedToolIds
+  orderedToolIds,
+  layout = "grid"
 }: ChapterToolCardsProps) {
+  const scrollerRef = useHorizontalDragScroll(layout === "rail");
   const cardTools = studyToolDefinitions.filter(isChapterTool).slice().sort((a, b) => {
     if (!orderedToolIds) return 0;
     return orderedToolIds.indexOf(a.id) - orderedToolIds.indexOf(b.id);
@@ -57,7 +61,7 @@ export function ChapterToolCards({
   ];
 
   return (
-    <div className="study-tool-grid" aria-label={ariaLabel}>
+    <div className="study-tool-grid" ref={scrollerRef} role="group" aria-label={ariaLabel} data-mouse-drag-scroll={layout === "rail" ? "self" : undefined}>
       {cardTools.map((tool) => {
         const Icon = toolIcons[tool.id];
         return (

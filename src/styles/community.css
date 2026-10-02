@@ -4,7 +4,7 @@
   gap: 0.75rem;
 }
 
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 719px) and (orientation: portrait) {
   .app-shell:has(> .screen-content[data-screen="community"]) .header-bar {
     top: calc(var(--safe-area-top) + 4px);
     right: 0;
@@ -628,7 +628,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 719px) {
   .community-category-rail,
   .community-category-menu {
     width: calc(100% + var(--content-x) + var(--content-x));
@@ -644,7 +644,7 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .community-screen {
     gap: 1.25rem;
   }
@@ -1114,7 +1114,7 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .community-detail-overview {
     --community-detail-visual-expanded: 17rem;
   }

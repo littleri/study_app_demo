@@ -224,7 +224,7 @@
   }
 }
 
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .parse-ready-summary {
     padding-bottom: 1rem;
   }
@@ -240,7 +240,7 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .screen-content.with-header.without-nav[data-screen="parseReady"] {
     --parse-ready-visual-block: 17rem;
   }

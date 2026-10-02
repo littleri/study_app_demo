@@ -295,7 +295,7 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .motion-screen-transition[data-motion-state="transitioning"][data-motion-direction]
     > .motion-screen-surface[data-motion-surface="current"] {
     animation-name: motion-screen-tablet-in;
@@ -307,7 +307,7 @@
   }
 }
 
-@media (max-width: 767px) and (orientation: portrait) {
+@media (max-width: 719px) and (orientation: portrait) {
   /* The global transition wrapper normally clips overflowing screen bodies.
      On Assignment that clip coincides with the padded content column and cuts
      off both full-bleed rounded sides until the transition settles. The screen
@@ -1583,8 +1583,12 @@
   animation: motion-local-item-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
 }
 
+.source-page-frame {
+  --source-page-enter-x: var(--motion-distance-medium);
+}
+
 [data-motion-item="source-page-content"][data-motion-item-state="entering"] {
-  animation: motion-source-page-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
+  animation: motion-source-page-in var(--motion-duration-global) var(--motion-ease-global-enter) both;
 }
 
 .citation-media-image[data-motion-image-state="loading"],
@@ -1981,11 +1985,13 @@
 
 @keyframes motion-source-page-in {
   from {
-    opacity: 0;
+    opacity: .24;
+    transform: translateX(var(--source-page-enter-x));
   }
 
   to {
     opacity: 1;
+    transform: translateX(0);
   }
 }
 
@@ -2033,7 +2039,7 @@
   animation: motion-lesson-page-back-in var(--motion-duration-global) var(--motion-ease-local-enter) both;
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .book-course-screen [data-motion-item="content"][data-motion-item-state="entering"],
   .lesson-screen [data-motion-item="content"][data-motion-item-state="entering"] {
     --motion-local-item-x: var(--motion-distance-small);

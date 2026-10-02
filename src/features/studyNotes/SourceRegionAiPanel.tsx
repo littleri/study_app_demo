@@ -1,3 +1,5 @@
+import { courseRagScope } from "../courses/selectors";
+import { useAppContext } from "../../context/AppContext";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { BookOpenCheck, Sparkles, X } from "lucide-react";
 import { Button } from "../../components/ui";
@@ -9,6 +11,7 @@ import { creditCosts, useCredits } from "../credits/creditStore";
 import { getStudyNote, updateTextStudyNote } from "./repository";
 import { textNoteQuestion } from "./textAnnotations";
 import type { TextNoteMessage, TextStudyNote } from "./types";
+import { getCitationSourceText } from "../../screens/sheets/citationSource";
 
 /** Client-pixel rectangle of the dashed selection the dialog grows out of. */
 export type RegionOrigin = {
@@ -83,6 +86,7 @@ export function SourceRegionAiPanel({
   reference: RegionAiReference | null;
 }) {
   const bookcourseRepository = useBookCourseRepository();
+  const { courses, openSourcePage } = useAppContext();
   const credits = useCredits();
   const reducedMotion = useReducedMotion();
   const motion = useMotionPresence<RegionAiReference>({
@@ -221,6 +225,7 @@ export function SourceRegionAiPanel({
     };
     try {
       const result = await bookcourseRepository.queryRag({
+        ...courseRagScope(courses.state, bookId),
         book_id: bookId,
         chapter_id: chapterId,
         history,
@@ -325,8 +330,12 @@ export function SourceRegionAiPanel({
                 </div>
                 {message.citations.map((citation) => (
                   <article key={citation.chunk_id || `${citation.page}:${citation.quote.slice(0, 16)}`}>
-                    <span>{citation.chapter_title || "教材原文"} · {citation.location_label || `第 ${citation.page} 页`}</span>
+                    <span>{typeof citation.source_metadata.filename === "string" ? `${citation.source_metadata.filename} · ` : ""}{citation.chapter_title || "教材原文"} · {citation.location_label || `第 ${citation.page} 页`}</span>
                     {citation.quote ? <blockquote>{citation.quote}</blockquote> : null}
+                    <button type="button" onClick={() => {
+                      onClose();
+                      openSourcePage({ courseId: courses.state.activeCourseId ?? undefined, bookId: citation.book_id ?? String(citation.source_metadata.book_id ?? bookId), title: citation.chapter_title, pageStart: citation.page, pageEnd: citation.page, sourceText: getCitationSourceText(citation) });
+                    }}>查看原文</button>
                   </article>
                 ))}
               </div>

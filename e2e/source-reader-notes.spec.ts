@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "playwright/test";
 import type { RagQuery } from "../src/types/api";
-import type { TextNoteMessage, TextNotePosition } from "../src/features/studyNotes/types";
+import type { InkStroke, TextNoteMessage, TextNotePosition } from "../src/features/studyNotes/types";
 
 test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
@@ -58,6 +58,23 @@ async function placeTextNote(page: Page, reader: Locator, x: number, y: number, 
   return editor;
 }
 
+async function clickOutsideTextNote(page: Page, reader: Locator) {
+  const panel = await reader.getByRole("region", { name: "原文文字笔记" }).boundingBox();
+  const image = await reader.locator(".source-annotation-page > img").boundingBox();
+  const viewport = page.viewportSize();
+  if (!panel || !image || !viewport) throw new Error("Missing visible annotation geometry");
+  const markers = await Promise.all((await reader.locator(".source-text-note-marker").all()).map((marker) => marker.boundingBox()));
+  const left = Math.max(0, image.x) + 16;
+  const right = Math.min(viewport.width, image.x + image.width) - 16;
+  const top = Math.max(0, image.y) + 16;
+  const bottom = Math.min(viewport.height, image.y + image.height) - 16;
+  const candidates = [{ x: right, y: top }, { x: left, y: top }, { x: right, y: bottom }, { x: left, y: bottom }];
+  const point = candidates.find(({ x, y }) => [panel, ...markers].every((box) => !box
+    || x < box.x - 4 || x > box.x + box.width + 4 || y < box.y - 4 || y > box.y + box.height + 4));
+  if (!point) throw new Error("No visible original-page point outside the annotation");
+  await page.mouse.click(point.x, point.y);
+}
+
 test.describe("text annotation popup motion", () => {
   test.use({ reducedMotion: "no-preference" });
 
@@ -66,6 +83,144 @@ test.describe("text annotation popup motion", () => {
       element.dispatchEvent(new AnimationEvent(event.type, { animationName: event.name, bubbles: true }));
     }, { type, name });
   }
+
+  test("completes one text annotation on an outside tap and exits placement without opening another", async ({ page }, testInfo) => {
+    const { reader } = await openLessonSource(page);
+    const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+    await textTool.click();
+    const body = "点击弹窗外应保存这条批注，然后继续阅读。";
+    const editor = await placeTextNote(page, reader, .22, .35, body);
+    const marker = reader.locator(".source-text-note-marker");
+    const id = await marker.getAttribute("data-note-id");
+    await expect(reader.getByRole("button", { name: "点击原文添加文字批注" })).toHaveCount(0);
+    await editor.getByLabel("我的理解").click();
+    await expect(editor.getByLabel("我的理解")).toBeFocused();
+    await clickOutsideTextNote(page, reader);
+    await expect(editor).toHaveCount(0);
+    await expect(reader).toHaveAttribute("data-note-mode", "read");
+    await expect(textTool).toHaveAttribute("aria-pressed", "false");
+    await expect(marker).toHaveCount(1);
+    const notes = (await readStoredNotes(page)).filter((note) => note.kind === "text");
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatchObject({ id, body });
+    expect(notes[0].position?.x).toBeCloseTo(.22, 2);
+    expect(notes[0].position?.y).toBeCloseTo(.35, 2);
+    await page.screenshot({ path: testInfo.outputPath("outside-click-completed-note.png") });
+
+    await marker.click();
+    await editor.getByRole("button", { name: "编辑批注", exact: true }).click();
+    const updated = "编辑已有批注后，点击外部也只完成当前笔记。";
+    await editor.getByLabel("我的理解").fill(updated);
+    await clickOutsideTextNote(page, reader);
+    await expect(editor).toHaveCount(0);
+    await expect(reader).toHaveAttribute("data-note-mode", "read");
+    expect((await readStoredNotes(page)).filter((note) => note.kind === "text")).toEqual([
+      expect.objectContaining({ id, body: updated })
+    ]);
+
+    await textTool.click();
+    await placeTextNote(page, reader, .7, .6, "");
+    await clickOutsideTextNote(page, reader);
+    await expect(editor).toHaveCount(0);
+    await expect(reader).toHaveAttribute("data-note-mode", "read");
+    await expect(marker).toHaveCount(1);
+    expect((await readStoredNotes(page)).filter((note) => note.kind === "text")).toHaveLength(1);
+  });
+
+  test("shows a draft marker immediately, animates empty cancellation, and keeps one marker through autosave and deletion", async ({ page }, testInfo) => {
+    const { reader } = await openLessonSource(page);
+    await expect(reader.locator(".source-page-frame")).toHaveAttribute("data-motion-item-state", "idle");
+    await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+    await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
+    await page.addStyleTag({ content: ".source-text-note-marker > span { animation-play-state: paused !important; }" });
+    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+    const box = await target.boundingBox();
+    if (!box) throw new Error("Missing annotation target");
+    const point = { x: box.x + box.width * .22, y: box.y + box.height * .3 };
+    await page.mouse.click(point.x, point.y);
+    const panel = reader.locator(".source-text-note-popover");
+    const marker = reader.locator(".source-text-note-marker");
+    await expect(panel.getByLabel("我的理解")).toHaveValue("");
+    await expect(marker).toHaveCount(1);
+    await expect(marker).toHaveAttribute("data-note-draft", "true");
+    await expect(marker).toHaveAttribute("data-motion-state", "entering");
+    await expect(marker.locator("span")).toHaveCSS("animation-name", "motion-text-note-marker-in");
+    const markerBox = await marker.boundingBox();
+    expect(Math.abs(markerBox!.x + markerBox!.width / 2 - point.x)).toBeLessThan(2);
+    expect(Math.abs(markerBox!.y + markerBox!.height / 2 - point.y)).toBeLessThan(2);
+    await dispatchMotion(marker.locator("span"), "animationcancel", "motion-text-note-marker-out");
+    await expect(marker).toHaveAttribute("data-motion-state", "entering");
+    await dispatchMotion(marker.locator("span"), "animationend", "motion-text-note-marker-in");
+    await expect(marker).toHaveAttribute("data-motion-state", "idle");
+    await page.screenshot({ path: testInfo.outputPath("immediate-draft-marker.png") });
+    await panel.getByRole("button", { name: "关闭文字笔记" }).click();
+    await expect(marker).toHaveAttribute("data-motion-state", "closing");
+    await expect(marker).toBeDisabled();
+    await expect(marker.locator("span")).toHaveCSS("animation-name", "motion-text-note-marker-out");
+    await dispatchMotion(marker.locator("span"), "animationend", "motion-text-note-marker-in");
+    await expect(marker).toHaveAttribute("data-motion-state", "closing");
+    await dispatchMotion(marker.locator("span"), "animationcancel", "motion-text-note-marker-out");
+    await expect(marker).toHaveCount(0);
+    expect((await readStoredNotes(page)).filter((note) => note.kind === "text")).toHaveLength(0);
+    await expect(panel).toHaveCount(0);
+
+    if (await reader.getByRole("button", { name: "文字笔记", exact: true }).getAttribute("aria-pressed") !== "true") {
+      await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    }
+    await page.mouse.click(point.x, point.y);
+    await dispatchMotion(marker.locator("span"), "animationend", "motion-text-note-marker-in");
+    const originalMarker = await marker.elementHandle();
+    const id = await marker.getAttribute("data-note-id");
+    await panel.getByLabel("我的理解").fill("同一个图标在自动保存后继续显示。");
+    await page.clock.runFor(600);
+    await expect(marker).toHaveAttribute("data-note-draft", "false");
+    await expect(marker).toHaveAttribute("data-motion-state", "idle");
+    await expect(marker).toHaveAttribute("data-note-id", id!);
+    expect(await originalMarker!.evaluate((element) => element === document.querySelector(".source-text-note-marker"))).toBe(true);
+    await panel.getByRole("button", { name: "完成", exact: true }).click();
+    await expect(panel).toHaveCount(0);
+    await marker.click();
+    await expect(panel.locator(".source-text-note-body")).toHaveText("同一个图标在自动保存后继续显示。");
+    await panel.getByRole("button", { name: "删除批注" }).click();
+    await expect(marker).toHaveAttribute("data-motion-state", "closing");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(marker).toHaveCount(0);
+    expect((await readStoredNotes(page)).some((note) => note.id === id)).toBe(false);
+  });
+
+  test("waits for the original page image before sliding in, follows the page direction, and settles with real animation events", async ({ page }, testInfo) => {
+    const { reader } = await openLessonSource(page);
+    const frame = reader.locator(".source-page-frame");
+    await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
+    let releaseImage: () => void = () => {};
+    const imageReady = new Promise<void>((resolve) => { releaseImage = resolve; });
+    const imageUrl = await reader.locator(".source-page-image").getAttribute("src");
+    if (!imageUrl) throw new Error("Missing source page URL");
+    const nextImageUrl = imageUrl.replace(/\d+(?=\.[^/.]+$)/u, (number) => String(Number(number) + 1).padStart(number.length, "0"));
+    expect(nextImageUrl).not.toBe(imageUrl);
+    await page.route(`**${nextImageUrl}`, async (route) => { await imageReady; await route.continue(); });
+    const pause = await page.addStyleTag({ content: ".source-page-frame { animation-play-state: paused !important; }" });
+    await swipeSourcePage(page, "left");
+    await expect(page.locator(".header-title p")).toHaveText("第 17 页");
+    await expect(reader.locator(".source-page-skeleton-reveal")).toHaveAttribute("data-motion-load-state", "loading");
+    await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
+    releaseImage();
+    await expect(frame).toHaveAttribute("data-motion-item-state", "entering");
+    await expect(frame).toHaveAttribute("data-page-direction", "forward");
+    await expect(frame).toHaveCSS("animation-duration", "0.35s");
+    expect(await frame.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41)).toBeGreaterThan(0);
+    await dispatchMotion(frame, "animationend", "motion-source-page-in");
+    await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
+    await swipeSourcePage(page, "right");
+    await expect(page.locator(".header-title p")).toHaveText("第 16 页");
+    await expect(frame).toHaveAttribute("data-motion-item-state", "entering");
+    await expect(frame).toHaveAttribute("data-page-direction", "back");
+    expect(await frame.evaluate((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).m41)).toBeLessThan(0);
+    await pause.evaluate((element) => element.remove());
+    await expect(frame).toHaveAttribute("data-motion-item-state", "idle");
+    await page.screenshot({ path: testInfo.outputPath("source-page-transition.png") });
+  });
 
   test("keeps entry and exit generation-bound, grows from the annotation, and settles reduced motion directly", async ({ page }) => {
     await page.setViewportSize({ width: 783, height: 1138 });
@@ -212,6 +367,68 @@ test("anchors selected text on the original page and reopens it for reading and 
   await expect(page.locator(".lesson-page-progress")).toHaveAttribute("aria-valuenow", progress ?? "1");
 });
 
+test("exits text annotation mode after completion so later page taps do not create another note", async ({ page }, testInfo) => {
+  const { reader } = await openLessonSource(page);
+  const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+  await textTool.click();
+  const editor = await placeTextNote(page, reader, .22, .35, "完成后应该继续阅读原文。");
+  await editor.getByRole("button", { name: "完成", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(textTool).toHaveAttribute("aria-pressed", "false");
+  await expect(reader.getByRole("button", { name: "点击原文添加文字批注" })).toHaveCount(0);
+  await expect(reader.locator(".source-text-placement-hint")).toHaveCount(0);
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
+
+  const image = reader.locator(".source-annotation-page > img");
+  const bounds = await image.boundingBox();
+  if (!bounds) throw new Error("Missing original page image");
+  await page.mouse.click(bounds.x + bounds.width * .8, bounds.y + bounds.height * .2);
+  await expect(editor).toHaveCount(0);
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
+  const notes = (await readStoredNotes(page)).filter((note) => note.kind === "text");
+  expect(notes).toHaveLength(1);
+  expect(notes[0].body).toBe("完成后应该继续阅读原文。");
+  await page.screenshot({ path: testInfo.outputPath("annotation-completed-reading-mode.png") });
+
+  await reader.locator(".source-text-note-marker").click();
+  await expect(reader.locator(".source-text-note-body")).toHaveText("完成后应该继续阅读原文。");
+  await editor.getByRole("button", { name: "编辑批注", exact: true }).click();
+  await editor.getByLabel("我的理解").fill("更新已有批注后也应退出批注模式。");
+  await editor.getByRole("button", { name: "完成", exact: true }).click();
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(textTool).toHaveAttribute("aria-pressed", "false");
+
+  await textTool.click();
+  const nextEditor = await placeTextNote(page, reader, .7, .6, "重新开启后可以添加下一条批注。");
+  await nextEditor.getByRole("button", { name: "完成", exact: true }).click();
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(2);
+});
+
+test("uses a tap on another annotation only to complete the current note before reopening a saved one", async ({ page }) => {
+  const { reader } = await openLessonSource(page);
+  const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+  await textTool.click();
+  const firstBody = "先前保存的批注。";
+  const editor = await placeTextNote(page, reader, .12, .08, firstBody);
+  const firstId = await reader.locator(".source-text-note-marker").getAttribute("data-note-id");
+  await editor.getByRole("button", { name: "完成", exact: true }).click();
+  await textTool.click();
+  const secondBody = "本次点击只完成这条新批注。";
+  await placeTextNote(page, reader, .84, .85, secondBody);
+  const firstMarker = reader.locator(`[data-note-id='${firstId}']`);
+  await firstMarker.click();
+  await expect(editor).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(2);
+  expect((await readStoredNotes(page)).filter((note) => note.kind === "text").map((note) => note.body).sort()).toEqual([firstBody, secondBody].sort());
+  await firstMarker.click();
+  await expect(editor.locator(".source-text-note-body")).toHaveText(firstBody);
+  await clickOutsideTextNote(page, reader);
+  await expect(editor).toHaveCount(0);
+});
+
 test("places independent text markers, restores them across pages and resizing, and deletes one", async ({ page }) => {
   await page.setViewportSize({ width: 834, height: 1194 });
   const { reader } = await openLessonSource(page);
@@ -230,6 +447,8 @@ test("places independent text markers, restores them across pages and resizing, 
   await expect(reader.locator(".source-reader-side-panel")).toHaveCount(0);
   await editor.getByRole("button", { name: "完成", exact: true }).click();
   await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
+  await expect(textTool).toHaveAttribute("aria-pressed", "false");
+  await textTool.click();
   editor = await placeTextNote(page, reader, .78, .68, second);
   await page.screenshot({ path: "output/text-notes-ipad-editor.png" });
   await editor.getByRole("button", { name: "完成", exact: true }).click();
@@ -238,7 +457,7 @@ test("places independent text markers, restores them across pages and resizing, 
   expect(saved.position?.x).toBeCloseTo(.24, 2);
   expect(saved.position?.y).toBeCloseTo(.23, 2);
 
-  await textTool.click();
+  await expect(textTool).toHaveAttribute("aria-pressed", "false");
   await swipeSourcePage(page, "left");
   await expect(reader.locator(".source-text-note-marker")).toHaveCount(0);
   await swipeSourcePage(page, "right");
@@ -365,12 +584,21 @@ test("keeps an unsaved annotation open when storage fails and saves it on retry"
   const editor = await placeTextNote(page, reader, .3, .3, body);
   await editor.getByRole("button", { name: "完成", exact: true }).click();
   await expect(editor.getByRole("alert")).toContainText("保存失败");
+  await expect(reader).toHaveAttribute("data-note-mode", "text");
   await expect(editor.getByLabel("我的理解")).toHaveValue(body);
-  await expect(reader.locator(".source-text-note-marker")).toHaveCount(0);
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
+  await expect(reader.locator(".source-text-note-marker")).toHaveAttribute("data-note-draft", "true");
+  await clickOutsideTextNote(page, reader);
+  await expect(editor.getByRole("alert")).toContainText("保存失败");
+  await expect(editor.getByLabel("我的理解")).toHaveValue(body);
+  await expect(reader).toHaveAttribute("data-note-mode", "text");
+  expect((await readStoredNotes(page)).filter((note) => note.kind === "text")).toHaveLength(0);
   await page.evaluate(() => (window as unknown as { __restoreNoteWrites: () => void }).__restoreNoteWrites());
   await editor.getByRole("button", { name: "重试保存", exact: true }).click();
   await expect(editor.getByRole("alert")).toHaveCount(0);
-  await editor.getByRole("button", { name: "完成", exact: true }).click();
+  await clickOutsideTextNote(page, reader);
+  await expect(editor).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
   await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
   expect((await readStoredNotes(page)).some((note) => note.body === body)).toBe(true);
 });
@@ -402,6 +630,64 @@ test("preserves a newer edit when a pending annotation AI answer finishes", asyn
     const note = (await readStoredNotes(page)).find((item) => item.body === revised);
     return note?.conversation?.some((message) => message.role === "assistant");
   }).toBe(true);
+});
+
+test("starts the marker at the former maximum size, draws three wider flat nibs, and remembers each tool's size", async ({ page }, testInfo) => {
+  const { reader } = await openLessonSource(page);
+  await reader.getByRole("button", { name: "荧光笔", exact: true }).click();
+  const sizes = reader.getByRole("group", { name: "笔迹粗细" });
+  await expect(sizes).toHaveAttribute("data-brush-tool", "highlighter");
+  await expect(sizes.getByRole("button", { name: "细", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const widths = await sizes.locator("button").evaluateAll((buttons) => buttons.map((button) => Number((button as HTMLElement).dataset.brushWidth)));
+  expect(widths).toEqual([.01, .02, .03]);
+  const canvas = reader.getByLabel("教材手写批注画布");
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("Missing marker canvas");
+  for (const [index, label] of ["细", "中", "粗"].entries()) {
+    await sizes.getByRole("button", { name: label, exact: true }).click();
+    const y = bounds.y + bounds.height * (.18 + index * .075);
+    await page.mouse.move(bounds.x + bounds.width * .25, y);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width * .72, y, { steps: 12 });
+    await page.mouse.up();
+  }
+  await reader.getByRole("button", { name: "荧光笔", exact: true }).click();
+  await expect.poll(async () => {
+    const notes = await readStoredNotes(page);
+    const ink = notes.find((note) => note.kind === "ink" && !note.id.startsWith("ink-demo-"));
+    return ink ? (Object.values(ink.pages ?? {}).flat() as InkStroke[]).map((stroke) => [stroke.tool, stroke.width]) : undefined;
+  }).toEqual([["highlighter", .01], ["highlighter", .02], ["highlighter", .03]]);
+  const storedMarker = (await readStoredNotes(page)).find((note) => note.kind === "ink" && !note.id.startsWith("ink-demo-"))!;
+  const widestStroke = (Object.values(storedMarker.pages!).flat() as InkStroke[])[2];
+  // A square nib covers both outer corners of each end. Round caps would leave
+  // these samples transparent even when the stroke's centerline is identical.
+  const endCorners = await canvas.evaluate((element, stroke) => {
+    const bitmap = element as HTMLCanvasElement;
+    const context = bitmap.getContext("2d")!;
+    const halfWidth = Math.min(bitmap.width, bitmap.height) * stroke.width / 2;
+    return [stroke.points[0], stroke.points[stroke.points.length - 1]]
+      .flatMap((point, end) => [-1, 1].map((side) => context.getImageData(
+        Math.floor(point.x * bitmap.width + (end ? 1 : -1) * halfWidth * .8),
+        Math.floor(point.y * bitmap.height + side * halfWidth * .8), 1, 1
+      ).data[3]));
+  }, widestStroke);
+  expect(endCorners, "both flat ends cover their rectangular corners").toEqual([expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number)]);
+  expect(endCorners.every((alpha) => alpha > 30), `flat end corner alpha: ${endCorners.join(", ")}`).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("flat-marker-three-sizes.png") });
+  await reader.getByRole("button", { name: "钢笔", exact: true }).click();
+  await expect(sizes).toHaveAttribute("data-brush-tool", "pen");
+  await expect(sizes.getByRole("button", { name: "中", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await sizes.getByRole("button", { name: "细", exact: true }).click();
+  await reader.getByRole("button", { name: "荧光笔", exact: true }).click();
+  await expect(sizes.getByRole("button", { name: "粗", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await reader.getByRole("button", { name: "荧光笔", exact: true }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "继续学习", exact: true }).click();
+  await page.locator(".lesson-source-link").first().click();
+  await reader.getByRole("button", { name: "荧光笔", exact: true }).click();
+  await expect(reader.getByRole("button", { name: "撤销", exact: true })).toBeDisabled();
+  const restored = await canvas.evaluate((element) => (element as HTMLCanvasElement).getContext("2d")!.getImageData(0, 0, (element as HTMLCanvasElement).width, (element as HTMLCanvasElement).height).data.some((value, index) => index % 4 === 3 && value > 30));
+  expect(restored).toBe(true);
 });
 
 test("draws on the original page and restores the saved stroke", async ({ page }) => {

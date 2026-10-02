@@ -113,7 +113,7 @@ export type TocAnalysis = {
   warnings: string[];
 };
 
-export type CourseSummary = {
+export type CourseSourceSummary = {
   book_id: string;
   title: string;
   filename?: string | null;
@@ -329,6 +329,7 @@ export type ImageGenerationJobResponse = {
 };
 
 export type Citation = {
+  book_id?: string;
   chapter_id: string;
   chapter_title: string;
   page: number;
@@ -364,6 +365,8 @@ export type RagReferenceImage = {
 
 export type RagQuery = {
   book_id: string;
+  book_ids?: string[];
+  course_id?: string;
   chapter_id?: string | null;
   question: string;
   history?: Array<Record<string, unknown>>;

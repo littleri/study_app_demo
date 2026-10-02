@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 
-export const PAD_LAYOUT_MEDIA_QUERY = "(min-width: 768px) and (min-height: 600px)";
+// Includes Android tablets with a 753px portrait viewport; short landscape
+// phones still use bottom navigation because of the height requirement.
+export const PAD_LAYOUT_MEDIA_QUERY = "(min-width: 720px) and (min-height: 600px)";
 
 type MediaQueryListWithLegacyListeners = MediaQueryList & {
   addListener?: (listener: (event: MediaQueryListEvent) => void) => void;

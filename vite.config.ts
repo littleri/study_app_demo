@@ -26,6 +26,11 @@ if (!hasLanCertificate) {
 
 export default defineConfig({
   plugins: [react()],
+  // These libraries enter through import/AI actions. Prepare them at startup
+  // so the first interaction does not trigger Vite's dependency reload.
+  optimizeDeps: {
+    include: ["@huggingface/transformers", "pdfjs-dist", "fflate"]
+  },
   // Transformers.js imports ONNX Runtime inside the textbook Worker. Select
   // ONNX Runtime's documented external-WASM condition so Vite does not copy a
   // second bundled JSEP runtime; the pinned one-thread WASM lives under

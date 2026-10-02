@@ -22,6 +22,8 @@ import {
   studyPlanCourseTitle,
   studyTaskStatusLabel
 } from "./studyPlanPresentation";
+import { useCoursePlans } from "../features/courses/useCoursePlans";
+import { courseSources } from "../features/courses/selectors";
 
 const defaultStudyPlanDays = 14;
 const minimumStudyPlanDays = 1;
@@ -42,7 +44,11 @@ function selectRenderablePlanDay(value: unknown, planDayCount: number) {
 
 export function StudyPlanScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { currentStudyPlan, go, setCurrentStudyPlan, showToast, uploadedFile } = useAppContext();
+  const { currentStudyPlan, courses, sourceSummaries, selectSource, setActiveChapterId, go, setCurrentStudyPlan, showToast, uploadedFile } = useAppContext();
+  const activeCourse = courses.state.courses.find((course) => course.id === courses.state.activeCourseId);
+  const sources = courseSources(activeCourse, courses.state.resources, sourceSummaries);
+  const { plans, refresh: refreshPlans } = useCoursePlans(activeCourse?.id);
+  const [taskOverrides, setTaskOverrides] = useState<Record<string, string>>({});
   const reducedMotion = useReducedMotion();
   const [selectedDay, setSelectedDay] = useState(1);
   const [selectedDateMotion, setSelectedDateMotion] = useState<{ day: number | null; state: "entering" | "idle" }>({ day: null, state: "idle" });
@@ -53,15 +59,18 @@ export function StudyPlanScreen() {
   });
   const emptyStateSequenceRef = useRef(0);
   const usesFrontEndMockPlan = hasFrontEndMockStudyPlan(uploadedFile);
-  const liveTasks = mergeFrontEndMockStudyTasks(
+  const sourceTasks = mergeFrontEndMockStudyTasks(
     currentStudyPlan?.tasks ?? [],
     uploadedFile,
     currentStudyPlan?.user_id ?? runtimeConfig.defaultUserId
   );
+  const scopedTasks = sources.length > 1 ? [...plans.values()].flatMap((plan) => plan.tasks) : sourceTasks;
+  const liveTasks = scopedTasks.map((task) => taskOverrides[task.task_id] ? { ...task, status: taskOverrides[task.task_id] } : task);
+  const sourceForTask = (taskId: string) => sources.find((source) => source.bookId && plans.get(source.bookId)?.tasks.some((task) => task.task_id === taskId));
   const planDayCount = normalizeStudyPlanDays(
     usesFrontEndMockPlan
       ? Math.max(defaultStudyPlanDays, currentStudyPlan?.days ?? 0)
-      : currentStudyPlan?.days
+      : sources.length > 1 ? Math.max(1, ...[...plans.values()].map((plan) => plan.days)) : currentStudyPlan?.days
   );
   const selectedPlanDay = selectRenderablePlanDay(selectedDay, planDayCount);
   const planDays = Array.from({ length: planDayCount }, (_, index) => index + 1);
@@ -123,6 +132,8 @@ export function StudyPlanScreen() {
     }
     try {
       const updated = await bookcourseRepository.patchStudyTask(taskId, { status: "done", score: 88, weak_points: [] });
+      setTaskOverrides((current) => ({ ...current, [taskId]: updated.status }));
+      refreshPlans();
       setCurrentStudyPlan(currentStudyPlan ? {
         ...currentStudyPlan,
         tasks: currentStudyPlan.tasks.map((task) => (task.task_id === updated.task_id ? updated : task))
@@ -178,11 +189,9 @@ export function StudyPlanScreen() {
           <CalendarDays size={30} aria-hidden="true" />
         </span>
         <div>
-          <h2>{studyPlanCourseTitle(uploadedFile.name)}</h2>
+          <h2>{activeCourse?.name ?? studyPlanCourseTitle(uploadedFile.name)}</h2>
           <p>{planDayCount} 天 · 每天 {currentStudyPlan?.daily_minutes ?? 30} 分钟</p>
-          <p>{usesFrontEndMockPlan
-            ? "计划根据当前课程的章节和学习内容生成，可在本地记录完成状态。"
-            : "计划由后端根据解析章节、错题记录和学习状态自动生成，可同步完成状态。"}</p>
+          <p>按课程资料汇总学习任务，完成状态会保存到对应资料。</p>
           <ProgressBar value={Math.round((liveTasks.filter((task) => task.status === "done").length / Math.max(1, liveTasks.length)) * 100)} label={`已完成 ${liveTasks.filter((task) => task.status === "done").length} / ${liveTasks.length} 项`} />
         </div>
       </Card>
@@ -245,7 +254,7 @@ export function StudyPlanScreen() {
             </span>
             <div>
               <h3>{task.title}</h3>
-              <p>{task.task_type} · {task.minutes} 分钟 · {studyTaskStatusLabel(task.status)}</p>
+              <p>{sourceForTask(task.task_id)?.name ?? uploadedFile.name} · {task.task_type} · {task.minutes} 分钟 · {studyTaskStatusLabel(task.status)}</p>
             </div>
           </button>
         )) : (
@@ -269,7 +278,12 @@ export function StudyPlanScreen() {
       </Section>
       </div>
       <Button icon={<CalendarDays size={18} aria-hidden="true" />} onClick={() => showToast("已加入学习日历")}>加入日历</Button>
-      <Button variant="secondary" onClick={() => go("lesson")}>开始今天学习</Button>
+      <Button variant="secondary" onClick={() => {
+        const task = selectedLiveTasks.find((item) => item.status !== "done") ?? selectedLiveTasks[0];
+        const source = task ? sourceForTask(task.task_id) : null;
+        if (source?.bookId) void selectSource(source.bookId, activeCourse?.id).then((opened) => { if (opened) { if (task?.chapter_id) setActiveChapterId(task.chapter_id); go("lesson"); } });
+        else { if (task?.chapter_id) setActiveChapterId(task.chapter_id); go("lesson"); }
+      }}>开始今天学习</Button>
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
 } from "./components/ui";
 import { runtimeConfig } from "./config/runtime";
 import { AppProvider } from "./context/AppContext";
-import type { CourseSummariesLoadState, CourseSummariesReadyKind } from "./context/AppContext";
+import type { SourceSummariesLoadState, SourceSummariesReadyKind } from "./context/AppContext";
 import { communityBooks } from "./data/mockBook";
 import { useBookCourseRepository } from "./context/BookCourseRepositoryContext";
 import { demoRepository } from "./services/DemoRepository";
@@ -60,7 +60,7 @@ import type {
   ApiAsset,
   ApiChapter,
   ApiChunk,
-  CourseSummary,
+  CourseSourceSummary,
   DiagnosisResponse,
   Flashcard,
   JobStatusResponse,
@@ -73,10 +73,14 @@ import type {
 import type { Screen, SheetState, SourcePageTarget, StudyLocation, ToastMessage, ToastTone, UploadedCourseFile } from "./types/app";
 import type { NoteCaptureIntent } from "./features/studyNotes/types";
 import { resolveSourceReaderHeading } from "./features/studyNotes/sourceReaderHeading";
-import { useLearningSetStore } from "./features/learningSets/repository";
-import { courseResourceId } from "./features/learningSets/model";
-import { LearningSetSetupScreen, OnboardingScreen } from "./features/learningSets/FlowScreens";
-import { LearningSetDetailScreen } from "./features/learningSets/HomeScreens";
+import { useCourseStore } from "./features/courses/repository";
+import { sourceResourceId } from "./features/courses/model";
+import { CourseSetupScreen, OnboardingScreen } from "./features/courses/FlowScreens";
+import { CourseDetailScreen } from "./features/courses/HomeScreens";
+import { AddMaterialsSheetContent } from "./features/courses/AddMaterialsSheetContent";
+import { courseLocationKey, preferredCourseSource } from "./features/courses/selectors";
+import { bookIdFromResourceId } from "./features/courses/model";
+import { prepareLocalSource } from "./services/LocalSources";
 import { createCourseSelectionCoordinator } from "./screens/homeBookModel";
 import { lessonHeaderSubtitle } from "./screens/lessonHeader";
 import {
@@ -86,7 +90,7 @@ import {
   shouldClearLoadedCourseForDeletedBook,
   shouldClearRemoteSessionAfterRefresh,
   type LoadedCourseContext
-} from "./screens/courseResourceIdentity";
+} from "./screens/sourceResourceIdentity";
 
 const studyLocationsStorageKey = "bookcourse.study-locations.v1";
 const demoParseJobPollIntervalMs = 700;
@@ -108,14 +112,14 @@ function loadStudyLocations(): Record<string, StudyLocation> {
 const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
   home: {},
   onboarding: { hideNav: true },
-  learningSetSetup: { hideNav: true },
-  learningSet: { title: "学习集", back: true },
-  upload: { title: "创建学习集", back: true, hideNav: true },
+  courseSetup: { hideNav: true },
+  courseDetail: { title: "课程", back: true },
+  upload: { title: "创建课程", back: true, hideNav: true },
   parseReady: { title: "解析教材", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
-  chapterConfirm: { title: "确认目录", subtitle: "核对原书和 AI 课程映射", back: true, hideNav: true },
+  chapterConfirm: { title: "确认目录", subtitle: "核对资料目录与 AI 课时映射", back: true, hideNav: true },
   courseReady: { hideNav: true },
-  library: { title: "我的课程", subtitle: "管理由书生成的 AI 课程", back: true, hideNav: true },
+  library: { title: "我的课程", subtitle: "管理课程、教材与学习资料", back: true, hideNav: true },
   community: { title: "发现", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
   communityImport: { hideNav: true },
@@ -169,18 +173,21 @@ function snapshotSheetState(sheet: OpenSheetState): OpenSheetState {
       };
     case "bookSwitcher":
       return { type: "bookSwitcher" };
+    case "addMaterials":
+      return { ...sheet };
   }
 }
 
 export default function App() {
   const bookcourseRepository = useBookCourseRepository();
   const reducedMotion = useReducedMotion();
-  const learningSets = useLearningSetStore();
-  const learningSetsRef = useRef(learningSets);
-  learningSetsRef.current = learningSets;
-  const parseDraft = learningSets.state.draft;
+  const courses = useCourseStore();
+  const coursesRef = useRef(courses);
+  coursesRef.current = courses;
+  const sourceSelectorRef = useRef<(bookId: string, courseId?: string) => Promise<boolean>>(async () => false);
+  const parseDraft = courses.state.draft;
   const navigationRef = useRef<NavigationSnapshot>(createInitialNavigation(
-    learningSets.state.preferences ? "home" : "onboarding"
+    courses.state.preferences ? "home" : "onboarding"
   ));
   const [navigation, setNavigation] = useState<NavigationSnapshot>(navigationRef.current);
   const screen = navigation.screen;
@@ -211,17 +218,17 @@ export default function App() {
         }
       : null
   );
-  const [courseSummaries, setCourseSummaries] = useState<CourseSummary[]>([]);
-  const [courseSummariesLoadState, setCourseSummariesLoadState] = useState<CourseSummariesLoadState>("loading");
-  const [courseSummariesReadyKind, setCourseSummariesReadyKind] = useState<CourseSummariesReadyKind>("empty");
-  const [courseSummariesError, setCourseSummariesError] = useState<string | null>(null);
-  const [courseSummariesRefreshing, setCourseSummariesRefreshing] = useState(false);
+  const [sourceSummaries, setSourceSummaries] = useState<CourseSourceSummary[]>([]);
+  const [sourceSummariesLoadState, setSourceSummariesLoadState] = useState<SourceSummariesLoadState>("loading");
+  const [sourceSummariesReadyKind, setSourceSummariesReadyKind] = useState<SourceSummariesReadyKind>("empty");
+  const [sourceSummariesError, setSourceSummariesError] = useState<string | null>(null);
+  const [sourceSummariesRefreshing, setSourceSummariesRefreshing] = useState(false);
   const [selectedCommunityBookId, setSelectedCommunityBookId] = useState(communityBooks[0]?.id ?? "");
   const [communityImportGeneration, setCommunityImportGeneration] = useState(0);
   const [pendingBookId, setPendingBookId] = useState<string | null>(null);
   const courseSelectionCoordinatorRef = useRef(createCourseSelectionCoordinator());
-  const courseSummariesRef = useRef<CourseSummary[]>([]);
-  courseSummariesRef.current = courseSummaries;
+  const sourceSummariesRef = useRef<CourseSourceSummary[]>([]);
+  sourceSummariesRef.current = sourceSummaries;
   const [loadedBookId, setLoadedBookId] = useState<string | null>(null);
   const [parsedScanResult, setParsedScanResult] = useState<ScanResult | null>(null);
   const [parsedChapters, setParsedChapters] = useState<ApiChapter[] | null>(null);
@@ -326,11 +333,11 @@ export default function App() {
 
   const go = useCallback((next: Screen) => {
     const current = navigationRef.current;
-    const draft = learningSetsRef.current.state.draft;
-    const pendingSetImport = draft && !draft.editingSetId && draft.uploadedCourse
+    const draft = coursesRef.current.getState().draft;
+    const pendingCourseImport = draft && !draft.editingCourseId && draft.uploadedCourse
       && draft.uploadedCourse.bookId === uploadedFileRef.current?.bookId;
-    const target = next === "chapterConfirm" && pendingSetImport
-      ? draft.parseCompleted ? "learningSetSetup" : draft.parseJobId ? "processing" : "parseReady"
+    const target = next === "chapterConfirm" && pendingCourseImport
+      ? draft.parseCompleted ? "courseSetup" : draft.parseJobId ? "processing" : "parseReady"
       : next;
     if (current.screen === "voiceNote" && target !== "voiceNote") setNoteCaptureIntent(null);
     const nextNavigation = navigate(current, { type: "go", screen: target });
@@ -343,14 +350,9 @@ export default function App() {
     setSelectedCommunityBookId(bookId);
   }, []);
 
-  const beginCommunityImport = useCallback(() => {
-    setCommunityImportGeneration((current) => current + 1);
-    go("communityImport");
-  }, [go]);
-
   const back = useCallback(() => {
     const current = navigationRef.current;
-    if (current.screen === "source" || current.screen === "voiceNote" || current.screen === "onboarding" || current.screen === "learningSetSetup") {
+    if (current.screen === "source" || current.screen === "voiceNote" || current.screen === "onboarding" || current.screen === "courseSetup") {
       const recordingBackEvent = new CustomEvent("bookcourse:native-back", { cancelable: true });
       window.dispatchEvent(recordingBackEvent);
       if (recordingBackEvent.defaultPrevented) return;
@@ -365,6 +367,11 @@ export default function App() {
   }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const openSourcePage = useCallback((target: SourcePageTarget) => {
+    const store = coursesRef.current.getState();
+    const parent = store.courses.find((course) => course.id === (target.courseId ?? store.activeCourseId) && course.resourceIds.some((id) => bookIdFromResourceId(id, store.resources) === target.bookId))
+      ?? store.courses.find((course) => course.resourceIds.some((id) => bookIdFromResourceId(id, store.resources) === target.bookId));
+    target = { ...target, courseId: parent?.id };
+    const open = () => {
     const current = navigationRef.current;
     setSourceReaderCurrentPage(Math.max(1, target.pageStart));
     if (current.screen === "source") {
@@ -377,6 +384,10 @@ export default function App() {
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
     setSourcePageTarget(target);
     commitNavigation(() => nextNavigation);
+    };
+    if (loadedBookIdRef.current !== target.bookId || (parent && parent.id !== store.activeCourseId)) {
+      void sourceSelectorRef.current(target.bookId, parent?.id).then((selected) => { if (selected) open(); });
+    } else open();
   }, [commitNavigation, requestSheetCloseForNavigation, saveCurrentScreenScrollPosition]);
 
   const replaceScreen = useCallback((next: Screen) => {
@@ -457,12 +468,29 @@ export default function App() {
     toastTimerRef.current = timer;
   }, []);
 
+  const beginCommunityImport = useCallback(() => {
+    const book = communityBooks.find((item) => item.id === selectedCommunityBookId);
+    if (book) {
+      try {
+        coursesRef.current.importCatalogCourse(book.id, book.title);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "课程添加失败", "warning");
+        return;
+      }
+    }
+    setCommunityImportGeneration((current) => current + 1);
+    go("communityImport");
+  }, [go, selectedCommunityBookId, showToast]);
+
   const finishNoteCapture = useCallback(() => {
     setNoteCaptureIntent(null);
   }, []);
 
   const startNote = useCallback((intent: NoteCaptureIntent) => {
+    const courseId = intent.anchor?.courseId ?? intent.source?.courseId ?? coursesRef.current.getState().activeCourseId ?? undefined;
+    intent = { ...intent, anchor: intent.anchor ? { ...intent.anchor, courseId } : undefined, source: intent.source ? { ...intent.source, courseId } : undefined };
     const source = intent.source ?? (intent.anchor?.bookId && intent.anchor.pageStart ? {
+      courseId,
       bookId: intent.anchor.bookId,
       title: intent.anchor.chapterTitle ?? intent.anchor.bookTitle ?? "教材原文",
       pageStart: intent.anchor.pageStart,
@@ -563,16 +591,26 @@ export default function App() {
     return true;
   }, []);
 
-  const refreshCourses = useCallback(async () => {
-    const hasExistingCourses = courseSummariesRef.current.length > 0;
-    if (!hasExistingCourses) setCourseSummariesLoadState("loading");
-    setCourseSummariesRefreshing(true);
+  const refreshSources = useCallback(async () => {
+    const hasExistingCourses = sourceSummariesRef.current.length > 0;
+    if (!hasExistingCourses) setSourceSummariesLoadState("loading");
+    setSourceSummariesRefreshing(true);
     try {
-      const courses = await bookcourseRepository.listCourses();
-      setCourseSummaries(courses);
-      setCourseSummariesReadyKind(courses.length > 0 ? "content" : "empty");
-      setCourseSummariesLoadState("ready");
-      setCourseSummariesError(null);
+      const courses = await bookcourseRepository.listSources();
+      sourceSummariesRef.current = courses;
+      // The prepared source may have committed just before a browser reload.
+      // Reconcile it with its original file before creating orphan course entries.
+      for (const resource of coursesRef.current.getState().resources) {
+        const source = courses.find((item) => item.book_id === (resource.bookId ?? `book_local_${resource.id}`));
+        if (source?.status === "ready" && (resource.status !== "ready" || resource.bookId !== source.book_id)) {
+          coursesRef.current.updateResource(resource.id, { bookId: source.book_id, status: "ready", progress: 100, error: undefined });
+        }
+      }
+      coursesRef.current.syncSources(courses);
+      setSourceSummaries(courses);
+      setSourceSummariesReadyKind(courses.length > 0 ? "content" : "empty");
+      setSourceSummariesLoadState("ready");
+      setSourceSummariesError(null);
 
       const activeUploadedFile = uploadedFileRef.current;
       if (shouldClearLoadedCourseAfterRefresh(loadedBookIdRef.current, activeUploadedFile, courses)) {
@@ -582,19 +620,20 @@ export default function App() {
         clearCourseSession(activeUploadedFile?.bookId);
       }
     } catch (err) {
-      setCourseSummariesError(err instanceof Error ? err.message : "课程列表加载失败");
-      if (!hasExistingCourses) setCourseSummariesLoadState("error");
+      setSourceSummariesError(err instanceof Error ? err.message : "课程列表加载失败");
+      if (!hasExistingCourses) setSourceSummariesLoadState("error");
     } finally {
-      setCourseSummariesRefreshing(false);
+      setSourceSummariesRefreshing(false);
     }
   }, [bookcourseRepository, clearCourseSession, clearLoadedCourse]);
 
   const updateStudyLocation = useCallback((bookId: string, location: Partial<StudyLocation>) => {
+    const key = courseLocationKey(coursesRef.current.getState().activeCourseId, bookId);
     setStudyLocations((current) => ({
       ...current,
-      [bookId]: {
-        expandedChapterId: current[bookId]?.expandedChapterId ?? null,
-        expandedSectionId: current[bookId]?.expandedSectionId ?? null,
+      [key]: {
+        expandedChapterId: (current[key] ?? current[bookId])?.expandedChapterId ?? null,
+        expandedSectionId: (current[key] ?? current[bookId])?.expandedSectionId ?? null,
         ...location
       }
     }));
@@ -609,18 +648,31 @@ export default function App() {
     }
   }, [studyLocations]);
 
-  const cancelCourseSelection = useCallback(() => {
+  const cancelSourceSelection = useCallback(() => {
     courseSelectionCoordinatorRef.current.invalidate();
     setPendingBookId(null);
   }, []);
 
-  const selectCourse = useCallback(async (bookId: string) => {
+  const selectSource = useCallback(async (bookId: string, courseId?: string) => {
+    const store = coursesRef.current;
+    const state = store.getState();
+    const containsSource = (course: typeof state.courses[number]) => course.resourceIds.some((id) => bookIdFromResourceId(id, state.resources) === bookId);
+    const parent = courseId ? state.courses.find((course) => course.id === courseId && containsSource(course))
+      : state.courses.find((course) => course.id === state.activeCourseId && containsSource(course)) ?? state.courses.find(containsSource);
+    if (courseId && !parent) { showToast("资料不属于这门课程", "warning"); return false; }
+    const commitParent = () => {
+      const resource = parent?.resourceIds.find((id) => bookIdFromResourceId(id, state.resources) === bookId);
+      if (parent && resource) coursesRef.current.setActiveResource(parent.id, resource);
+    };
     if (hasCompleteLoadedCourseContext(loadedCourseContextRef.current, bookId)) {
       courseSelectionCoordinatorRef.current.invalidate();
       setPendingBookId(null);
+      commitParent();
+      const saved = studyLocationsRef.current[courseLocationKey(parent?.id, bookId)] ?? studyLocationsRef.current[bookId];
+      if (saved?.expandedSectionId) setActiveChapterId(saved.expandedSectionId);
       return true;
     }
-    const summary = courseSummariesRef.current.find((course) => course.book_id === bookId);
+    const summary = sourceSummariesRef.current.find((course) => course.book_id === bookId);
     return courseSelectionCoordinatorRef.current.run(bookId, {
       load: async () => {
         const [scan, chapters, chunks, assets, plan, lessons, cards, quizzes] = await Promise.all([
@@ -636,7 +688,7 @@ export default function App() {
         return { scan, chapters, chunks, assets, plan, lessons, cards, quizzes };
       },
       commit: ({ scan, chapters, chunks, assets, plan, lessons, cards, quizzes }) => {
-        const storedLocation = studyLocationsRef.current[bookId];
+        const storedLocation = studyLocationsRef.current[courseLocationKey(parent?.id, bookId)] ?? studyLocationsRef.current[bookId];
         const chapterIds = new Set(chapters.map((chapter) => chapter.chapter_id));
         const activeId = storedLocation?.expandedSectionId && chapterIds.has(storedLocation.expandedSectionId)
           ? storedLocation.expandedSectionId
@@ -681,6 +733,7 @@ export default function App() {
         setAnswer("");
         setSourcePageTarget(null);
         setLoadedBookId(bookId);
+        commitParent();
       },
       onLatestError: (error) => {
         showToast(error instanceof Error ? error.message : "课程数据加载失败", "warning");
@@ -688,10 +741,47 @@ export default function App() {
       onPendingChange: setPendingBookId
     });
   }, [bookcourseRepository, clearCourseSession, showToast]);
+  sourceSelectorRef.current = selectSource;
+
+  const selectCourse = useCallback(async (courseId: string) => {
+    const store = coursesRef.current;
+    const state = store.getState();
+    const course = state.courses.find((item) => item.id === courseId);
+    if (!course) return false;
+    const source = preferredCourseSource(course, state.resources, sourceSummariesRef.current);
+    if (source?.bookId) return selectSource(source.bookId, courseId);
+    cancelSourceSelection();
+    clearLoadedCourse();
+    clearCourseSession();
+    store.setActiveCourse(courseId);
+    return true;
+  }, [cancelSourceSelection, clearCourseSession, clearLoadedCourse, selectSource]);
+
+  const importsRef = useRef(new Map<string, Promise<void>>());
+  const importCourseFile = useCallback(async (file: File, courseId?: string) => {
+    const resource = await coursesRef.current.addLocalFile(file, courseId);
+    if (resource.status === "ready") return;
+    const existing = importsRef.current.get(resource.id);
+    if (existing) return existing;
+    const operation = (async () => {
+      try {
+        coursesRef.current.updateResource(resource.id, { status: "processing", progress: 0, error: undefined });
+        const source = await prepareLocalSource(resource.id, file, (progress) => coursesRef.current.updateResource(resource.id, { progress }));
+        coursesRef.current.updateResource(resource.id, { status: "ready", progress: 100, bookId: source.bookId });
+        await refreshSources();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "资料整理失败，原文件已保存，可以重试";
+        coursesRef.current.updateResource(resource.id, { status: "error", error: message });
+        throw error;
+      } finally { importsRef.current.delete(resource.id); }
+    })();
+    importsRef.current.set(resource.id, operation);
+    return operation;
+  }, [refreshSources]);
 
   useEffect(() => {
-    void refreshCourses();
-  }, [refreshCourses]);
+    void refreshSources();
+  }, [refreshSources]);
 
   useEffect(() => {
     // A locally chosen or freshly uploaded file is an explicit user decision.
@@ -703,7 +793,7 @@ export default function App() {
       navigationRef.current.screen === "upload" ||
       navigationRef.current.screen === "parseReady"
     ) return;
-    const resumable = courseSummaries.find(
+    const resumable = sourceSummaries.find(
       (course) => course.parse_job_id && ["pending", "processing", "failed"].includes(course.parse_job_status ?? "")
     );
     if (!resumable?.parse_job_id || !resumable.parse_job_status) return;
@@ -726,7 +816,7 @@ export default function App() {
       message: resumable.parse_job_message,
       error: resumable.parse_job_error
     });
-  }, [courseSummaries, parseJobId, uploadedFile]);
+  }, [sourceSummaries, parseJobId, uploadedFile]);
 
   useEffect(() => {
     if (!parseJobId || !uploadedFile || completedParseJobRef.current === parseJobId) return;
@@ -797,23 +887,23 @@ export default function App() {
         if (job.status === "done") {
           await loadParsedCourse(activeBookId);
           if (!isCurrentParseSession()) return;
-          const setDraft = learningSetsRef.current.state.draft;
-          const continuesLearningSet = Boolean(
-            setDraft && !setDraft.editingSetId
+          const setDraft = coursesRef.current.getState().draft;
+          const continuesCourse = Boolean(
+            setDraft && !setDraft.editingCourseId
             && setDraft.uploadedCourse?.bookId === activeBookId
-            && setDraft.resourceIds.includes(courseResourceId(activeBookId))
+            && setDraft.resourceIds.includes(sourceResourceId(activeBookId))
           );
-          if (continuesLearningSet && setDraft) {
-            learningSetsRef.current.updateDraft({
+          if (continuesCourse && setDraft) {
+            coursesRef.current.updateDraft({
               step: Math.max(0, setDraft.step),
               parseJobId: activeParseJobId,
               parseCompleted: true
             });
           }
           completedParseJobRef.current = activeParseJobId;
-          void refreshCourses();
+          void refreshSources();
           if (navigationRef.current.screen === "parseReady" || navigationRef.current.screen === "processing") {
-            replaceScreen(continuesLearningSet ? "learningSetSetup" : "chapterConfirm");
+            replaceScreen(continuesCourse ? "courseSetup" : "chapterConfirm");
           }
           return;
         }
@@ -834,11 +924,11 @@ export default function App() {
       active = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [bookcourseRepository, parseJobId, refreshCourses, replaceScreen, uploadedFile]);
+  }, [bookcourseRepository, parseJobId, refreshSources, replaceScreen, uploadedFile]);
 
   const sharedProps = useMemo(
     () => ({
-      learningSets,
+      courses,
       go,
       replaceScreen,
       back,
@@ -848,7 +938,9 @@ export default function App() {
       openSheet,
       closeSheet,
       showToast,
+      selectSource,
       selectCourse,
+      importCourseFile,
       updateStudyLocation,
       demoShelfEnabled: bookcourseRepository === demoRepository,
       selectedUpload,
@@ -859,20 +951,20 @@ export default function App() {
       setParseJobId,
       parseJobStatus,
       setParseJobStatus,
-      courseSummaries,
-      courseSummariesLoadState,
-      courseSummariesReadyKind,
-      courseSummariesError,
-      courseSummariesRefreshing,
+      sourceSummaries,
+      sourceSummariesLoadState,
+      sourceSummariesReadyKind,
+      sourceSummariesError,
+      sourceSummariesRefreshing,
       selectedCommunityBookId,
       selectCommunityBook,
       loadedBookId,
       clearLoadedCourse,
       clearCourseSession,
       pendingBookId,
-      courseSelectionLoadingId: pendingBookId,
-      cancelCourseSelection,
-      refreshCourses,
+      sourceSelectionLoadingId: pendingBookId,
+      cancelSourceSelection,
+      refreshSources,
       parsedScanResult,
       setParsedScanResult,
       parsedChapters,
@@ -908,12 +1000,12 @@ export default function App() {
       studyLocations
     }),
     [
-      learningSets,
+      courses,
       activeChapterId,
       answer,
       back,
       bookcourseRepository,
-      cancelCourseSelection,
+      cancelSourceSelection,
       clearCourseSession,
       clearLoadedCourse,
       closeSheet,
@@ -927,11 +1019,11 @@ export default function App() {
       latestDiagnosis,
       lessonBuildJobId,
       lessonBuildJobStatus,
-      courseSummaries,
-      courseSummariesError,
-      courseSummariesLoadState,
-      courseSummariesReadyKind,
-      courseSummariesRefreshing,
+      sourceSummaries,
+      sourceSummariesError,
+      sourceSummariesLoadState,
+      sourceSummariesReadyKind,
+      sourceSummariesRefreshing,
       selectedCommunityBookId,
       selectCommunityBook,
       loadedBookId,
@@ -945,10 +1037,12 @@ export default function App() {
       parsedChapters,
       parsedChunks,
       parsedScanResult,
-      refreshCourses,
+      refreshSources,
       savedNoteCount,
       selectedUpload,
+      selectSource,
       selectCourse,
+      importCourseFile,
       showToast,
       sourcePageTarget,
       sourceReaderCurrentPage,
@@ -1033,10 +1127,12 @@ export default function App() {
       return {
         key: "bookSwitcher",
         sheet,
-        title: "切换教材",
+        title: "切换课程",
         content: <BookSwitcherSheetContent />
       };
     }
+
+    if (sheet.type === "addMaterials") return { key: `addMaterials:${sheet.courseId}`, sheet, title: "添加课程资料", content: <AddMaterialsSheetContent courseId={sheet.courseId} /> };
 
     const chapter = parsedChapters?.find((item) => item.chapter_id === sheet.chapterId);
     if (!chapter || !parsedChapters) return null;
@@ -1106,8 +1202,8 @@ export default function App() {
       }
     : screen === "source"
       ? { ...titles.source, title: sourceHeading.title, subtitle: sourceHeading.pageLabel }
-    : screen === "learningSet"
-      ? { ...titles.learningSet, title: learningSets.state.sets.find((item) => item.id === learningSets.state.activeSetId)?.name ?? "学习集" }
+    : screen === "courseDetail"
+      ? { ...titles.courseDetail, title: courses.state.courses.find((item) => item.id === courses.state.activeCourseId)?.name ?? "课程" }
     : titles[screen];
 
   function renderScreen() {
@@ -1116,10 +1212,10 @@ export default function App() {
         return <HomeScreen />;
       case "onboarding":
         return <OnboardingScreen />;
-      case "learningSetSetup":
-        return <LearningSetSetupScreen />;
-      case "learningSet":
-        return <LearningSetDetailScreen />;
+      case "courseSetup":
+        return <CourseSetupScreen />;
+      case "courseDetail":
+        return <CourseDetailScreen />;
       case "upload":
         return <UploadScreen />;
       case "parseReady":

@@ -25,7 +25,7 @@ import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
 import "./styles/course-ready.css";
 import "./styles/profile.css";
-import "./styles/learning-sets.css";
+import "./styles/courses.css";
 import "./styles/tablet.css";
 import "./styles/typography.css";
 

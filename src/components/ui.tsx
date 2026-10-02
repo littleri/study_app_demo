@@ -1,3 +1,5 @@
+import { courseRagScope } from "../features/courses/selectors";
+import { courseSourceBookIds } from "../features/courses/model";
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
@@ -286,19 +288,19 @@ export function PrimaryNav({
   const previousExpandedRef = useRef(expanded);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const reducedMotion = useReducedMotion();
-  const { courseSummaries, loadedBookId, openSheet, uploadedFile } = useAppContext();
+  const { loadedBookId, openSheet, uploadedFile, courses: courseStore } = useAppContext();
   const isStudyActive = active === "study" || active === "book";
-  const currentCourse = courseSummaries.find((course) => course.book_id === loadedBookId);
-  const currentCourseTitle = currentCourse?.title
+  const currentCourse = courseStore.state.courses.find((course) => course.id === courseStore.state.activeCourseId);
+  const currentCourseTitle = currentCourse?.name
     ?? (uploadedFile?.bookId === loadedBookId ? uploadedFile.name : null)
-    ?? "尚未选择教材";
+    ?? "尚未选择课程";
   const hasCurrentCourse = Boolean(loadedBookId && (currentCourse || uploadedFile?.bookId === loadedBookId));
   const items = [
     {
       screen: "home" as Screen,
       label: "首页",
       icon: Home,
-      active: active === "home" || active === "library" || active === "learningSet"
+      active: active === "home" || active === "library" || active === "courseDetail"
     },
     {
       screen: "study" as Screen,
@@ -444,11 +446,11 @@ export function PrimaryNav({
                   <button
                     className="nav-course-switch"
                     type="button"
-                    aria-label={hasCurrentCourse ? `切换教材，当前课程：${currentCourseTitle}` : "选择教材"}
-                    title={hasCurrentCourse ? "切换教材" : "选择教材"}
+                    aria-label={currentCourse ? `切换课程，当前课程：${currentCourseTitle}` : "选择课程"}
+                    title={currentCourse ? "切换课程" : "选择课程"}
                     onClick={() => {
-                      if (courseSummaries.length > 0) openSheet({ type: "bookSwitcher" });
-                      else go("upload");
+                      if (courseStore.state.courses.length > 0) openSheet({ type: "bookSwitcher" });
+                      else go("library");
                     }}
                   >
                     <RefreshCw size={17} aria-hidden="true" />
@@ -631,7 +633,7 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "learningSetSetup" ? (
+        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" ? (
           <GlobalAIAssistant
             active={active}
             containerElement={appShellElement}
@@ -775,7 +777,6 @@ type AiAssistantContent = {
   suggestionsVisible: boolean;
 };
 
-const defaultDemoRagBookId = "book_biology_2";
 const discoveryAssistantContent: AiAssistantContent = {
   contextLabel: "",
   contextMeta: "",
@@ -815,7 +816,8 @@ function getUniqueCitationPages(citations: Citation[]) {
   const seen = new Set<string>();
   return citations.filter((citation) => {
     const printedPage = getCitationPrintedPage(citation);
-    const key = printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`;
+    const bookId = citation.book_id ?? String(citation.source_metadata.book_id ?? "");
+    const key = `${bookId}:${printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -905,7 +907,8 @@ function GlobalAIAssistant({
   const credits = useCredits();
   const {
     activeChapterId,
-    courseSummaries,
+    courses: courseStore,
+    sourceSummaries,
     generatedLessons,
     go,
     loadedBookId,
@@ -914,13 +917,11 @@ function GlobalAIAssistant({
     selectCommunityBook,
     uploadedFile
   } = useAppContext();
-  const ragBookId = loadedBookId
-    ?? uploadedFile?.bookId
-    ?? courseSummaries.find((course) => course.rag_index_status === "ready")?.book_id
-    ?? courseSummaries[0]?.book_id
-    ?? defaultDemoRagBookId;
-  const activeCourse = courseSummaries.find((course) => course.book_id === ragBookId)
-    ?? courseSummaries[0]
+  const currentCourse = courseStore.state.courses.find((course) => course.id === courseStore.state.activeCourseId);
+  const currentBookIds = courseSourceBookIds(currentCourse, courseStore.state.resources);
+  const ragBookId = loadedBookId && currentBookIds.includes(loadedBookId) ? loadedBookId
+    : currentBookIds.find((bookId) => sourceSummaries.some((source) => source.book_id === bookId && source.status === "ready")) ?? "";
+  const activeCourse = sourceSummaries.find((course) => course.book_id === ragBookId)
     ?? null;
   const activeChapter = parsedChapters?.find((chapter) => chapter.chapter_id === activeChapterId)
     ?? parsedChapters?.[0]
@@ -931,11 +932,11 @@ function GlobalAIAssistant({
   const assistantContent = useMemo<AiAssistantContent>(() => {
     if (active === "community") return discoveryAssistantContent;
     if (!activeChapter && !activeLesson) {
-      const courseTitle = activeCourse?.title ?? "生物 必修 2《遗传与进化》";
+      const courseTitle = currentCourse?.name ?? "尚未选择课程";
       return {
         ...learningAssistantPresentation,
-        contextLabel: "当前教材",
-        contextMeta: activeCourse ? "教材资料已准备" : "可在有可靠来源时查看教材页码",
+        contextLabel: "当前课程",
+        contextMeta: activeCourse ? `${currentBookIds.length} 份课程资料` : "添加资料后可依据课程原文回答",
         contextTitle: courseTitle,
         modes: ["知识点讲解", "原文问答", "复习计划"],
         suggestionTitle: "你可能感兴趣",
@@ -968,7 +969,7 @@ function GlobalAIAssistant({
           : `围绕“${title}”给我出一道题`
       ]
     };
-  }, [active, activeChapter, activeCourse, activeLesson, uploadedFile]);
+  }, [active, activeChapter, activeCourse, activeLesson, uploadedFile, currentCourse?.name, currentBookIds.length]);
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -984,6 +985,7 @@ function GlobalAIAssistant({
   const suppressOrbClickRef = useRef(false);
   const hasDraggedOrbRef = useRef(false);
   const dialogEpochRef = useRef(0);
+  const conversationEpochRef = useRef(0);
   const dialogCloseEpochRef = useRef<number | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const settleFrameRef = useRef<number | null>(null);
@@ -1034,7 +1036,8 @@ function GlobalAIAssistant({
     const sourceText = getCitationSourceText(citation);
     requestDialogClose();
     openSourcePage({
-      bookId: ragBookId,
+      courseId: currentCourse?.id,
+      bookId: citation.book_id ?? String(citation.source_metadata.book_id ?? ragBookId),
       title,
       pageStart: citation.page,
       pageEnd: citation.page,
@@ -1043,7 +1046,7 @@ function GlobalAIAssistant({
       sourceText: sourceText || undefined,
       from: active
     });
-  }, [active, openSourcePage, ragBookId, requestDialogClose]);
+  }, [active, openSourcePage, ragBookId, requestDialogClose, currentCourse?.id]);
 
   useEffect(() => {
     const closeForNativeBack: EventListener = (event) => {
@@ -1068,11 +1071,12 @@ function GlobalAIAssistant({
   }, [containerElement, requestDialogOpen]);
 
   useEffect(() => {
+    conversationEpochRef.current += 1;
     setInput("");
     setMessages([]);
     setLoading(false);
     setCreditError(null);
-  }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId]);
+  }, [active, activeChapter?.chapter_id, activeLesson?.lesson_id, ragBookId, currentCourse?.id]);
 
   useEffect(() => {
     if (active === "community" || !dialogVisible || ragBookId !== "book_biology_2") return;
@@ -1202,6 +1206,11 @@ function GlobalAIAssistant({
     event.preventDefault();
     const text = input.trim();
     if (!text || loading) return;
+    if (active !== "community" && !ragBookId) {
+      setCreditError("请先为当前课程添加可阅读的资料，再使用原文问答。");
+      return;
+    }
+    const conversationEpoch = conversationEpochRef.current;
     let reservationId: string;
     try {
       reservationId = credits.reserve("chat");
@@ -1233,6 +1242,7 @@ function GlobalAIAssistant({
     setLoading(true);
     try {
       const result = await bookcourseRepository.queryRag({
+        ...courseRagScope(courseStore.state, ragBookId),
         book_id: ragBookId,
         chapter_id: activeChapter?.chapter_id ?? null,
         history,
@@ -1245,6 +1255,10 @@ function GlobalAIAssistant({
           key_concepts: activeLesson?.key_concepts.filter(Boolean).slice(0, 8) ?? []
         }
       });
+      if (conversationEpoch !== conversationEpochRef.current) {
+        credits.refund(reservationId);
+        return;
+      }
       credits.complete(reservationId);
       setMessages((items) => [
         ...items,
@@ -1257,6 +1271,7 @@ function GlobalAIAssistant({
       ]);
     } catch (error) {
       credits.refund(reservationId);
+      if (conversationEpoch !== conversationEpochRef.current) return;
       setMessages((items) => [
         ...items,
         {
@@ -1267,7 +1282,7 @@ function GlobalAIAssistant({
         }
       ]);
     } finally {
-      setLoading(false);
+      if (conversationEpoch === conversationEpochRef.current) setLoading(false);
     }
   }
 
@@ -1813,13 +1828,14 @@ function AIAssistantDialog({
                       </div>
                       {getUniqueCitationPages(message.citations).map((citation) => {
                         const printedPage = getCitationPrintedPage(citation);
-                        const label = printedPage ? `教材第 ${printedPage} 页` : `PDF 第 ${citation.page} 页`;
+                        const filename = typeof citation.source_metadata.filename === "string" ? citation.source_metadata.filename : "";
+                        const label = printedPage ? `教材第 ${printedPage} 页` : filename && !/\.pdf$/i.test(filename) ? `原文第 ${citation.page} 页` : `PDF 第 ${citation.page} 页`;
                         return (
                           <article
                             className="ai-message-citation-item"
                             key={citation.chunk_id || (printedPage ? `printed:${printedPage}` : `pdf:${citation.page}`)}
                           >
-                            <strong>{citation.chapter_title || "教材原文"}</strong>
+                            <strong>{filename ? `${filename} · ` : ""}{citation.chapter_title || "教材原文"}</strong>
                             <span>{label}</span>
                             {citation.quote ? <blockquote>{citation.quote}</blockquote> : null}
                             <button

@@ -267,7 +267,7 @@
 .source-reader-summary > .pill { width: fit-content; }
 .source-reader-summary > p { grid-column: 1 / -1; }
 
-@media (min-width: 768px) {
+@media (min-width: 720px) {
   .screen-content.without-nav[data-screen="source"] {
     padding-left: calc(var(--safe-area-left) + var(--space-inline));
   }
@@ -597,12 +597,12 @@
   background: #fff;
   font-weight: 750;
 }
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .source-reader-screen[data-note-mode="text"] .source-reader-workspace {
     grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
   }
 }
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .source-reader-topbar { grid-template-columns: minmax(0, 1fr); }
   .source-reader-screen[data-note-mode="text"] .source-reader-workspace .source-reader-side-panel {
     grid-column: 1;
@@ -618,14 +618,14 @@
   }
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .source-reader-screen[data-note-mode="text"] .source-reader-workspace,
   .source-reader-screen[data-note-mode="voice"] .source-reader-workspace {
     grid-template-columns: minmax(0, 1fr) minmax(290px, 360px);
   }
 }
 
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .source-note-actions,
   .ink-annotation-tools,
   .ink-organized-result,
@@ -682,6 +682,7 @@
 }
 
 .ink-width-row button span { display: block; border-radius: 50%; background: currentColor; }
+.ink-width-row[data-brush-tool="highlighter"] button span { border-radius: 1px; }
 
 .ink-result-heading {
   display: flex;
@@ -709,7 +710,7 @@
   scrollbar-width: thin;
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .source-reader-side-panel {
     overflow-y: auto;
     padding-bottom: 6px;
@@ -905,7 +906,7 @@
 .notes-empty-state p, .notes-empty-detail p { color: var(--color-text-muted); }
 .notes-ink-wave { width: 190px; height: 64px; background: url("/assets/notes/ink-wave-divider.png") center / contain no-repeat; }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .voice-note-workspace { grid-template-columns: minmax(0, 1.08fr) minmax(300px, .92fr); align-items: start; }
   .voice-recorder-card { position: sticky; top: calc(var(--header-block-size) + var(--space-layout)); }
   .study-notes-hub .notes-workspace { grid-template-columns: minmax(250px, .72fr) minmax(0, 1.28fr); align-items: start; }
@@ -913,7 +914,7 @@
   .study-notes-hub .notes-actions { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 719px) {
   .notes-hub-toolbar { align-items: stretch; flex-direction: column; }
   .notes-view-tabs, .notes-hub-toolbar > .button { width: 100%; }
   .notes-view-tabs button { flex: 1; }
@@ -996,7 +997,7 @@
 /* The shared stacking rule puts the note entries first on narrow or short
    surfaces; the group divider then belongs between them and the brush tools
    instead of sitting on the band's leading edge. */
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .source-reader-topbar .source-reader-note-shortcuts {
     padding-left: 0;
     border-left: 0;
@@ -1135,7 +1136,7 @@
 .source-voice-fab:hover,
 .source-voice-fab:focus-visible { background: #692bd3; }
 
-@media (max-width: 767px), (max-height: 599px) {
+@media (max-width: 719px), (max-height: 599px) {
   .source-reader-screen[data-note-mode="text"] .source-reader-workspace .source-reader-side-panel {
     width: min(380px, 100%);
   }
@@ -1344,7 +1345,7 @@
 
 /* A wide surface caps the column so a 1200px page does not stretch the
    conversation to an unreadable measure; it stays right-anchored and tall. */
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .source-region-ai {
     left: auto;
     width: min(520px, calc(100% - 48px));
@@ -1414,6 +1415,29 @@
 .source-text-note-marker:hover > span,
 .source-text-note-marker[aria-expanded="true"] > span { background: var(--color-primary-pressed); }
 .source-text-note-marker:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -3px; }
+
+.source-text-note-marker[data-motion-state="entering"] > span {
+  animation: motion-text-note-marker-in var(--motion-duration-local-base) var(--motion-ease-local-enter) both;
+}
+
+.source-text-note-marker[data-motion-state="closing"] { pointer-events: none; }
+.source-text-note-marker[data-motion-state="closing"] > span {
+  animation: motion-text-note-marker-out var(--motion-duration-local-fast) var(--motion-ease-local-exit) both;
+}
+
+@keyframes motion-text-note-marker-in {
+  from { opacity: 0; transform: translateY(4px) scale(.6); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes motion-text-note-marker-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(3px) scale(.6); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-text-note-marker > span { animation: none !important; }
+}
 
 .source-text-placement-hint {
   position: absolute;

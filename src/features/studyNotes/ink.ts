@@ -1,5 +1,8 @@
 import type { InkPoint, InkStroke } from "./types";
 
+export const penBrushWidths = [0.004, 0.006, 0.01] as const;
+export const highlighterBrushWidths = [0.01, 0.02, 0.03] as const;
+
 export function clampUnit(value: number) {
   return Math.min(1, Math.max(0, value));
 }
@@ -67,12 +70,17 @@ export function drawInkStrokes(
     context.globalAlpha = stroke.opacity;
     context.strokeStyle = stroke.color;
     context.fillStyle = stroke.color;
+    context.lineCap = stroke.tool === "highlighter" ? "square" : "round";
     context.lineWidth = stroke.width * Math.min(width, height);
     if (stroke.points.length === 1) {
       const point = stroke.points[0];
-      context.beginPath();
-      context.arc(point.x * width, point.y * height, context.lineWidth / 2, 0, Math.PI * 2);
-      context.fill();
+      if (stroke.tool === "highlighter") {
+        context.fillRect(point.x * width - context.lineWidth / 2, point.y * height - context.lineWidth / 2, context.lineWidth, context.lineWidth);
+      } else {
+        context.beginPath();
+        context.arc(point.x * width, point.y * height, context.lineWidth / 2, 0, Math.PI * 2);
+        context.fill();
+      }
     } else {
       context.beginPath();
       stroke.points.forEach((point, index) => {

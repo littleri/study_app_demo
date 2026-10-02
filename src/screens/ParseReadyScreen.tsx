@@ -13,7 +13,7 @@ import {
 } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
-import { courseResourceId } from "../features/learningSets/model";
+import { sourceResourceId } from "../features/courses/model";
 import {
   fileTitleBeforeParenthesis,
   formatFileSize,
@@ -37,12 +37,12 @@ function resolveUploadedCover(fileName: string) {
 
 export function ParseReadyScreen() {
   const bookcourseRepository = useBookCourseRepository();
-  const { clearLoadedCourse, go, learningSets, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus } = useAppContext();
-  const draft = learningSets.state.draft;
-  const forLearningSet = Boolean(
-    draft && uploadedFile && !draft.editingSetId
+  const { clearLoadedCourse, go, courses, parseJobId, parseJobStatus, uploadedFile, setParseJobId, setParseJobStatus } = useAppContext();
+  const draft = courses.state.draft;
+  const forCourse = Boolean(
+    draft && uploadedFile && !draft.editingCourseId
     && draft.uploadedCourse?.bookId === uploadedFile.bookId
-    && draft.resourceIds.includes(courseResourceId(uploadedFile.bookId))
+    && draft.resourceIds.includes(sourceResourceId(uploadedFile.bookId))
   );
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -56,8 +56,8 @@ export function ParseReadyScreen() {
     setParseError(null);
     try {
       const job = await startConfirmedCourseParse(uploadedFile, bookcourseRepository);
-      if (forLearningSet) {
-        learningSets.updateDraft({ step: -2, parseJobId: job.job_id, parseCompleted: false });
+      if (forCourse) {
+        courses.updateDraft({ step: -2, parseJobId: job.job_id, parseCompleted: false });
       }
       setParseJobId(job.job_id);
       setParseJobStatus({
@@ -108,7 +108,7 @@ export function ParseReadyScreen() {
       ? parseJobStatus.error ?? parseJobStatus.message ?? "解析失败，请检查文件后重试"
       : null);
   const primaryActionText = parseJobStatus?.status === "done"
-    ? forLearningSet ? "填写学习方式问卷" : "查看目录"
+    ? forCourse ? "填写学习方式问卷" : "查看目录"
     : retryable
       ? "重新解析"
       : parseJobId
@@ -175,7 +175,7 @@ export function ParseReadyScreen() {
           disabled={parsing}
           onClick={() => {
             if (parseJobStatus?.status === "done") {
-              go(forLearningSet ? "learningSetSetup" : "chapterConfirm");
+              go(forCourse ? "courseSetup" : "chapterConfirm");
               return;
             }
             if (retryable) {

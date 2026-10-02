@@ -30,6 +30,9 @@ const targetViewports: readonly CssViewport[] = [
 const breakpointViewports: readonly CssViewport[] = [
   { width: 599, height: 800 },
   { width: 600, height: 800 },
+  { width: 719, height: 800 },
+  { width: 720, height: 800 },
+  { width: 753, height: 1165 },
   { width: 767, height: 800 },
   { width: 768, height: 800 },
   { width: 1023, height: 800 },
@@ -44,7 +47,7 @@ const screenshotOptions = {
 };
 
 function expectedRail(viewport: CssViewport) {
-  return viewport.width >= 768 && viewport.height >= 600;
+  return viewport.width >= 720 && viewport.height >= 600;
 }
 
 function overlaps(first: Bounds, second: Bounds) {
@@ -247,7 +250,7 @@ async function loadProductionCourse(page: Page, scenario = "default") {
 async function openProductionLibrary(page: Page, scenario = "default") {
   await loadProductionCourse(page, scenario);
   await clickAfterMotionAndScrollSettle(
-    page.getByRole("button", { name: /全部教材/ }),
+    page.getByRole("button", { name: /全部课程/ }),
     "open production Library"
   );
   await expect(page.locator(".library-course-grid")).toBeVisible();
@@ -449,7 +452,7 @@ async function expectViewportShellContract(page: Page, viewport: CssViewport, la
   expect(metrics.navItems, `${label}: primary navigation retains all four controls`).toHaveLength(4);
   expect(metrics.homeActionButtons.length, `${label}: home retains actionable primary controls`).toBeGreaterThan(0);
   const actualRail = metrics.nav.height > metrics.nav.width;
-  expect(actualRail, `${label}: rail only appears at width >= 768 and height >= 600`).toBe(expectedRail(viewport));
+  expect(actualRail, `${label}: rail only appears at width >= 720 and height >= 600`).toBe(expectedRail(viewport));
   for (const item of metrics.navItems) {
     expect(item.width, `${label}: navigation control is at least 44px wide`).toBeGreaterThanOrEqual(44);
     expect(item.height, `${label}: navigation control is at least 44px high`).toBeGreaterThanOrEqual(44);

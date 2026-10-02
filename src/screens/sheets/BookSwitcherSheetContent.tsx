@@ -1,109 +1,35 @@
 import { useState } from "react";
-import { BookOpenCheck, Check, ChevronRight, LibraryBig, Plus } from "lucide-react";
+import { Check, ChevronRight, LibraryBig, Plus } from "lucide-react";
 import { Button } from "../../components/ui";
 import { useAppContext } from "../../context/AppContext";
-import { hasCompleteLoadedCourseContext } from "../courseResourceIdentity";
+import { preferredCourseSource } from "../../features/courses/selectors";
 import { courseCoverImageUrl } from "../shared";
 
-function statusLabel(status: string) {
-  if (status === "ready") return "可以学习";
-  if (status === "needs_review") return "待确认目录";
-  if (status === "processing") return "正在生成";
-  if (status === "error") return "需要处理";
-  return "等待解析";
-}
-
 export function BookSwitcherSheetContent() {
-  const {
-    closeSheet,
-    courseSelectionLoadingId,
-    courseSummaries,
-    currentStudyPlan,
-    generatedFlashcards,
-    generatedLessons,
-    generatedQuizzes,
-    go,
-    loadedBookId,
-    parsedAssets,
-    parsedChapters,
-    parsedChunks,
-    parsedScanResult,
-    selectCourse,
-    showToast,
-    uploadedFile
-  } = useAppContext();
+  const { courses, sourceSummaries, closeSheet, selectCourse, go, showToast } = useAppContext();
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const hasLoadedContext = hasCompleteLoadedCourseContext({
-    loadedBookId,
-    uploadedFile,
-    parsedScanResult,
-    parsedChapters,
-    parsedChunks,
-    parsedAssets,
-    currentStudyPlan,
-    generatedLessons,
-    generatedFlashcards,
-    generatedQuizzes
-  });
-
-  async function chooseCourse(bookId: string, status: string) {
-    if (hasLoadedContext && bookId === loadedBookId) {
-      closeSheet();
-      return;
-    }
-    if (status !== "ready" && status !== "needs_review") {
-      closeSheet();
-      go("library");
-      showToast("这本教材还在准备中，可在课程库查看进度", "info");
-      return;
-    }
-    setOpeningId(bookId);
-    const selected = await selectCourse(bookId);
-    setOpeningId(null);
-    if (!selected) return;
-    closeSheet();
-    go(status === "needs_review" ? "chapterConfirm" : "study");
+  async function chooseCourse(courseId: string) {
+    setOpeningId(courseId);
+    try {
+      if (await selectCourse(courseId)) { closeSheet(); go("study"); }
+    } catch (error) { showToast(error instanceof Error ? error.message : "课程暂时无法打开", "warning"); }
+    finally { setOpeningId(null); }
   }
-
-  return (
-    <div className="book-switcher-sheet">
-      <p className="book-switcher-helper">切换后会回到这本教材上次展开的小节。</p>
-      <div className="book-switcher-list">
-        {courseSummaries.map((course) => {
-          const selected = hasLoadedContext && course.book_id === loadedBookId;
-          const loading = openingId === course.book_id || courseSelectionLoadingId === course.book_id;
-          return (
-            <button
-              className={`book-switcher-row ${selected ? "is-selected" : ""}`}
-              type="button"
-              key={course.book_id}
-              disabled={Boolean(courseSelectionLoadingId)}
-              onClick={() => void chooseCourse(course.book_id, course.status)}
-            >
-              <img src={courseCoverImageUrl(course.book_id)} alt="" />
-              <span>
-                <strong>{course.title}</strong>
-                <small>{loading ? "正在打开…" : statusLabel(course.status)}</small>
-              </span>
-              {selected ? <Check size={19} aria-label="当前教材" /> : <ChevronRight size={19} aria-hidden="true" />}
-            </button>
-          );
-        })}
-        {courseSummaries.length === 0 ? (
-          <div className="book-switcher-empty">
-            <BookOpenCheck size={28} aria-hidden="true" />
-            <span><strong>还没有教材</strong><small>添加一本教材后即可开始学习</small></span>
-          </div>
-        ) : null}
-      </div>
-      <div className="book-switcher-actions">
-        <Button icon={<Plus size={18} aria-hidden="true" />} onClick={() => { closeSheet(); go("upload"); }}>
-          添加新教材
-        </Button>
-        <Button variant="secondary" icon={<LibraryBig size={18} aria-hidden="true" />} onClick={() => { closeSheet(); go("library"); }}>
-          管理全部教材
-        </Button>
-      </div>
+  return <div className="book-switcher-sheet">
+    <p className="book-switcher-helper">切换后会恢复这门课程上次打开的资料和小节。</p>
+    <div className="book-switcher-list">{courses.state.courses.map((course) => {
+      const selected = course.id === courses.state.activeCourseId;
+      const source = preferredCourseSource(course, courses.state.resources, sourceSummaries);
+      return <button className={`book-switcher-row ${selected ? "is-selected" : ""}`} type="button" key={course.id} disabled={Boolean(openingId)} onClick={() => void chooseCourse(course.id)}>
+        <img src={courseCoverImageUrl(source?.bookId ?? "")} alt="" />
+        <span><strong>{course.name}</strong><small>{openingId === course.id ? "正在打开…" : `${course.resourceIds.length} 份资料`}</small></span>
+        {selected ? <Check size={19} aria-label="当前课程" /> : <ChevronRight size={19} aria-hidden="true" />}
+      </button>;
+    })}</div>
+    {courses.state.courses.length === 0 ? <p className="book-switcher-empty">还没有课程，创建课程并添加资料后即可学习。</p> : null}
+    <div className="book-switcher-actions">
+      <Button icon={<Plus size={18} />} onClick={() => { try { courses.startDraft(); closeSheet(); go("courseSetup"); } catch (error) { showToast(error instanceof Error ? error.message : "创建失败", "warning"); } }}>创建新课程</Button>
+      <Button variant="secondary" icon={<LibraryBig size={18} />} onClick={() => { closeSheet(); go("library"); }}>管理全部课程</Button>
     </div>
-  );
+  </div>;
 }

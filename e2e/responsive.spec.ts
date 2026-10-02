@@ -37,7 +37,7 @@ test.use({
 });
 
 function expectedDeviceLayout(viewport: CssViewport) {
-  return viewport.width >= 768 && viewport.height >= 600 ? "pad" : "phone";
+  return viewport.width >= 720 && viewport.height >= 600 ? "pad" : "phone";
 }
 
 async function dispatchCurrentAnimation(page: Page) {
@@ -359,6 +359,47 @@ async function expectAllControlsReachableInVisualViewport(page: Page, selector: 
 }
 
 test.describe("current DemoRepository responsive matrix", () => {
+  test("uses tablet side navigation on Android portrait viewports and preserves phone fallback at boundaries", async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "ipad-pro-11", "One viewport sweep covers the Android tablet breakpoint");
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await gotoApp(page);
+
+    const shell = page.locator(".app-shell");
+    const nav = page.locator(".primary-nav");
+    const toggle = page.locator(".nav-expand-toggle");
+
+    for (const viewport of [
+      { width: 720, height: 600 },
+      { width: 753, height: 1165 },
+      { width: 1165, height: 753 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect(shell).toHaveAttribute("data-device-layout", "pad");
+      await expect(toggle).toBeVisible();
+      await expect(nav.locator(".nav-item")).toHaveCount(4);
+      const rail = (await nav.boundingBox())!;
+      expect(rail.x).toBe(0);
+      expect(rail.width).toBeCloseTo(88 * 2 / 3, 0);
+      expect(rail.height).toBeGreaterThan(rail.width);
+      await expectNoShellOverflow(page, `Android tablet ${viewport.width}x${viewport.height}`);
+    }
+
+    for (const viewport of [
+      { width: 719, height: 1165 },
+      { width: 753, height: 599 },
+      { width: 874, height: 402 },
+      { width: 402, height: 874 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect(shell).toHaveAttribute("data-device-layout", "phone");
+      await expect(toggle).toBeHidden();
+      await expect(nav.locator(".nav-item")).toHaveCount(4);
+      const bottomNav = (await nav.boundingBox())!;
+      expect(bottomNav.width).toBeGreaterThan(bottomNav.height);
+      await expectNoShellOverflow(page, `Phone fallback ${viewport.width}x${viewport.height}`);
+    }
+  });
+
   test("expands the tablet sidebar and switches the current study course", async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== "ipad-pro-11", "The iPad portrait project covers the sidebar interaction");
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -382,6 +423,8 @@ test.describe("current DemoRepository responsive matrix", () => {
     for (const viewport of [
       { width: 834, height: 1194 },
       { width: 1194, height: 834 },
+      { width: 753, height: 1165 },
+      { width: 720, height: 600 },
       { width: 768, height: 600 }
     ]) {
       await page.setViewportSize(viewport);

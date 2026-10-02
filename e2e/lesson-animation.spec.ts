@@ -3,7 +3,7 @@ import { expect, test } from "./fixtures";
 test("opens the meiosis explainer from the lesson figure", async ({ page }) => {
   await page.setViewportSize({ width: 402, height: 874 });
   await page.goto("/?embedded=device-preview");
-  await expect(page.getByRole("listbox", { name: "选择教材" })).toBeVisible();
+  await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
   await page.getByRole("button", { name: "学习", exact: true }).click();
 
   const secondChapter = page.getByRole("button", { name: /第 2 章 基因和染色体的关系/ });

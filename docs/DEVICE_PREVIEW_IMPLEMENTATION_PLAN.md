@@ -55,7 +55,7 @@
 | iPhone 17 Pro | 402 × 874 | 874 × 402 | phone |
 | iPad Pro 11″ | 834 × 1194 | 1194 × 834 | pad |
 
-Phone/Pad 断点继续遵守现有契约：宽度至少 768 px 且高度至少 600 px 时使用 Pad rail，其余使用 Phone bottom navigation。这样短横屏手机仍使用手机导航。
+Phone/Pad 断点使用应用窗口的 CSS 逻辑尺寸：宽度至少 720 px 且高度至少 600 px 时使用 Pad rail，其余使用 Phone bottom navigation。720 px 门槛覆盖 SM-X710 安卓平板约 753 × 1165 的竖屏视口；高度条件让短横屏手机仍使用手机导航。
 
 ### 3.2 清晰度 preset
 
@@ -119,7 +119,7 @@ e2e/
 
 ### 阶段 C：Phone/Pad 外壳分层
 
-1. 使用与 CSS 相同的媒体条件订阅布局族；推荐 `matchMedia('(min-width: 768px) and (min-height: 600px)')` 与 `useSyncExternalStore`，避免渲染阶段直接读取不可订阅的 `window.innerWidth`。
+1. 使用与 CSS 相同的媒体条件订阅布局族；推荐 `matchMedia('(min-width: 720px) and (min-height: 600px)')` 与 `useSyncExternalStore`，避免渲染阶段直接读取不可订阅的 `window.innerWidth`。
 2. Phone 外壳负责：
    - iOS 模拟状态栏；
    - 四项底部导航；

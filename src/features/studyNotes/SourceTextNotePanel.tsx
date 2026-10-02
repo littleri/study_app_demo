@@ -5,7 +5,7 @@ import { deleteStudyNote, updateTextStudyNote } from "./repository";
 import type { NoteAnchor, TextStudyNote } from "./types";
 import type { TextNoteLocation } from "./SourceTextAnnotationLayer";
 
-export type SourceTextNotePanelHandle = { save: () => Promise<TextStudyNote | undefined> };
+export type SourceTextNotePanelHandle = { save: () => Promise<TextStudyNote | undefined>; close: () => Promise<void>; focus: () => void };
 export const sourceTextNoteAnimationNames = ["motion-text-note-in", "motion-text-note-out"] as const;
 
 type TextNoteMotion = Pick<MotionPresence<unknown>, "state" | "presenceId" | "onAnimationEnd" | "onAnimationCancel">;
@@ -49,6 +49,9 @@ export function SourceTextNotePanel({
   const closingRef = useRef(false);
   const deletedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
+  const outsidePressRef = useRef<{ id: number; x: number; y: number } | null>(null);
+  const outsidePointersRef = useRef(new Set<number>());
+  const outsideTapRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(existing ? "已保存" : "自动保存");
   const [error, setError] = useState("");
@@ -116,8 +119,6 @@ export function SourceTextNotePanel({
     return result;
   }, []);
 
-  useImperativeHandle(ref, () => ({ save: () => persist(bodyRef.current) }), [persist]);
-
   const requestClose = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -132,6 +133,55 @@ export function SourceTextNotePanel({
       setBusy(false);
     }
   }, [onClose, persist]);
+
+  useImperativeHandle(ref, () => ({ save: () => persist(bodyRef.current), close: requestClose, focus: () => inputRef.current?.focus() }), [persist, requestClose]);
+
+  useEffect(() => {
+    if (isClosing) return;
+    const belongsToNote = (target: EventTarget | null) => target instanceof Node && (
+      panelRef.current?.contains(target)
+      || target instanceof Element && target.closest<HTMLElement>(".source-text-note-marker")?.dataset.noteId === idRef.current
+    );
+    const handleDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      outsideTapRef.current = false;
+      outsidePointersRef.current.add(event.pointerId);
+      outsidePressRef.current = outsidePointersRef.current.size === 1 && !belongsToNote(event.target)
+        ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
+    };
+    const handleUp = (event: PointerEvent) => {
+      const start = outsidePressRef.current;
+      outsideTapRef.current = outsidePointersRef.current.size === 1 && start?.id === event.pointerId
+        && !belongsToNote(event.target) && Math.hypot(event.clientX - start.x, event.clientY - start.y) <= 8;
+      outsidePointersRef.current.delete(event.pointerId);
+      outsidePressRef.current = null;
+    };
+    const handleCancel = (event: PointerEvent) => {
+      outsidePointersRef.current.delete(event.pointerId);
+      outsidePressRef.current = null;
+      outsideTapRef.current = false;
+    };
+    const handleClick = (event: MouseEvent) => {
+      const dismiss = event.detail === 0 || outsideTapRef.current;
+      outsideTapRef.current = false;
+      if (!dismiss || belongsToNote(event.target)) return;
+      // Consume this activation so saving cannot also open another note or
+      // activate the control behind the popup. Swipes and pinches stay gestures.
+      event.preventDefault();
+      event.stopPropagation();
+      void requestClose();
+    };
+    document.addEventListener("pointerdown", handleDown, true);
+    document.addEventListener("pointerup", handleUp, true);
+    document.addEventListener("pointercancel", handleCancel, true);
+    document.addEventListener("click", handleClick, true);
+    return () => {
+      document.removeEventListener("pointerdown", handleDown, true);
+      document.removeEventListener("pointerup", handleUp, true);
+      document.removeEventListener("pointercancel", handleCancel, true);
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, [isClosing, requestClose]);
 
   useEffect(() => {
     if (body === savedBodyRef.current || busy) return;

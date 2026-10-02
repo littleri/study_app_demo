@@ -49,7 +49,7 @@ test.describe("assignment exercise sequence", () => {
     });
     const viewport = page.viewportSize();
     const expectsPhonePortraitFullBleed = Boolean(
-      viewport && viewport.width < 768 && viewport.width <= viewport.height
+      viewport && viewport.width < 720 && viewport.width <= viewport.height
     );
     if (expectsPhonePortraitFullBleed) {
       expect(judgmentComposition.leftReachesEdge).toBe(true);
@@ -115,7 +115,7 @@ test.describe("assignment entry geometry", () => {
 
   test("keeps the full-bleed exercise card edges visible during the phone entry transition", async ({ page }) => {
     const viewport = page.viewportSize();
-    test.skip(!viewport || viewport.width >= 768 || viewport.width > viewport.height, "The full-bleed card is a phone portrait layout.");
+    test.skip(!viewport || viewport.width >= 720 || viewport.width > viewport.height, "The full-bleed card is a phone portrait layout.");
 
     await page.goto("/?embedded=device-preview");
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");

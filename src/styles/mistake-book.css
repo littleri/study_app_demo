@@ -20,7 +20,7 @@
   -webkit-backdrop-filter: none;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 720px) {
   .app-shell[data-active-screen="mistakes"] .header-bar {
     left: calc(var(--safe-area-left) + var(--nav-rail-width) + var(--space-layout) + var(--space-layout));
     padding-left: 0;
@@ -904,7 +904,7 @@
   white-space: nowrap;
 }
 
-@media (min-width: 768px) and (min-height: 600px) {
+@media (min-width: 720px) and (min-height: 600px) {
   .mistake-overview {
     grid-template-columns: minmax(250px, .72fr) minmax(360px, 1.28fr);
     align-items: center;
@@ -951,7 +951,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 719px) {
   .mistake-toolbar {
     display: grid;
   }

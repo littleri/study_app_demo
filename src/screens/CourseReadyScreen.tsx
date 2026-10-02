@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import {
   FileText,
   Upload
@@ -90,12 +90,12 @@ type CourseCompletionScreenProps = {
   assetCount: number;
   chapterCount: number;
   className?: string;
+  completionMessage?: string;
   courseTitle: string;
   lessonCount: number;
   motionKey: string;
   onEnterStudy: () => void;
   onViewPlan: () => void;
-  joinControl?: ReactNode;
   ragChunkCount: number;
   statusTitle: string;
   focused?: boolean;
@@ -103,19 +103,19 @@ type CourseCompletionScreenProps = {
 
 type FocusedCourseCompletionProps = Pick<
   CourseCompletionScreenProps,
-  "className" | "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "joinControl" | "statusTitle"
+  "className" | "completionMessage" | "courseTitle" | "lessonCount" | "motionKey" | "onEnterStudy" | "onViewPlan" | "statusTitle"
 >;
 
 type CourseReadyPhase = "celebrating" | "moving" | "revealing" | "settled";
 
 function FocusedCourseCompletion({
   className,
+  completionMessage: customCompletionMessage,
   courseTitle,
   lessonCount,
   motionKey,
   onEnterStudy,
   onViewPlan,
-  joinControl,
   statusTitle
 }: FocusedCourseCompletionProps) {
   const { consume } = useMotionHistory();
@@ -160,7 +160,7 @@ function FocusedCourseCompletion({
 
   const copyRevealed = phase === "revealing" || phase === "settled";
   const actionsRevealed = phase === "settled";
-  const completionMessage = `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课程。`;
+  const completionMessage = customCompletionMessage ?? `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课时。`;
 
   return (
     <div
@@ -195,7 +195,6 @@ function FocusedCourseCompletion({
       <div className="course-ready-actions course-ready-focus-actions" aria-hidden={!actionsRevealed}>
         <Button disabled={!actionsRevealed} onClick={onEnterStudy}>进入学习</Button>
         <Button disabled={!actionsRevealed} variant="secondary" onClick={onViewPlan}>查看学习计划</Button>
-        {actionsRevealed ? joinControl : null}
       </div>
 
       <p className="motion-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
@@ -209,12 +208,12 @@ export function CourseCompletionScreen({
   assetCount,
   chapterCount,
   className,
+  completionMessage,
   courseTitle,
   lessonCount,
   motionKey,
   onEnterStudy,
   onViewPlan,
-  joinControl,
   ragChunkCount,
   statusTitle,
   focused = false
@@ -223,19 +222,19 @@ export function CourseCompletionScreen({
     return (
       <FocusedCourseCompletion
         className={className}
+        completionMessage={completionMessage}
         courseTitle={courseTitle}
         lessonCount={lessonCount}
         motionKey={motionKey}
         onEnterStudy={onEnterStudy}
         onViewPlan={onViewPlan}
-        joinControl={joinControl}
         statusTitle={statusTitle}
       />
     );
   }
 
   const moduleValues = [
-    ["课程", `${lessonCount}`, `${chapterCount} 个目录项完成编排`],
+    ["AI 课时", `${lessonCount}`, `${chapterCount} 个目录项完成编排`],
     ["RAG 片段", `${ragChunkCount}`, "可用于问答检索"],
     ["课程插图", `${assetCount}`, "源文件抽取优先"],
     ["检索链路", "混合", "BM25 + pgvector + reranker"]
@@ -249,7 +248,7 @@ export function CourseCompletionScreen({
           <h1>{statusTitle}</h1>
           <CourseReadySuccessMark key={motionKey} motionKey={motionKey} />
         </div>
-        <p role="status" aria-live="polite">已将《{courseTitle}》编排为 {lessonCount} 节 AI 课程。</p>
+        <p role="status" aria-live="polite">{completionMessage ?? `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课时。`}</p>
       </div>
       <aside className="course-ready-support" aria-label={`${statusTitle}结果`}>
         <div className="module-grid">
@@ -261,7 +260,6 @@ export function CourseCompletionScreen({
       <div className="course-ready-actions">
         <Button onClick={onEnterStudy}>进入学习</Button>
         <Button variant="secondary" onClick={onViewPlan}>查看学习计划</Button>
-        {joinControl}
       </div>
     </div>
   );

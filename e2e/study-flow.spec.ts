@@ -13,12 +13,10 @@ test.describe("study directory flow", () => {
     await expect(bookBar).toBeVisible();
     await expect(plan).toBeVisible();
     await expect(plan).toHaveAttribute("data-plan-state", "expanded");
-    await expect(plan.locator(".study-plan-copy small")).toHaveText("前置页已完成 · 第 2 章进行中");
-    await expect(plan.locator(".study-plan-copy strong")).toHaveText("第 2 章 基因和染色体的关系");
+    await expect(plan.locator(".study-plan-copy small")).toHaveText("今日建议 · 30 分钟");
+    await expect(plan.locator(".study-plan-copy strong")).toHaveText("减数分裂和受精作用");
     await expect(plan.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "17");
-    await expect(page.locator("#study-chapter-frontmatter-toggle .study-chapter-copy strong")).toHaveText(
-      "教材封面、前言与目录"
-    );
+    await expect(page.locator("#study-chapter-frontmatter-toggle")).toHaveCount(0);
     await expect(page.locator(".study-chapter-progress").nth(0)).toHaveAttribute("data-progress", "100");
     await expect(page.locator(".study-chapter-progress").nth(0)).toHaveClass(/is-complete/);
     await expect(page.locator(".study-chapter-progress").nth(1)).toHaveAttribute("data-progress", "17");
@@ -47,7 +45,7 @@ test.describe("study directory flow", () => {
     expect(initialLayout.barTop - initialLayout.statusBarBottom).toBeLessThanOrEqual(4);
     expect(initialLayout.barBottom).toBeLessThanOrEqual(initialLayout.planTop);
     expect(initialLayout.planTop - initialLayout.barBottom).toBeLessThanOrEqual(1);
-    expect(initialLayout.planHeight).toBeLessThanOrEqual(132);
+    expect(initialLayout.planHeight).toBeLessThanOrEqual(176);
     expect(initialLayout.planBottom).toBeLessThanOrEqual(initialLayout.directoryTop);
     expect(initialLayout.directoryHeadingTop - initialLayout.planBottom).toBeGreaterThanOrEqual(8);
     expect(initialLayout.directoryHeadingTop - initialLayout.planBottom).toBeLessThanOrEqual(12);
@@ -191,8 +189,8 @@ test.describe("study directory flow", () => {
 
     await expect(page.getByRole("heading", { name: "学习计划", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "当前教材 人教版高中生物必修二遗传与进化", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "添加", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "当前课程 生物 必修 2 遗传与进化", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "添加资料", exact: true })).toBeVisible();
     const expandedChapterCandidate = page.locator(".study-chapter-toggle[aria-expanded='true']").first();
     await expect(expandedChapterCandidate).toBeVisible();
     const expandedChapterId = await expandedChapterCandidate.getAttribute("id");
@@ -383,15 +381,16 @@ test.describe("study directory flow", () => {
     await page.setViewportSize({ width: 402, height: 874 });
     await page.goto("/?embedded=device-preview");
     await page.getByRole("button", { name: "学习", exact: true }).click();
-    const switcher = page.getByRole("button", { name: "当前教材 人教版高中生物必修二遗传与进化", exact: true });
+    const switcher = page.getByRole("button", { name: "当前课程 生物 必修 2 遗传与进化", exact: true });
     await expect(switcher).toBeVisible();
     await switcher.click();
 
-    const dialog = page.getByRole("dialog", { name: "切换教材" });
+    const dialog = page.getByRole("dialog", { name: "切换课程" });
     await expect(dialog).toBeVisible();
-    await expect(page.getByRole("button", { name: "添加新教材", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "管理全部教材", exact: true })).toBeVisible();
-    const mathBook = dialog.getByRole("button", { name: "数学 必修 第二册 可以学习", exact: true });
+    await expect(dialog).toHaveAttribute("data-motion-state", "idle");
+    await expect(page.getByRole("button", { name: "创建新课程", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "管理全部课程", exact: true })).toBeVisible();
+    const mathBook = dialog.getByRole("button", { name: "数学 必修 第二册 1 份资料", exact: true });
     await expect(mathBook).toBeVisible();
     await expect(mathBook.locator("img")).toHaveAttribute("src", "/assets/book-covers/high-school-math-required-2.webp");
 
@@ -413,7 +412,7 @@ test.describe("study directory flow", () => {
     expect(sheetGeometry.documentWidth).toBeLessThanOrEqual(sheetGeometry.viewportWidth);
 
     await mathBook.click();
-    await expect(page.getByRole("button", { name: "当前教材 人教 A 版高中数学必修第二册", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "当前课程 数学 必修 第二册", exact: true })).toBeVisible();
     await expect(page.getByRole("button", {
       name: "第六章 平面向量及其应用 4 个小节 教材第 1-66 页 学习进度 0%",
       exact: true
@@ -424,15 +423,15 @@ test.describe("study directory flow", () => {
       exact: true
     })).toBeVisible();
 
-    await page.getByRole("button", { name: "添加", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "上传书籍", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "添加资料", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "添加课程资料", exact: true })).toBeVisible();
   });
 
-  test("uses a master-detail directory layout on iPad without horizontal overflow", async ({ page }) => {
+  test("keeps the course directory in the tablet reading flow without horizontal overflow", async ({ page }) => {
     await page.setViewportSize({ width: 834, height: 1194 });
     await page.goto("/?embedded=device-preview");
     await page.getByRole("button", { name: "学习", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "教材目录", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "课程目录", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "第 7 章 现代生物进化理论 2 个小节 教材第 109-130 页 学习进度 0%", exact: true })).toBeVisible();
 
     const layout = await page.locator(".study-screen").evaluate((element) => {
@@ -441,14 +440,17 @@ test.describe("study directory flow", () => {
       return {
         display: getComputedStyle(element).display,
         planLeft: plan?.getBoundingClientRect().left ?? 0,
+        planBottom: plan?.getBoundingClientRect().bottom ?? 0,
         directoryLeft: directory?.getBoundingClientRect().left ?? 0,
+        directoryTop: directory?.getBoundingClientRect().top ?? 0,
         viewportWidth: document.documentElement.clientWidth,
         scrollWidth: document.documentElement.scrollWidth
       };
     });
 
-    expect(layout.display).toBe("grid");
-    expect(layout.directoryLeft).toBeGreaterThan(layout.planLeft);
+    expect(layout.display).toBe("block");
+    expect(Math.abs(layout.directoryLeft - layout.planLeft)).toBeLessThanOrEqual(1);
+    expect(layout.directoryTop).toBeGreaterThanOrEqual(layout.planBottom);
     expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
   });
 });

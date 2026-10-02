@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CourseSummary, JobStatusResponse } from "../types/api";
+import type { CourseSourceSummary, JobStatusResponse } from "../types/api";
 import type { UploadedCourseFile } from "../types/app";
 import {
   buildHomeBookModels,
@@ -11,7 +11,7 @@ import {
   stableBookCoverVariant
 } from "./homeBookModel";
 
-function course(bookId: string, status = "ready", overrides: Partial<CourseSummary> = {}): CourseSummary {
+function course(bookId: string, status = "ready", overrides: Partial<CourseSourceSummary> = {}): CourseSourceSummary {
   return {
     book_id: bookId,
     title: `教材 ${bookId}`,
