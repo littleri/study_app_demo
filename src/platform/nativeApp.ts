@@ -1,7 +1,6 @@
 import { App as NativeApp } from "@capacitor/app";
-import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
+import { Capacitor, SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacitor/core";
 import { Keyboard } from "@capacitor/keyboard";
-import { StatusBar, Style } from "@capacitor/status-bar";
 
 export type RuntimePlatform = "android" | "ios" | "web";
 
@@ -14,18 +13,13 @@ export function isNativeAndroid() {
   return getRuntimePlatform() === "android";
 }
 
-/** Configure the actual Android status bar instead of rendering iPhone chrome. */
+/** Keep Android system bars readable while CSS handles the edge-to-edge safe areas. */
 export async function configureNativeAppShell() {
   if (!isNativeAndroid()) return;
 
-  // Android 15+ may force edge-to-edge behaviour and reject some of these
-  // methods. The CSS shell remains correct in that case, so failures are
-  // intentionally non-fatal.
-  await Promise.allSettled([
-    StatusBar.setStyle({ style: Style.Light }),
-    StatusBar.setBackgroundColor({ color: "#F6F8FB" }),
-    StatusBar.setOverlaysWebView({ overlay: false })
-  ]);
+  // Avoid legacy overlay calls that resize the WebView away from the system
+  // navigation area and expose a solid strip underneath the tablet sidebar.
+  await SystemBars.setStyle({ style: SystemBarsStyle.Light }).catch(() => undefined);
 }
 
 export function registerAndroidBackButton(handler: () => void) {

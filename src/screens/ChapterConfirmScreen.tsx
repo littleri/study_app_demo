@@ -1,8 +1,8 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   AlertCircle,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -172,7 +172,7 @@ function ChapterStatusMark({
         if (event.animationName === "motion-chapter-check-in") settle();
       }}
     >
-      <CheckCircle2 size={14} strokeWidth={2.5} />
+      <StickerIcon name="CheckCircle2" size={14} strokeWidth={2.5} />
     </span>
   );
 }
@@ -827,7 +827,7 @@ export function ChapterConfirmScreen() {
         <Card className="chapter-conflict-card">
           <div className="chapter-conflict-heading">
             <span className="chapter-conflict-icon">
-              <AlertTriangle size={20} aria-hidden="true" />
+              <StickerIcon name="AlertTriangle" size={20} aria-hidden="true" />
             </span>
             <div>
               <h3>发现 {chapterRangeConflicts.length} 处页码冲突</h3>

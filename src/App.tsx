@@ -50,6 +50,7 @@ import {
   ParseReadyScreen,
   ProcessingScreen,
   ProfileScreen,
+  SettingsScreen,
   SourceReaderScreen,
   StudyScreen,
   StudyPlanScreen,
@@ -136,7 +137,8 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   source: { back: true, hideNav: true },
   export: { title: "导出预览", subtitle: "选择要导出的模块", back: true, hideNav: true },
   report: { title: "章节报告", subtitle: "完成后调整计划", back: true, hideNav: true },
-  profile: { title: "我的", subtitle: "学习数据与偏好" }
+  profile: { title: "我的", subtitle: "学习数据与偏好" },
+  settings: { title: "设置", back: true, hideNav: true }
 };
 
 const toastQuietScreens = new Set<Screen>([
@@ -333,7 +335,9 @@ export default function App() {
 
   const go = useCallback((next: Screen) => {
     const current = navigationRef.current;
-    const draft = coursesRef.current.getState().draft;
+    const state = coursesRef.current.getState();
+    if (!state.preferences) next = "onboarding";
+    const draft = state.draft;
     const pendingCourseImport = draft && !draft.editingCourseId && draft.uploadedCourse
       && draft.uploadedCourse.bookId === uploadedFileRef.current?.bookId;
     const target = next === "chapterConfirm" && pendingCourseImport
@@ -357,6 +361,7 @@ export default function App() {
       window.dispatchEvent(recordingBackEvent);
       if (recordingBackEvent.defaultPrevented) return;
     }
+    if (!coursesRef.current.getState().preferences) return;
     if (current.screen === "source" || current.screen === "voiceNote") {
       setNoteCaptureIntent(null);
     }
@@ -392,6 +397,7 @@ export default function App() {
 
   const replaceScreen = useCallback((next: Screen) => {
     const current = navigationRef.current;
+    if (!coursesRef.current.getState().preferences) next = "onboarding";
     const nextNavigation = navigate(current, { type: "replace", screen: next });
     saveCurrentScreenScrollPosition(current, nextNavigation);
     requestSheetCloseForNavigation(nextNavigation.nonce === current.nonce);
@@ -590,6 +596,24 @@ export default function App() {
     completedParseJobRef.current = null;
     return true;
   }, []);
+
+  const logout = useCallback(() => {
+    // Persist first: if saving fails, keep the learner on the settings page.
+    coursesRef.current.logout();
+    requestSheetCloseForNavigation(false);
+    clearLoadedCourse();
+    clearCourseSession();
+    setSelectedUpload(false);
+    setNoteCaptureIntent(null);
+    setSourceReaderCurrentPage(1);
+    if (toastTimerRef.current !== undefined) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = undefined;
+    }
+    setToast(null);
+    screenScrollPositionsRef.current.clear();
+    commitNavigation((current) => navigate(current, { type: "reset", screen: "onboarding" }));
+  }, [clearCourseSession, clearLoadedCourse, commitNavigation, requestSheetCloseForNavigation]);
 
   const refreshSources = useCallback(async () => {
     const hasExistingCourses = sourceSummariesRef.current.length > 0;
@@ -931,6 +955,7 @@ export default function App() {
       courses,
       go,
       replaceScreen,
+      logout,
       back,
       openSourcePage,
       startNote,
@@ -1012,6 +1037,7 @@ export default function App() {
       currentStudyPlan,
       go,
       replaceScreen,
+      logout,
       openSheet,
       openSourcePage,
       startNote,
@@ -1262,6 +1288,8 @@ export default function App() {
         return <LessonReportScreen />;
       case "profile":
         return <ProfileScreen />;
+      case "settings":
+        return <SettingsScreen />;
       default:
         return <HomeScreen />;
     }
@@ -1304,7 +1332,7 @@ export default function App() {
           <IconButton
             className="profile-header-settings"
             label="设置"
-            onClick={() => showToast("设置功能正在完善")}
+            onClick={() => go("settings")}
           >
             <Settings size={21} aria-hidden="true" />
           </IconButton>

@@ -22,6 +22,7 @@ export { ExportPreviewScreen } from "./ExportPreviewScreen";
 export { LessonReportScreen } from "./LessonReportScreen";
 export { StudyPlanScreen } from "./StudyPlanScreen";
 export { ProfileScreen } from "./ProfileScreen";
+export { SettingsScreen } from "./SettingsScreen";
 export { ChatSheetContent } from "./sheets/ChatSheetContent";
 export { NoteSheetContent } from "./sheets/NoteSheetContent";
 export { NoteTypeSheetContent } from "./sheets/NoteTypeSheetContent";

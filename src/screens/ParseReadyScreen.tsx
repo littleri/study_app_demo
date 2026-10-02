@@ -1,6 +1,6 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import { useState } from "react";
 import {
-  CheckCircle2,
   CircleAlert,
   FileText,
   FolderOpen
@@ -125,7 +125,7 @@ export function ParseReadyScreen() {
             ) : (
               <div className="community-detail-cover-fallback parse-ready-cover" aria-hidden="true">
                 <span className="parse-ready-cover-icon">
-                  <FileText size={56} />
+                  <StickerIcon name="FileText" size={56} />
                 </span>
                 <strong>{fileKind}</strong>
                 <span>AI 课程资料</span>
@@ -135,7 +135,7 @@ export function ParseReadyScreen() {
 
           <div className="community-detail-summary parse-ready-summary">
             <p className="community-detail-owner parse-ready-owner">
-              <span className="upload-success-mark" aria-hidden="true"><CheckCircle2 size={15} /></span>
+              <span className="upload-success-mark" aria-hidden="true"><StickerIcon name="CheckCircle2" size={15} /></span>
               <span>已上传 · 待解析</span>
             </p>
             <h2 title={uploadedFile.name}>{displayTitle}</h2>

@@ -20,9 +20,13 @@ const config: CapacitorConfig = {
       // chooses an edge-to-edge/full-screen system-bar implementation.
       resizeOnFullScreen: true
     },
+    SystemBars: {
+      insetsHandling: "css",
+      style: "LIGHT"
+    },
     StatusBar: {
-      backgroundColor: "#F6F8FB",
-      overlaysWebView: false,
+      backgroundColor: "#00000000",
+      overlaysWebView: true,
       style: "LIGHT"
     }
   }

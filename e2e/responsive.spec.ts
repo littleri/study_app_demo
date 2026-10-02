@@ -62,7 +62,7 @@ async function gotoApp(page: Page) {
 }
 
 async function openLibrary(page: Page) {
-  await page.locator(".home-book-picker-heading button").click();
+  await page.locator(".home-course-library-action").click();
   await expect(page.locator(".library-screen")).toBeVisible();
   await settleScreen(page);
 }
@@ -79,9 +79,9 @@ async function advanceAssignmentToShortAnswer(page: Page) {
 async function openStudy(page: Page) {
   await gotoApp(page);
   await openLibrary(page);
-  const course = page.locator(".library-course-grid .course-space-card").first();
+  const course = page.locator(".course-library-list .course-library-open").first();
   await expect(course).toBeVisible();
-  await course.locator(".button-row .button").click();
+  await course.click();
   await expect(page.locator(".book-course-screen")).toBeVisible({ timeout: 15_000 });
   await settleScreen(page);
 }
@@ -1151,7 +1151,7 @@ test.describe("current DemoRepository responsive matrix", () => {
       ".profile-workspace",
       ".profile-card",
       ".profile-today-card",
-      ".profile-courses-card",
+      ".profile-course-space-picker",
       ".profile-header-settings"
     ], `${project.name} Profile`);
     await page.getByRole("button", { name: "发现", exact: true }).click();

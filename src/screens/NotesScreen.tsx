@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, FileDown, FileText, Mic2, NotebookPen, PenLine, Plus, Sparkles, Upload } from "lucide-react";
+import { StickerIcon } from "../components/icons/StickerIcon";
+import { BookOpen, FileDown, NotebookPen, Plus, Sparkles, Upload } from "lucide-react";
 import { Button, Card, Pill } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
 import { listStudyNotes } from "../features/studyNotes/repository";
@@ -19,9 +20,9 @@ function notePreview(note: StudyNote) {
 }
 
 function noteIcon(note: StudyNote) {
-  if (note.kind === "voice") return <Mic2 size={18} aria-hidden="true" />;
-  if (note.kind === "ink") return <PenLine size={18} aria-hidden="true" />;
-  return <FileText size={18} aria-hidden="true" />;
+  if (note.kind === "voice") return <StickerIcon name="Mic2" size={18} aria-hidden="true" />;
+  if (note.kind === "ink") return <StickerIcon name="PenLine" size={18} aria-hidden="true" />;
+  return <StickerIcon name="FileText" size={18} aria-hidden="true" />;
 }
 
 export function NotesScreen() {

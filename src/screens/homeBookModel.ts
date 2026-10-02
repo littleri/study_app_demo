@@ -35,6 +35,8 @@ export type HomeBookModel = Readonly<{
   updatedAt: number;
   coverVariant: number;
   coverUrl: string | null;
+  directoryOnly?: boolean;
+  directoryUnitLabel?: "章" | "单元";
 }>;
 
 export type BuildHomeBookModelsInput = Readonly<{
@@ -218,7 +220,7 @@ export function buildHomeBookModels({
       title,
       filename: course.filename ?? (isSessionBook ? uploadedFile?.name ?? null : null),
       status,
-      statusLabel: homeBookStatusLabel(status, progress),
+      statusLabel: course.content_mode === "directory" ? "演示课程" : homeBookStatusLabel(status, progress),
       pageCount: Math.max(0, course.page_count),
       chapterCount: Math.max(0, course.chapter_count),
       progress,
@@ -226,7 +228,9 @@ export function buildHomeBookModels({
       errorMessage,
       updatedAt: course.updated_at,
       coverVariant: stableBookCoverVariant(course.book_id, title),
-      coverUrl: catalogByBookId.get(course.book_id)?.coverUrl ?? null
+      coverUrl: course.cover_url ?? catalogByBookId.get(course.book_id)?.coverUrl ?? null,
+      directoryOnly: course.content_mode === "directory",
+      directoryUnitLabel: course.directory_unit_label
     };
   });
 

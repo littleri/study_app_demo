@@ -10,12 +10,48 @@
   color: var(--color-text);
 }
 
+.study-directory-preview-note {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--color-primary-soft);
+  color: var(--color-text-secondary);
+  font-size: var(--type-caption);
+  line-height: 1.5;
+}
+
+.study-directory-reference {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.study-directory-reference small {
+  color: var(--color-text-secondary);
+}
+
 .study-sticky-stack {
   position: sticky;
   z-index: 3;
   top: 0;
+  height: var(--study-sticky-reserved-height, auto);
   padding-bottom: 0;
   background: transparent;
+  pointer-events: none;
+}
+
+.study-sticky-stack > .study-book-bar,
+.study-sticky-stack > .study-plan-summary,
+.study-sticky-stack > .study-directory-preview-note {
+  pointer-events: auto;
+}
+
+.study-sticky-stack > .study-directory-preview-note {
+  background: var(--color-bg);
 }
 
 .study-book-bar {

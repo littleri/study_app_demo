@@ -1,5 +1,5 @@
-import { type ComponentType } from "react";
-import { BookX, ChevronRight, ClipboardCheck, Layers3, NotebookPen } from "lucide-react";
+import { ChevronRight } from "lucide-react";
+import { StickerIcon, type StickerIconName } from "../icons/StickerIcon";
 import { useHorizontalDragScroll } from "./useHorizontalDragScroll";
 import {
   type ChapterToolPreviewContent,
@@ -19,14 +19,11 @@ export type ChapterToolCardsProps = Readonly<{
   layout?: "grid" | "rail";
 }>;
 
-const toolIcons: Record<
-  ChapterToolId,
-  ComponentType<{ size?: number; "aria-hidden"?: boolean }>
-> = {
-  assignment: ClipboardCheck,
-  flashcards: Layers3,
-  mistakes: BookX,
-  notes: NotebookPen
+const toolIcons: Record<ChapterToolId, StickerIconName> = {
+  assignment: "ClipboardCheck",
+  flashcards: "Layers3",
+  mistakes: "BookX",
+  notes: "NotebookPen"
 };
 
 function isChapterTool(
@@ -63,7 +60,6 @@ export function ChapterToolCards({
   return (
     <div className="study-tool-grid" ref={scrollerRef} role="group" aria-label={ariaLabel} data-mouse-drag-scroll={layout === "rail" ? "self" : undefined}>
       {cardTools.map((tool) => {
-        const Icon = toolIcons[tool.id];
         return (
           <button
             aria-label={`${tool.title} ${tool.description}`}
@@ -106,7 +102,7 @@ export function ChapterToolCards({
               )}
             </span>
             <span className="study-tool-card-footer">
-              <span className="study-tool-card-icon" aria-hidden="true"><Icon size={17} /></span>
+              <span className="study-tool-card-icon" aria-hidden="true"><StickerIcon name={toolIcons[tool.id]} size={17} /></span>
               <span className="study-tool-copy">
                 <strong>{tool.title}</strong>
                 <small>{tool.description}</small>

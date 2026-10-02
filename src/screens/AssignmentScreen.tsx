@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StickerIcon } from "../components/icons/StickerIcon";
 import {
-  BookOpenCheck,
   Check,
   CheckCircle2,
   ClipboardCheck,
-  FileText,
   Lightbulb,
-  ListChecks,
   Upload,
   X
 } from "lucide-react";
@@ -30,9 +28,9 @@ const assignmentCardExitAnimationName = "motion-assignment-card-postcard-out";
 const assignmentCardEnterAnimationName = "motion-assignment-card-postcard-in";
 
 const exerciseIcons = {
-  judgment: CheckCircle2,
-  choice: ListChecks,
-  "short-answer": FileText
+  judgment: "CheckCircle2",
+  choice: "ListChecks",
+  "short-answer": "FileText"
 } as const;
 
 export function AssignmentScreen() {
@@ -58,7 +56,7 @@ export function AssignmentScreen() {
     (generatedQuizzes ?? []).filter((quiz) => quiz.chapter_id === liveChapter?.chapter_id)
   ), [generatedQuizzes, liveChapter?.chapter_id]);
   const currentExercise = assignmentExercises[exerciseIndex] ?? assignmentExercises[0];
-  const ExerciseIcon = currentExercise ? exerciseIcons[currentExercise.id] : FileText;
+  const exerciseIcon = currentExercise ? exerciseIcons[currentExercise.id] : "FileText";
   const displayedPageStart = currentExercise?.printedPageStart ?? currentExercise?.pageStart;
   const displayedPageEnd = currentExercise?.printedPageEnd ?? currentExercise?.pageEnd;
   const canOpenSource = Boolean(uploadedFile && currentExercise?.sourceKind === "textbook" && currentExercise.pageStart > 0);
@@ -230,7 +228,7 @@ export function AssignmentScreen() {
         <Card className="assignment-progress-card" aria-label="练习进度">
           <div className="assignment-progress-heading">
             <span className="assignment-progress-icon" aria-hidden="true">
-              <BookOpenCheck size={20} />
+              <StickerIcon name="BookOpenCheck" size={20} />
             </span>
             <div>
               <small>本节练习</small>
@@ -264,7 +262,7 @@ export function AssignmentScreen() {
           }}
         >
           <div className="assignment-exercise-kicker">
-            <span aria-hidden="true"><ExerciseIcon size={19} /></span>
+            <span aria-hidden="true"><StickerIcon name={exerciseIcon} size={19} /></span>
             <strong>{currentExercise.label} · 第 {exerciseIndex + 1} 题</strong>
           </div>
           <h2 ref={questionHeadingRef} tabIndex={-1} className="assignment-question">

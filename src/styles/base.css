@@ -9,6 +9,7 @@ html {
   -webkit-font-smoothing: antialiased;
   font-synthesis: none;
   text-rendering: geometricPrecision;
+  -webkit-tap-highlight-color: transparent;
   color: var(--color-text);
   letter-spacing: 0;
 }

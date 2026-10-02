@@ -1,6 +1,6 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  CheckCircle2,
   FileText,
   Upload
 } from "lucide-react";
@@ -48,7 +48,7 @@ function StageCompletionCheck({
         if (event.animationName === "motion-stage-check-in") settle(motionKey);
       }}
     >
-      <CheckCircle2 size={18} />
+      <StickerIcon name="CheckCircle2" size={18} />
     </span>
   );
 }

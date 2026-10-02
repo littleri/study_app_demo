@@ -1,5 +1,7 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -8,9 +10,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  LibraryBig,
-  Plus,
-  Upload
+  Plus
 } from "lucide-react";
 import { ChapterToolCards } from "../components/study/ChapterToolCards";
 import { Button, ProgressBar } from "../components/ui";
@@ -69,7 +69,7 @@ function getChapterNodeIds(node: ChapterTreeNode): string[] {
 }
 
 function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
-  const { go, courses, setActiveChapterId, uploadedFile } = useAppContext();
+  const { go, courses, setActiveChapterId, uploadedFile, sourceSummaries } = useAppContext();
   const activeCourseProfile = courses.state.courses.find((item) => item.id === courses.state.activeCourseId
     && uploadedFile && item.resourceIds.some((id) => bookIdFromResourceId(id, courses.state.resources) === uploadedFile.bookId));
   const toolOrder = activeCourseProfile ? preferredToolIds(activeCourseProfile.diagnosis) : undefined;
@@ -90,6 +90,10 @@ function SectionLearningPanel({ chapter }: { chapter: ApiChapter }) {
       return;
     }
     go(toolId === "mistakes" ? "mistakes" : "flashcards");
+  }
+
+  if (sourceSummaries.find((source) => source.book_id === uploadedFile?.bookId)?.content_mode === "directory") {
+    return <p className="study-directory-preview-note">目录演示 · {chapterPageLabel(chapter)}</p>;
   }
 
   return (
@@ -181,7 +185,8 @@ function StudyChapter({
   tasks,
   location,
   onToggleChapter,
-  onToggleSection
+  onToggleSection,
+  directoryOnly = false
 }: {
   node: ChapterTreeNode;
   chapterIndex: number;
@@ -190,6 +195,7 @@ function StudyChapter({
   location: StudyLocation;
   onToggleChapter: () => void;
   onToggleSection: (sectionId: string) => void;
+  directoryOnly?: boolean;
 }) {
   const expanded = location.expandedChapterId === node.chapter.chapter_id;
   const articleRef = useRef<HTMLElement | null>(null);
@@ -224,7 +230,7 @@ function StudyChapter({
       const articleRect = article.getBoundingClientRect();
       const scrollerRect = scroller.getBoundingClientRect();
       const stickyBottom = Array.from(
-        scroller.querySelectorAll<HTMLElement>(".study-sticky-stack, .study-book-bar, .study-plan-summary")
+        scroller.querySelectorAll<HTMLElement>(".study-book-bar, .study-plan-summary")
       ).reduce((bottom, element) => {
         const rect = element.getBoundingClientRect();
         const horizontallyOverlaps = rect.right > articleRect.left && rect.left < articleRect.right;
@@ -289,7 +295,7 @@ function StudyChapter({
         id={toggleId}
         className="study-chapter-toggle"
         type="button"
-        aria-label={`${node.chapter.source_title} ${formalSectionCount} 个小节 ${chapterPageLabel(node.chapter)} 学习进度 ${progress}%${complete ? " 已完成" : ""}`}
+        aria-label={`${node.chapter.source_title} ${formalSectionCount} 个小节 ${chapterPageLabel(node.chapter)}${directoryOnly ? "" : ` 学习进度 ${progress}%${complete ? " 已完成" : ""}`}`}
         aria-expanded={expanded}
         aria-controls={regionId}
         onClick={onToggleChapter}
@@ -353,7 +359,7 @@ function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
   return (
     <section className="study-empty-state">
       <span className="study-empty-icon" aria-hidden="true">
-        {kind === "empty" ? <Upload size={26} /> : <LibraryBig size={26} />}
+        {kind === "empty" ? <StickerIcon name="Upload" size={26} /> : <StickerIcon name="LibraryBig" size={26} />}
       </span>
       <h2>{kind === "empty" ? "开始你的第一门课程" : "课程资料还在准备中"}</h2>
       <p>{kind === "empty" ? "添加教材后，这里会按原书目录整理章节和每个小节的学习入口。" : "你可以查看解析进度，或先选择另一门已经就绪的课程。"}</p>
@@ -418,6 +424,8 @@ export function StudyScreen() {
   const activeChapters = hasLoadedCourse ? parsedChapters : null;
   const chapterTree = useMemo(() => buildStudyDirectory(activeChapters ?? []), [activeChapters]);
   const currentBookId = hasLoadedCourse ? loadedBookId : null;
+  const currentSource = sourceSummaries.find((source) => source.book_id === currentBookId);
+  const directoryOnly = currentSource?.content_mode === "directory";
   const defaultLocation = useMemo(() => getDefaultLocation(activeChapters ?? []), [activeChapters]);
   const locationKey = currentBookId ? courseLocationKey(activeCourse?.id, currentBookId) : "";
   const location = currentBookId ? studyLocations[locationKey] ?? studyLocations[currentBookId] ?? defaultLocation : defaultLocation;
@@ -441,9 +449,47 @@ export function StudyScreen() {
     void selectCourse(activeCourse.id);
   }, [attemptedBookId, sourceSelectionLoadingId, sourceSummaries, courses.state.activeCourseId, courses.state.courses, parsedChapters, selectSource, uploadedFile]);
 
-  useEffect(() => {
-    const scroller = studyScreenRef.current?.closest<HTMLElement>(".screen-content");
-    if (!scroller) return;
+  useLayoutEffect(() => {
+    const screen = studyScreenRef.current;
+    const scroller = screen?.closest<HTMLElement>(".screen-content");
+    const stickyStack = screen?.querySelector<HTMLElement>(".study-sticky-stack");
+    if (!screen || !scroller || !stickyStack) return;
+
+    const reserveExpandedHeight = () => {
+      if (getComputedStyle(stickyStack).display === "contents") {
+        stickyStack.style.removeProperty("--study-sticky-reserved-height");
+        return;
+      }
+      // Measure the expanded layout only when content, width or fonts change.
+      // Keeping its space prevents compaction from pulling the directory during a swipe.
+      const expandedStack = stickyStack.cloneNode(true) as HTMLElement;
+      expandedStack.classList.remove("is-plan-compact");
+      expandedStack.querySelector(".study-plan-summary")?.classList.remove("is-compact");
+      expandedStack.setAttribute("aria-hidden", "true");
+      expandedStack.inert = true;
+      Object.assign(expandedStack.style, {
+        position: "absolute",
+        visibility: "hidden",
+        pointerEvents: "none",
+        width: `${stickyStack.clientWidth}px`,
+        height: "auto",
+        minHeight: "0",
+        inset: "0 auto auto 0"
+      });
+      screen.append(expandedStack);
+      const expandedHeight = expandedStack.offsetHeight;
+      expandedStack.remove();
+      stickyStack.style.setProperty("--study-sticky-reserved-height", `${expandedHeight}px`);
+    };
+    let measuredWidth = screen.clientWidth;
+    const resizeObserver = new ResizeObserver(() => {
+      if (screen.clientWidth === measuredWidth) return;
+      measuredWidth = screen.clientWidth;
+      reserveExpandedHeight();
+    });
+    reserveExpandedHeight();
+    resizeObserver.observe(screen);
+    document.fonts.addEventListener("loadingdone", reserveExpandedHeight);
 
     let updateFrame: number | null = null;
     const updatePlanState = () => {
@@ -469,10 +515,12 @@ export function StudyScreen() {
     updatePlanState();
     scroller.addEventListener("scroll", schedulePlanStateUpdate, { passive: true });
     return () => {
+      resizeObserver.disconnect();
+      document.fonts.removeEventListener("loadingdone", reserveExpandedHeight);
       scroller.removeEventListener("scroll", schedulePlanStateUpdate);
       if (updateFrame !== null) window.cancelAnimationFrame(updateFrame);
     };
-  }, [sourceSelectionLoadingId, sourceSummariesLoadState, currentBookId, parsedChapters?.length]);
+  }, [sourceSelectionLoadingId, sourceSummariesLoadState, currentBookId, parsedChapters?.length, currentStudyPlan, generatedLessons]);
 
   const studyTasks = useMemo(() => mergeFrontEndMockStudyTasks(
     currentStudyPlan?.tasks ?? [],
@@ -548,7 +596,7 @@ export function StudyScreen() {
       <div className="study-screen book-course-screen">
         <header className="study-book-bar study-book-bar-empty">
           <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
-            <span className="study-book-cover-placeholder"><LibraryBig size={19} aria-hidden="true" /></span>
+            <span className="study-book-cover-placeholder"><StickerIcon name="LibraryBig" size={19} aria-hidden="true" /></span>
             <span><small>当前课程</small><strong>{activeCourse?.name ?? "尚未选择"}</strong></span>
             <ChevronDown size={19} aria-hidden="true" />
           </button>
@@ -562,7 +610,7 @@ export function StudyScreen() {
   }
 
   return (
-    <div ref={studyScreenRef} className="study-screen book-course-screen">
+    <div ref={studyScreenRef} className="study-screen book-course-screen" data-directory-only={directoryOnly ? "true" : undefined}>
       <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
         <header className="study-book-bar">
           <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
@@ -578,7 +626,7 @@ export function StudyScreen() {
           </button>
         </header>
 
-        <section
+        {directoryOnly ? <p className="study-directory-preview-note">演示课程 · 仅展示教材封面、标题和原书目录</p> : <section
           className={`study-plan-summary ${planCompact ? "is-compact" : ""}`}
           data-plan-state={planCompact ? "compact" : "expanded"}
           aria-label="学习计划"
@@ -592,7 +640,7 @@ export function StudyScreen() {
               </button>
             </div>
             <div className="study-plan-copy">
-              <span className="study-plan-icon" aria-hidden="true"><Check size={18} /></span>
+              <span className="study-plan-icon" aria-hidden="true"><StickerIcon name="Check" size={18} /></span>
               <div>
                 <small>
                   今日建议 · {todayMinutes} 分钟
@@ -602,17 +650,21 @@ export function StudyScreen() {
             </div>
           </div>
           <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
-        </section>
+        </section>}
       </div>
 
       <section className="study-directory" aria-labelledby="study-directory-title">
         <div className="study-directory-heading">
           <h2 id="study-directory-title">课程目录</h2>
-          <span>{chapterTree.length} 章 · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} 节</span>
+          <span>{directoryOnly ? chapterTree.filter((node) => node.children.length > 0).length : chapterTree.length} {currentSource?.directory_unit_label ?? "章"} · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} {currentSource?.directory_unit_label ? "个目录项" : "节"}</span>
         </div>
         <div className="course-source-heading"><strong>{bookTitle}</strong><button type="button" onClick={() => go("courseDetail")}>管理资料 <ChevronRight size={16} /></button></div>
         <div className="study-chapter-list">
-          {chapterTree.map((node, index) => (
+          {chapterTree.map((node, index) => directoryOnly && node.children.length === 0 ? (
+            <article className="study-directory-reference" key={node.chapter.chapter_id}>
+              <strong>{node.chapter.source_title}</strong><small>{chapterPageLabel(node.chapter)}</small>
+            </article>
+          ) : (
             <StudyChapter
               key={node.chapter.chapter_id}
               node={node}
@@ -622,6 +674,7 @@ export function StudyScreen() {
               location={location}
               onToggleChapter={() => toggleChapter(node)}
               onToggleSection={toggleSection}
+              directoryOnly={directoryOnly}
             />
           ))}
         </div>

@@ -13,7 +13,8 @@ export type NavigationIntent =
   | { type: "go"; screen: Screen }
   | { type: "back" }
   | { type: "source" }
-  | { type: "replace"; screen: Screen };
+  | { type: "replace"; screen: Screen }
+  | { type: "reset"; screen: Screen };
 
 export function createInitialNavigation(initialScreen: Screen = "home"): NavigationSnapshot {
   return {
@@ -76,5 +77,7 @@ export function navigate(
       return withScreen(current, "source", "forward", [...current.history, current.screen], true);
     case "replace":
       return withScreen(current, intent.screen, "replace", current.history);
+    case "reset":
+      return withScreen(current, intent.screen, "replace", []);
   }
 }

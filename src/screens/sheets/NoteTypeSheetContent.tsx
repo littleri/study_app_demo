@@ -1,30 +1,30 @@
 import { useState } from "react";
-import { Mic2, NotebookPen, PenLine } from "lucide-react";
+import { StickerIcon, type StickerIconName } from "../../components/icons/StickerIcon";
 import type { NoteKind } from "../../features/studyNotes/types";
 
 const choices: readonly {
   kind: NoteKind;
   title: string;
   description: string;
-  icon: typeof NotebookPen;
+  icon: StickerIconName;
 }[] = [
   {
     kind: "text",
     title: "文字笔记",
     description: "点击原文任意位置，输入文字批注",
-    icon: NotebookPen
+    icon: "NotebookPen"
   },
   {
     kind: "ink",
     title: "手写批注",
     description: "打开教材原页，用触控笔圈画",
-    icon: PenLine
+    icon: "PenLine"
   },
   {
     kind: "voice",
     title: "语音笔记",
     description: "录下想法，确认逐字稿后自动整理",
-    icon: Mic2
+    icon: "Mic2"
   }
 ];
 
@@ -57,7 +57,6 @@ export function NoteTypeSheetContent({
       ) : null}
       <div className="note-type-options" role="group" aria-label="选择笔记类型">
         {choices.map((choice) => {
-          const Icon = choice.icon;
           const disabled = choice.kind === "ink" && !hasInkPage;
           return (
             <button
@@ -67,7 +66,7 @@ export function NoteTypeSheetContent({
               type="button"
               onClick={() => onChoose(choice.kind, choice.kind !== "voice" ? selectedPage : undefined)}
             >
-              <span className="note-type-icon" aria-hidden="true"><Icon size={23} /></span>
+              <span className="note-type-icon" aria-hidden="true"><StickerIcon name={choice.icon} size={23} /></span>
               <span>
                 <strong>{choice.title}</strong>
                 <small>{disabled ? "当前页暂无可批注原图" : choice.description}</small>

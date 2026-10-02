@@ -20,6 +20,7 @@ import {
   demoMathStudyPlan,
   demoMathSummary
 } from "../data/demoMathCourse";
+import { demoDirectoryCourseFor, demoDirectoryCourses } from "../data/demoDirectoryCourses";
 import type {
   ApiAsset,
   ApiChapter,
@@ -298,7 +299,7 @@ export class DemoRepository {
       parse_job_message: "MinerU 结构化课程已就绪",
       parse_job_error: null,
       updated_at: 1785638400
-    }, clone(demoMathSummary), ...(await listLocalSources()).map((source) => source.summary)];
+    }, clone(demoMathSummary), ...demoDirectoryCourses.map((course) => clone(course.summary)), ...(await listLocalSources()).map((source) => source.summary)];
   }
 
   async deleteCourse(_bookId: string) {
@@ -351,6 +352,8 @@ export class DemoRepository {
     if (local) return structuredClone(local.scan);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathScan);
+    const directory = demoDirectoryCourseFor(bookId);
+    if (directory) return clone(directory.scan);
     return clone(this.state.scan);
   }
 
@@ -360,10 +363,13 @@ export class DemoRepository {
     if (local) return structuredClone(local.chapters);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathChapters);
+    const directory = demoDirectoryCourseFor(bookId);
+    if (directory) return clone(directory.chapters);
     return clone(this.state.chapters);
   }
 
   async updateChapter(_bookId: string, chapterId: string, payload: Partial<ApiChapter>) {
+    if (demoDirectoryCourseFor(_bookId)) throw new Error("演示课程的原书目录仅供浏览");
     await wait();
     const chapter = this.state.chapters.find((item) => item.chapter_id === chapterId);
     if (!chapter) throw new Error("目录项不存在");
@@ -372,13 +378,19 @@ export class DemoRepository {
   }
 
   async rebuildChapters(_bookId: string) {
+    const directory = demoDirectoryCourseFor(_bookId);
+    if (directory) return clone(directory.chapters);
     await wait();
     return clone(this.state.chapters);
   }
 
   async getTocAnalysis(bookId: string): Promise<TocAnalysis> {
     await wait();
-    const pageMap: PageMapEntry[] = this.state.scan.source_locations.map((location) => ({
+    const directory = demoDirectoryCourseFor(bookId);
+    const scan = directory?.scan ?? this.state.scan;
+    const chapters = directory?.chapters ?? this.state.chapters;
+    const reasons = directory ? ["PDF 原书目录", "PDF 与教材印刷页映射"] : ["MinerU 目录层级", "content_list 标题页", "PDF 与教材印刷页映射"];
+    const pageMap: PageMapEntry[] = scan.source_locations.map((location) => ({
       pdf_page: Number(location.pdf_page ?? location.index),
       printed_page: typeof location.printed_page === "number" ? location.printed_page : null,
       confidence: Number(location.confidence ?? 0),
@@ -389,9 +401,9 @@ export class DemoRepository {
     return {
       book_id: bookId,
       status: "ready",
-      toc_pages: [{ page: 3, score: 96, line_count: this.state.chapters.length, reasons: ["MinerU title hierarchy", "page range continuity"], sample_lines: this.state.chapters.slice(0, 4).map((item) => item.source_title) }],
+      toc_pages: (directory?.tocPages ?? [3]).map((page) => ({ page, score: 96, line_count: chapters.length, reasons, sample_lines: chapters.slice(0, 4).map((item) => item.source_title) })),
       page_map: pageMap,
-      chapter_evidence: this.state.chapters.map((chapter) => ({
+      chapter_evidence: chapters.map((chapter) => ({
         chapter_id: chapter.chapter_id,
         source_title: chapter.source_title,
         level: chapter.level,
@@ -404,7 +416,7 @@ export class DemoRepository {
         title_match_score: chapter.confidence,
         confidence: chapter.confidence,
         status: chapter.status,
-        reasons: ["MinerU 目录层级", "content_list 标题页", "PDF 与教材印刷页映射"]
+        reasons
       })),
       warnings: []
     };
@@ -415,6 +427,8 @@ export class DemoRepository {
   }
 
   async confirmChapters(_bookId: string, chapters?: ApiChapter[]) {
+    const directory = demoDirectoryCourseFor(_bookId);
+    if (directory) return clone(directory.chapters);
     await wait();
     this.state.chapters = clone(chapters?.length ? chapters : this.state.chapters);
     return clone(this.state.chapters);
@@ -426,10 +440,12 @@ export class DemoRepository {
     if (local) return structuredClone(local.chunks);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathChunks);
+    if (demoDirectoryCourseFor(bookId)) return [];
     return clone(this.state.chunks);
   }
 
   async buildLessons(bookId: string, payload: LessonBuildRequest = {}): Promise<LessonBuildJobResponse> {
+    if (demoDirectoryCourseFor(bookId)) throw new Error("演示课程仅提供封面与目录");
     await wait();
     const requested = payload.chapter_ids?.length ? new Set(payload.chapter_ids) : null;
     const lessons = clone(this.state.lessons.filter((lesson) => !requested || requested.has(lesson.chapter_id)));
@@ -480,10 +496,12 @@ export class DemoRepository {
     if (local) return structuredClone(local.lessons);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathLessons);
+    if (demoDirectoryCourseFor(bookId)) return [];
     return clone(this.state.lessons);
   }
 
   async getLesson(_bookId: string, lessonId: string) {
+    if (demoDirectoryCourseFor(_bookId)) throw new Error("演示课程仅提供封面与目录");
     await wait();
     const lesson = this.state.lessons.find((item) => item.lesson_id === lessonId);
     if (!lesson) throw new Error("课程不存在");
@@ -491,6 +509,7 @@ export class DemoRepository {
   }
 
   async buildFlashcards(_bookId: string, payload: LessonBuildRequest = {}) {
+    if (demoDirectoryCourseFor(_bookId)) return [];
     await wait();
     const requested = payload.chapter_ids?.length ? new Set(payload.chapter_ids) : null;
     return clone(this.state.flashcards.filter((card) => !requested || requested.has(card.chapter_id)));
@@ -502,10 +521,12 @@ export class DemoRepository {
     if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathFlashcards);
+    if (demoDirectoryCourseFor(bookId)) return [];
     return clone(this.state.flashcards);
   }
 
   async buildQuizzes(_bookId: string, payload: LessonBuildRequest = {}) {
+    if (demoDirectoryCourseFor(_bookId)) return [];
     await wait();
     const requested = payload.chapter_ids?.length ? new Set(payload.chapter_ids) : null;
     return clone(this.state.quizzes.filter((quiz) => !requested || requested.has(quiz.chapter_id)));
@@ -517,6 +538,7 @@ export class DemoRepository {
     if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathQuizzes);
+    if (demoDirectoryCourseFor(bookId)) return [];
     return clone(this.state.quizzes);
   }
 
@@ -526,6 +548,7 @@ export class DemoRepository {
     if (local) return structuredClone([]);
     await wait();
     if (bookId === demoMathBookId) return clone(demoMathAssets);
+    if (demoDirectoryCourseFor(bookId)) return [];
     return clone(this.state.assets);
   }
 
@@ -569,7 +592,7 @@ export class DemoRepository {
   async queryRag(payload: RagQuery): Promise<RagResponse> {
     const requestedBookIds = [...new Set(payload.book_ids?.length ? payload.book_ids : [payload.book_id])];
     const availableBookIds = new Set((await this.listSources())
-      .filter((source) => source.status === "ready" || source.status === "needs_review")
+      .filter((source) => source.content_mode !== "directory" && (source.status === "ready" || source.status === "needs_review"))
       .map((source) => source.book_id));
     const bookIds = requestedBookIds.filter((bookId) => availableBookIds.has(bookId));
     if (bookIds.length > 1 || bookIds.some((bookId) => bookId.startsWith("book_local_"))) {
@@ -712,6 +735,7 @@ export class DemoRepository {
   }
 
   async getMistakes(userId: string, bookId = this.state.book.id): Promise<MistakeRecord[]> {
+    if (demoDirectoryCourseFor(bookId)) return [];
     await wait();
     return [{
       mistake_id: "mistake_demo_01",
@@ -727,12 +751,15 @@ export class DemoRepository {
   }
 
   async createStudyPlan(bookId: string, payload: StudyPlanRequest): Promise<StudyPlan> {
+    if (demoDirectoryCourseFor(bookId)) return this.getStudyPlan(bookId, payload.user_id ?? "local_user");
     await wait();
     this.state.studyPlan = { ...clone(this.state.studyPlan), book_id: bookId, user_id: payload.user_id ?? this.state.studyPlan.user_id };
     return clone(this.state.studyPlan);
   }
 
   async getStudyPlan(bookId: string, userId = "local_user") {
+    const directory = demoDirectoryCourseFor(bookId);
+    if (directory) return { ...clone(directory.plan), user_id: userId };
     const local = await readLocalSource(bookId);
     if (bookId.startsWith("book_local_") && !local) throw new Error("资料整理结果尚未就绪，请重新整理");
     if (local) return structuredClone({ ...local.plan, user_id: userId });

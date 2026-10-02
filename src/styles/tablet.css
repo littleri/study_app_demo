@@ -54,6 +54,12 @@
     height: calc(100% - var(--status-bar-height));
   }
 
+  .app-shell[data-device-layout="pad"][data-runtime-platform="android"] .primary-nav.glass-nav[data-lg-variant="prominent"] {
+    top: var(--safe-area-top);
+    height: calc(100% - var(--safe-area-top));
+    padding-bottom: calc(20px + var(--safe-area-bottom));
+  }
+
   .primary-nav.glass-nav::before,
   .primary-nav.glass-nav::after {
     content: none;

@@ -116,6 +116,9 @@ export type TocAnalysis = {
 export type CourseSourceSummary = {
   book_id: string;
   title: string;
+  cover_url?: string | null;
+  content_mode?: "directory";
+  directory_unit_label?: "章" | "单元";
   filename?: string | null;
   status: string;
   page_count: number;

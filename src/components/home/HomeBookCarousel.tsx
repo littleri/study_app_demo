@@ -1,5 +1,6 @@
+import { StickerIcon } from "../icons/StickerIcon";
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowRight, BookOpenText, Plus } from "lucide-react";
+import { ArrowRight, Plus, Upload } from "lucide-react";
 import { useReducedMotion } from "../../motion/useReducedMotion";
 import type { HomeBookListState, HomeBookModel } from "../../screens/homeBookModel";
 
@@ -78,6 +79,26 @@ export function HomeBookCarousel({
       window.clearTimeout(scrollSettleTimerRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller || !selectedBookId) return;
+    let width = scroller.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (scroller.clientWidth === width) return;
+      width = scroller.clientWidth;
+      const option = optionRefs.current.get(selectedBookId);
+      if (!option) return;
+      if (scrollSettleTimerRef.current !== null) {
+        window.clearTimeout(scrollSettleTimerRef.current);
+        scrollSettleTimerRef.current = null;
+      }
+      programmaticScrollBookIdRef.current = selectedBookId;
+      scroller.scrollTo({ behavior: "auto", left: centeredScrollLeft(scroller, option) });
+    });
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [selectedBookId]);
 
   function selectByIndex(index: number, focus = false) {
     const book = books[Math.max(0, Math.min(books.length - 1, index))];
@@ -210,6 +231,16 @@ export function HomeBookCarousel({
 
   const selectedBook = books[selectedIndex] ?? null;
   if (listState === "error") return null;
+  const courseActions = (
+    <div className="home-course-action-stack">
+      <button className="home-course-library-action" type="button" disabled={books.length === 0} onClick={onOpenLibrary}>
+        全部课程 <ArrowRight size={15} aria-hidden="true" />
+      </button>
+      <button className="home-import-course-action" type="button" onClick={onAddBook}>
+        <Upload size={16} aria-hidden="true" /><span>创建课程</span>
+      </button>
+    </div>
+  );
 
   return (
     <section className="home-book-picker" aria-labelledby="home-book-picker-title">
@@ -218,25 +249,23 @@ export function HomeBookCarousel({
           <h2 id="home-book-picker-title">我的课程</h2>
           <span>{books.length > 0 ? `共 ${books.length} 门` : "从原书开始学习"}</span>
         </div>
-        {books.length > 0 ? (
-          <button type="button" onClick={onOpenLibrary}>
-            全部课程 <ArrowRight size={15} aria-hidden="true" />
-          </button>
-        ) : null}
       </div>
 
       {listState === "loading" ? (
-        <div className="home-book-carousel-skeleton" aria-label="正在加载课程" aria-busy="true">
-          <p className="home-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
-            正在加载课程列表，上传和学习操作暂不可用。
-          </p>
-          <span />
-          <span />
-          <span />
+        <div className="home-course-showcase">
+          <div className="home-book-carousel-skeleton" aria-label="正在加载课程" aria-busy="true">
+            <p className="home-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
+              正在加载课程列表，上传和学习操作暂不可用。
+            </p>
+            <span />
+            <span />
+            <span />
+          </div>
+          <aside className="home-course-controls" aria-label="课程操作">{courseActions}</aside>
         </div>
       ) : listState === "empty" ? (
         <div className="home-book-empty">
-          <span aria-hidden="true"><BookOpenText size={24} /></span>
+          <span aria-hidden="true"><StickerIcon name="BookOpenText" size={24} /></span>
           <div>
             <strong>还没有课程</strong>
             <small>添加课程资料后，可以从原书位置继续学习。</small>
@@ -246,7 +275,7 @@ export function HomeBookCarousel({
           </button>
         </div>
       ) : listState === "content" ? (
-        <>
+        <div className="home-course-showcase">
           <div
             ref={scrollerRef}
             className={`home-book-carousel ${books.length === 1 ? "is-single" : ""}`}
@@ -305,13 +334,16 @@ export function HomeBookCarousel({
             })}
           </div>
 
-          {selectedBook ? (
-            <div className="home-book-selection-summary" aria-live="polite">
-              <strong title={selectedBook.title}>{selectedBook.title}</strong>
-              <span>{selectedIndex + 1} / {books.length}</span>
-            </div>
-          ) : null}
-        </>
+          <aside className="home-course-controls" aria-label="课程操作">
+            {courseActions}
+            {selectedBook ? (
+              <div className="home-book-selection-summary" aria-live="polite" aria-atomic="true">
+                <strong title={selectedBook.title}>{selectedBook.title}</strong>
+                <span>{selectedIndex + 1} / {books.length}</span>
+              </div>
+            ) : null}
+          </aside>
+        </div>
       ) : null}
     </section>
   );

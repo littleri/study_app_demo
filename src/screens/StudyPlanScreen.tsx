@@ -1,3 +1,4 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import { useEffect, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -186,7 +187,7 @@ export function StudyPlanScreen() {
     <div className="screen-stack study-plan-screen">
       <Card className="plan-hero-card">
         <span className="book-summary-icon">
-          <CalendarDays size={30} aria-hidden="true" />
+          <StickerIcon name="CalendarDays" size={30} aria-hidden="true" />
         </span>
         <div>
           <h2>{activeCourse?.name ?? studyPlanCourseTitle(uploadedFile.name)}</h2>

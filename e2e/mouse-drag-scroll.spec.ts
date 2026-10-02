@@ -8,7 +8,7 @@ test.describe("global mouse drag scrolling", () => {
 
     const shell = page.locator(".app-shell");
     const scroller = page.locator('.screen-content[data-screen="home"]');
-    const libraryAction = page.locator(".home-book-picker-heading button");
+    const libraryAction = page.locator(".home-course-library-action");
     await expect(libraryAction).toBeVisible();
     await expect.poll(() => scroller.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeGreaterThan(120);
 

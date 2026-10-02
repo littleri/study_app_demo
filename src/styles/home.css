@@ -59,6 +59,7 @@
 
 .home-import-course-action {
   min-width: 0;
+  max-width: 100%;
   min-height: var(--touch-target-min);
   display: inline-flex;
   align-items: center;
@@ -122,12 +123,13 @@
   font-weight: 700;
 }
 
-.home-book-picker-heading button {
+.home-course-library-action {
   min-height: var(--touch-target-min);
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  padding: 4px 2px 4px 10px;
+  justify-content: flex-end;
+  padding: 4px 0 4px 8px;
   border: 0;
   color: var(--color-primary);
   background: transparent;
@@ -136,24 +138,59 @@
   font-weight: 780;
 }
 
+.home-course-showcase {
+  --home-book-width: clamp(128px, 26cqi, 180px);
+  --home-book-half-width: calc(var(--home-book-width) / 2);
+  --home-book-height: calc(var(--home-book-width) * 1.43);
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(128px, 30%, 252px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.home-course-controls {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-block: 8px 16px;
+}
+
+.home-course-action-stack {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
 .home-book-carousel {
-  --home-book-width: clamp(100px, 25vw, 108px);
-  --home-book-half-width: clamp(50px, 12.5vw, 54px);
-  --home-book-height: clamp(136px, 34vw, 147px);
+  --home-cover-fade-width: min(64px, 15%);
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 0;
+  isolation: isolate;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  padding-block: 32px 33px;
-  padding-inline: calc(42% - var(--home-book-half-width)) calc(58% - var(--home-book-half-width));
+  margin-inline-start: calc(0px - var(--space-inline));
+  padding-block: 24px;
+  /* Padding percentages follow the grid column; include the width exposed
+     in the page inset so the scroll viewport keeps its selection anchor. */
+  padding-inline:
+    calc(42% + var(--space-inline) * .42 - var(--home-book-half-width))
+    calc(58% + var(--space-inline) * .58 - var(--home-book-half-width));
   scroll-padding-inline: calc(42% - var(--home-book-half-width)) calc(58% - var(--home-book-half-width));
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   touch-action: pan-x pan-y;
   cursor: grab;
   user-select: none;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--home-cover-fade-width)), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--home-cover-fade-width)), transparent 100%);
 }
 
 .home-book-carousel.is-dragging {
@@ -167,9 +204,13 @@
 
 .home-book-carousel.is-single {
   overflow: hidden;
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .home-book-option {
+  position: relative;
+  z-index: 1;
   width: var(--home-book-width);
   min-width: var(--home-book-width);
   min-height: var(--home-book-height);
@@ -180,22 +221,22 @@
   background: transparent;
   scroll-snap-align: center;
   scroll-snap-stop: always;
-  transform: scale(.84);
-  opacity: .66;
-  transition:
-    opacity var(--motion-duration-local-base) var(--motion-ease-local-state),
-    transform var(--motion-duration-local-base) var(--motion-ease-local-state);
+  transform: scale(.9);
+  opacity: 1;
+  transition: transform var(--motion-duration-local-base) var(--motion-ease-local-state);
+}
+
+.home-book-option + .home-book-option {
+  margin-inline-start: calc(var(--home-book-width) * -.32);
 }
 
 .home-book-option.is-selected {
-  position: relative;
   z-index: 2;
-  opacity: 1;
-  transform: scale(1.3);
+  transform: scale(1.16);
 }
 
 .home-book-option:focus-visible,
-.home-book-picker-heading button:focus-visible,
+.home-course-library-action:focus-visible,
 .home-import-course-action:focus-visible,
 .home-book-empty button:focus-visible,
 .home-primary-action:focus-visible,
@@ -220,7 +261,7 @@
   background: #dce8ff;
   box-shadow: 0 4px 8px rgba(32, 38, 58, .15);
   text-align: left;
-  filter: blur(1.5px) saturate(.72) brightness(.98);
+  filter: blur(1.5px);
   transition: filter var(--motion-duration-local-base) var(--motion-ease-local-state);
 }
 
@@ -327,18 +368,22 @@
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  padding: 2px 12px 0;
-  text-align: center;
+  width: 100%;
+  align-items: end;
+  gap: 8px;
+  text-align: right;
 }
 
 .home-book-selection-summary strong {
+  display: -webkit-box;
   overflow: hidden;
   color: var(--color-text);
   font-size: .875rem;
   text-align: right;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
 }
 
 .home-book-selection-summary > span {
@@ -347,6 +392,45 @@
   font-variant-numeric: tabular-nums;
   font-weight: 760;
   text-align: left;
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+
+@container (max-width: 335px) {
+  .home-course-showcase {
+    --home-book-width: 112px;
+    grid-template-columns: minmax(0, 1fr) 116px;
+    gap: 8px;
+  }
+
+  .home-course-controls {
+    gap: 16px;
+  }
+
+  .home-book-selection-summary {
+    gap: 4px;
+  }
+
+  .home-import-course-action {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .home-import-course-action svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+@container (max-width: 430px) {
+  .home-book-selection-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  .home-book-selection-summary > span {
+    text-align: right;
+  }
 }
 
 .home-book-empty,
@@ -409,27 +493,33 @@
 }
 
 .home-book-carousel-skeleton {
-  min-height: 165px;
+  min-height: calc(var(--home-book-height) + 48px);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 0;
   overflow: hidden;
 }
 
 .home-book-carousel-skeleton span {
-  width: 100px;
-  height: 136px;
+  width: var(--home-book-width);
+  height: var(--home-book-height);
   flex: 0 0 auto;
   border-radius: 12px;
   background: var(--color-surface-tint);
   opacity: .62;
+  transform: scale(.9);
+}
+
+.home-book-carousel-skeleton span + span {
+  margin-inline-start: calc(var(--home-book-width) * -.32);
 }
 
 .home-book-carousel-skeleton span:nth-child(2) {
-  width: 108px;
-  height: 147px;
+  position: relative;
+  z-index: 1;
   opacity: 1;
+  transform: scale(1.16);
 }
 
 .home-focus-panel {
@@ -1120,7 +1210,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .home-book-picker-heading button:hover,
+  .home-course-library-action:hover,
   .home-global-action:hover {
     background: var(--color-surface-soft);
   }
@@ -1161,13 +1251,13 @@
   }
 
   .home-book-picker {
-    grid-column: 1;
+    grid-column: 1 / -1;
   }
 
   .home-book-workspace {
-    grid-column: 2;
+    grid-column: 1 / -1;
     min-height: 286px;
-    margin-top: 44px;
+    margin-top: 0;
     padding: 26px;
   }
 
@@ -1268,25 +1358,26 @@
     min-height: 36px;
   }
 
+  .home-course-showcase {
+    --home-book-width: 112px;
+    --home-book-height: 144px;
+    gap: 16px;
+  }
+
   .home-book-carousel {
-    gap: 6px;
-    padding-block: 2px;
-    padding-inline: calc(42% - 46px) calc(58% - 46px);
-    scroll-padding-inline: calc(42% - 46px) calc(58% - 46px);
+    padding-block: 16px;
   }
 
-  .home-book-option,
-  .home-book-cover {
-    width: 92px;
-    min-width: 92px;
+  .home-course-controls {
+    gap: 12px;
+    padding-block: 0 8px;
   }
 
-  .home-book-option {
-    min-height: 104px;
+  .home-course-action-stack {
+    gap: 4px;
   }
 
   .home-book-cover {
-    height: 104px;
     padding: 7px 9px 6px;
     border-radius: 10px;
   }
@@ -1322,7 +1413,6 @@
 
   .home-book-selection-summary {
     gap: 8px;
-    padding: 0 8px;
   }
 
   .home-book-selection-summary strong {

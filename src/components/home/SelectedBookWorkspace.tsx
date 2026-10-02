@@ -260,6 +260,24 @@ export function SelectedBookWorkspace({
 
   if (pending) return <LoadingBookWorkspace book={book} />;
 
+  if (book.directoryOnly && book.bookId === loadedBookId) {
+    return (
+      <section className="home-focus-panel home-book-workspace is-directory-preview" aria-labelledby="home-workspace-title" data-book-id={book.bookId} data-loaded="true" data-directory-only="true">
+        <div className="home-workspace-copy">
+          <span className="home-workspace-label"><BookOpenText size={16} aria-hidden="true" />演示课程 · {book.chapterCount} {book.directoryUnitLabel ?? "章"}</span>
+          <p className="home-workspace-course" title={book.title}>{book.title}</p>
+          <h2 id="home-workspace-title">浏览课程目录</h2>
+          <p>展示教材封面与原书目录，可以展开查看小节和页码。</p>
+        </div>
+        <div className="home-status-actions">
+          <button className="home-primary-action" type="button" onClick={() => onViewStatus(book)}>
+            <ListChecks size={17} aria-hidden="true" /><span>查看课程目录</span><ArrowRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+    );
+  }
+
   const loadedReady = book.status === "ready" && book.bookId === loadedBookId && Boolean(nextStep);
   const previewReady = book.status === "catalog" && studyPreview?.bookId === book.bookId;
   const workspaceReady = loadedReady || previewReady;

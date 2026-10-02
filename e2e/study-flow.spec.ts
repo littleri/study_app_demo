@@ -154,7 +154,7 @@ test.describe("study directory flow", () => {
       if (!scroller) return Number.POSITIVE_INFINITY;
       const articleRect = article.getBoundingClientRect();
       const stickyBottom = Array.from(
-        scroller.querySelectorAll<HTMLElement>(".study-sticky-stack, .study-book-bar, .study-plan-summary")
+        scroller.querySelectorAll<HTMLElement>(".study-book-bar, .study-plan-summary")
       ).reduce((bottom, element) => {
         const rect = element.getBoundingClientRect();
         const horizontallyOverlaps = rect.right > articleRect.left && rect.left < articleRect.right;

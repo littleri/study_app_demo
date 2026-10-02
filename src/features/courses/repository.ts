@@ -162,6 +162,14 @@ export function useCourseStore() {
     });
   }, [commit]);
 
+  const logout = useCallback(() => {
+    commit((current) => ({
+      ...current,
+      preferences: null,
+      onboardingDraft: emptyCourseState().onboardingDraft
+    }));
+  }, [commit]);
+
   const startDraft = useCallback((resourceId?: string, options?: { suggestedName?: string; uploadedCourse?: UploadedCourseFile | null }) => {
     commit((current) => {
       const draft = (current.draft?.editingCourseId ? null : current.draft) ?? {
@@ -418,6 +426,7 @@ export function useCourseStore() {
     updateOnboardingDraft,
     completeOnboarding,
     updatePreferences,
+    logout,
     startDraft,
     editCourse,
     updateDraft,
@@ -434,7 +443,7 @@ export function useCourseStore() {
     removeResource,
     addLocalFile
   }), [
-    state, getState, updateOnboardingDraft, completeOnboarding, updatePreferences, startDraft,
+    state, getState, updateOnboardingDraft, completeOnboarding, updatePreferences, logout, startDraft,
     editCourse, updateDraft, completeDraft, clearDraft, setActiveCourse,
     addSource, addExistingResource, removeResource, addLocalFile, updateResource, setActiveResource, syncSources, removeCourse, importCatalogCourse
   ]);

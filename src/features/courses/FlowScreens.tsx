@@ -1,3 +1,4 @@
+import { StickerIcon, type StickerIconName } from "../../components/icons/StickerIcon";
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   AlarmClock, ArrowLeft, BookOpen, CalendarDays, Check, CircleAlert, Clock3, Coffee,
@@ -15,12 +16,20 @@ import {
   localResourceId,
   primaryGoals,
   toggleDiagnosisValue,
-  type CourseDiagnosis
+  type CourseDiagnosis,
+  type PrimaryGoal
 } from "./model";
 
 function FlowError({ message }: { message: string | null }) {
   return message ? <p className="learning-flow-error" role="alert">{message}</p> : null;
 }
+
+const onboardingGoalIcons: Record<PrimaryGoal, StickerIconName> = {
+  systematic: "LibraryBig",
+  exam: "Target",
+  growth: "TrendingUp",
+  interest: "Heart"
+};
 
 const diagnosisQuestionIcons: Record<string, LucideIcon> = {
   urgency: AlarmClock,
@@ -124,7 +133,7 @@ export function OnboardingScreen() {
       <div className="learning-flow-center">
         {step === 0 ? (
           <div className="learning-flow-question">
-            <span className="learning-flow-symbol"><Sparkles size={24} aria-hidden="true" /></span>
+            <span className="learning-flow-symbol"><StickerIcon name="Sparkles" size={28} aria-hidden="true" /></span>
             <h1>我们怎么称呼你</h1>
             <label className="learning-flow-label" htmlFor="learner-name">你的称呼</label>
             <input
@@ -141,19 +150,22 @@ export function OnboardingScreen() {
           </div>
         ) : step === 1 ? (
           <div className="learning-flow-question">
-            <span className="learning-flow-symbol"><BookOpen size={24} aria-hidden="true" /></span>
+            <span className="learning-flow-symbol"><StickerIcon name="BookOpen" size={28} aria-hidden="true" /></span>
             <h1>你使用云径的主要目标是</h1>
             <p>选择此刻最重要的一项，之后可以修改。</p>
             <div className="learning-goal-grid" role="group" aria-label="主要学习目标">
-              {primaryGoals.map((option, index) => (
+              {primaryGoals.map((option) => (
                 <button
                   key={option.value}
                   type="button"
                   className={`learning-goal-option ${onboardingDraft.primaryGoal === option.value ? "selected" : ""}`}
+                  data-goal={option.value}
                   aria-pressed={onboardingDraft.primaryGoal === option.value}
                   onClick={() => update({ primaryGoal: option.value })}
                 >
-                  <span className="learning-goal-illustration" aria-hidden="true">{["01", "02", "03", "04"][index]}</span>
+                  <span className="learning-goal-illustration" aria-hidden="true">
+                    <span className="learning-goal-icon"><StickerIcon name={onboardingGoalIcons[option.value]} size={40} /></span>
+                  </span>
                   <strong>{option.label}</strong>
                 </button>
               ))}
@@ -161,7 +173,7 @@ export function OnboardingScreen() {
           </div>
         ) : (
           <div className="learning-flow-question">
-            <span className="learning-flow-symbol"><Clock3 size={24} aria-hidden="true" /></span>
+            <span className="learning-flow-symbol"><StickerIcon name="Clock3" size={28} aria-hidden="true" /></span>
             <h1>你每天能投入多少学习时间</h1>
             <p>只用于安排建议，不会限制你自由学习。</p>
             <div className="learning-time-grid" role="group" aria-label="每日学习时间">
@@ -370,7 +382,7 @@ export function CourseSetupScreen() {
       }}>
       {step < 0 ? (
         <div className="course-space-details">
-          <span className="learning-flow-symbol"><BookOpen size={24} aria-hidden="true" /></span>
+          <span className="learning-flow-symbol"><StickerIcon name="BookOpen" size={24} aria-hidden="true" /></span>
           <h1>{draft.editingCourseId ? "调整课程" : "创建课程"}</h1>
           <p>把同一目标下的书籍和资料放在一起，再设定适合自己的学习方式。</p>
           <label className="learning-flow-label" htmlFor="course-space-name">课程名称</label>

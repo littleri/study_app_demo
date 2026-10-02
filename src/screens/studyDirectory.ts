@@ -19,7 +19,7 @@ export function buildStudyDirectory(chapters: ApiChapter[]): ChapterTreeNode[] {
     .map((node) => ({
       ...node,
       children: node.children
-        .filter((child) => isFormalStudySection(child.chapter) || child.chapter.source === "local-original")
+        .filter((child) => isFormalStudySection(child.chapter) || child.chapter.source === "local-original" || child.chapter.source === "demo-directory")
         .map((child) => ({ ...child, children: [] }))
     }));
 }

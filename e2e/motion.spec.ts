@@ -110,7 +110,7 @@ async function gotoApp(page: Page) {
 
 async function openLibrary(page: Page) {
   if (await page.locator(".home-dashboard").isVisible().catch(() => false)) {
-    await page.locator(".home-book-picker-heading button").click();
+    await page.locator(".home-course-library-action").click();
   } else {
     await page.locator(".primary-nav .nav-item").nth(1).click();
   }
@@ -561,7 +561,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await gotoApp(page);
     await installPauseStyle(page, ".motion-screen-surface");
     const root = page.locator(".motion-screen-transition");
-    await page.locator(".home-book-picker-heading button").click();
+    await page.locator(".home-course-library-action").click();
     await expect(root).toHaveAttribute("data-motion-state", "transitioning");
     const current = root.locator(':scope > [data-motion-surface="current"]');
     const previous = root.locator(':scope > [data-motion-surface="previous"]');
@@ -602,7 +602,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     const staleHome = await homeSurface.elementHandle();
     if (!staleHome) throw new Error("rapid navigation needs the initial Home surface");
 
-    await page.locator(".home-book-picker-heading button").click();
+    await page.locator(".home-course-library-action").click();
     await expect(root).toHaveAttribute("data-screen", "library");
     await expect(root).toHaveAttribute("data-motion-state", "transitioning");
     const libraryCurrent = root.locator(':scope > [data-motion-surface="current"]');
@@ -993,12 +993,14 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
     await installPauseStyle(page, ".toast");
-    const reminder = page.locator(".profile-header-settings");
     const preferences = page.locator(".profile-portrait-button");
     const toast = page.locator(".toast");
+    const savePreferences = async () => {
+      await preferences.press("Enter");
+      await page.getByRole("button", { name: "保存偏好", exact: true }).press("Enter");
+    };
 
-    await reminder.focus();
-    await reminder.press("Enter");
+    await savePreferences();
     await expect(toast).toHaveAttribute("data-motion-state", "entering");
     const firstMotion = await readAnimation(toast);
     expect(firstMotion).toMatchObject({ duration: "0.18s", name: "motion-toast-in", playState: "paused" });
@@ -1014,7 +1016,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await page.clock.runFor(999);
     await expect(toast, "Toast A remains idle through 999ms of business dwell").toHaveAttribute("data-motion-state", "idle");
 
-    await preferences.press("Enter");
+    await savePreferences();
     await expect(toast).toHaveAttribute("data-motion-state", "entering");
     const secondPresence = Number(await toast.getAttribute("data-motion-presence"));
     expect(secondPresence, "Toast B receives a monotonic replacement generation").toBeGreaterThan(firstPresence);
@@ -1046,7 +1048,7 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     const closingSecond = await toast.elementHandle();
     if (!closingSecond) throw new Error("closing Toast B root is missing");
 
-    await reminder.press("Enter");
+    await savePreferences();
     await expect(toast, "Toast C replaces B's frozen exit with a fresh entry").toHaveAttribute("data-motion-state", "entering");
     const thirdPresence = Number(await toast.getAttribute("data-motion-presence"));
     expect(thirdPresence).toBeGreaterThan(secondPresence);

@@ -22,7 +22,7 @@ async function openStageSixCourse(page: Page, bookCourseApi: BookCourseApiFixtur
   });
   await page.goto("/?embedded=device-preview");
   await expect(page.locator(".home-book-option").first()).toBeVisible();
-  await page.locator(".home-book-picker-heading button").click();
+  await page.locator(".home-course-library-action").click();
   await expect(page.locator(".library-course-grid")).toBeVisible();
   await waitForNaturalScreenTransition(page, "Stage 6 Library transition settles");
   await page.locator(".library-course-grid .course-space-card .button").first().click();

@@ -1,5 +1,6 @@
+import { StickerIcon } from "../../components/icons/StickerIcon";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { MessageSquareText } from "lucide-react";
+
 import { useMotionPresence } from "../../motion/useMotionPresence";
 import { useReducedMotion } from "../../motion/useReducedMotion";
 import type { MotionAnimationEvent } from "../../motion/useMotionPresence";
@@ -75,7 +76,7 @@ function SourceTextNoteMarker({ marker, present, active, reducedMotion, onOpen, 
       }}
     >
       <span ref={spanRef} onAnimationEnd={(event) => settleAnimation(event, motion.onAnimationEnd)}>
-        <MessageSquareText size={15} aria-hidden="true" />
+        <StickerIcon name="MessageSquareText" size={15} aria-hidden="true" />
       </span>
     </button>
   );

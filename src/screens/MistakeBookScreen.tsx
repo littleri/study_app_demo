@@ -1,3 +1,4 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import {
   useEffect,
   useMemo,
@@ -8,8 +9,6 @@ import {
 import {
   AlertCircle,
   BookOpenCheck,
-  BrainCircuit,
-  CalendarClock,
   Check,
   CheckCircle2,
   ChevronLeft,
@@ -17,7 +16,6 @@ import {
   Clock3,
   RotateCcw,
   Search,
-  Target,
   X
 } from "lucide-react";
 import { runtimeConfig } from "../config/runtime";
@@ -349,7 +347,7 @@ export function MistakeBookScreen() {
               </div>
 
               <div className="mistake-core-idea">
-                <span className="mistake-core-icon" aria-hidden="true"><BrainCircuit size={20} /></span>
+                <span className="mistake-core-icon" aria-hidden="true"><StickerIcon name="BrainCircuit" size={20} /></span>
                 <div>
                   <h3>核心纠错点</h3>
                   <p>{selectedMistake.explanation ?? selectedMistake.stuck_point}</p>
@@ -385,7 +383,7 @@ export function MistakeBookScreen() {
         <section className="mistake-overview" aria-labelledby="mistake-overview-title">
           <div className="mistake-overview-main">
             <div>
-              <span className="mistake-overview-icon" aria-hidden="true"><CalendarClock size={22} /></span>
+              <span className="mistake-overview-icon" aria-hidden="true"><StickerIcon name="CalendarClock" size={22} /></span>
               <div>
                 <p id="mistake-overview-title">今日待复习</p>
                 <strong>{reviewableMistakes.length}<small> 道</small></strong>
@@ -463,14 +461,14 @@ export function MistakeBookScreen() {
 
         {!uploadedFile ? (
           <Card {...detailMotion.attributes} key={detailMotion.motionKey} className="mistake-card mistake-state-card">
-            <span className="mistake-state-icon" aria-hidden="true"><BookOpenCheck size={24} /></span>
+            <span className="mistake-state-icon" aria-hidden="true"><StickerIcon name="BookOpenCheck" size={24} /></span>
             <h3>还没有可以复习的错题</h3>
             <p>上传教材并完成一次作业诊断，系统会把真实卡点和对应原文整理到这里。</p>
             <Button onClick={() => go("upload")}>上传教材</Button>
           </Card>
         ) : mistakeError ? (
           <Card {...detailMotion.attributes} key={detailMotion.motionKey} className="mistake-card mistake-state-card">
-            <span className="mistake-state-icon mistake-state-icon-warning" aria-hidden="true"><AlertCircle size={24} /></span>
+            <span className="mistake-state-icon mistake-state-icon-warning" aria-hidden="true"><StickerIcon name="CircleAlert" size={24} /></span>
             <h3>错题记录加载失败</h3>
             <p>{mistakeError}</p>
             <Button onClick={() => setReloadKey((current) => current + 1)}>重新加载</Button>
@@ -498,11 +496,11 @@ export function MistakeBookScreen() {
 
             <div className="mistake-detail-content">
               <section className="mistake-detail-block">
-                <span className="mistake-detail-block-icon" aria-hidden="true"><RotateCcw size={18} /></span>
+                <span className="mistake-detail-block-icon" aria-hidden="true"><StickerIcon name="RotateCcw" size={18} /></span>
                 <div><h3>上次作答</h3><p>{selectedMistake.answer || "未记录答案"}</p></div>
               </section>
               <section className="mistake-detail-block mistake-detail-focus">
-                <span className="mistake-detail-block-icon" aria-hidden="true"><Target size={18} /></span>
+                <span className="mistake-detail-block-icon" aria-hidden="true"><StickerIcon name="Target" size={18} /></span>
                 <div><h3>纠错重点</h3><p>{selectedMistake.stuck_point}</p></div>
               </section>
               <section className="mistake-source-link">
@@ -524,14 +522,14 @@ export function MistakeBookScreen() {
           </Card>
         ) : mistakes.length > 0 ? (
           <Card {...detailMotion.attributes} key={detailMotion.motionKey} className="mistake-card mistake-state-card">
-            <span className="mistake-state-icon" aria-hidden="true"><Search size={24} /></span>
+            <span className="mistake-state-icon" aria-hidden="true"><StickerIcon name="Search" size={24} /></span>
             <h3>当前分类暂无错题</h3>
             <p>{searchQuery ? `没有找到与“${searchQuery}”相关的错题，可以换个关键词。` : `后端记录中没有匹配“${activeFilter.label}”的知识点，可切换分类查看其他错题。`}</p>
             <Button variant="secondary" onClick={() => { setFilter(allMistakesFilter); setSearchQuery(""); }}>查看全部错题</Button>
           </Card>
         ) : (
           <Card {...detailMotion.attributes} key={detailMotion.motionKey} className="mistake-card mistake-state-card">
-            <span className="mistake-state-icon" aria-hidden="true"><CheckCircle2 size={24} /></span>
+            <span className="mistake-state-icon" aria-hidden="true"><StickerIcon name="CheckCircle2" size={24} /></span>
             <h3>暂无后端错题记录</h3>
             <p>完成一次作业诊断后，真实的题目、卡点和教材引用会自动出现在这里。</p>
             <Button onClick={() => go("assignment")}>去做一次诊断</Button>

@@ -23,7 +23,11 @@ export function sourcePageImageUrl(bookId: string, page: number) {
 
 const courseCoverUrls: Readonly<Record<string, string>> = {
   book_biology_2: "/assets/book-covers/biology-required-2.webp",
-  catalog_high_school_math_required_2: "/assets/book-covers/high-school-math-required-2.webp"
+  catalog_high_school_math_required_2: "/assets/book-covers/high-school-math-required-2.webp",
+  catalog_physics_required_3: "/assets/book-covers/physics-required-3.webp",
+  catalog_chemistry_required_2: "/assets/book-covers/chemistry-required-2.webp",
+  catalog_english_required_3: "/assets/book-covers/english-required-3.webp",
+  catalog_advanced_mathematics_1: "/assets/book-covers/advanced-mathematics-1.webp"
 };
 
 export function courseCoverImageUrl(bookId: string) {

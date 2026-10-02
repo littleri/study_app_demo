@@ -1,6 +1,8 @@
-# 现有图标使用盘点
+# 图标使用盘点（贴纸迁移前快照）
 
 盘点日期：2026-10-02。
+
+本文件记录替换前的图标来源和样式统计。彩色徽章入口现已迁移到 33 款自定义彩色 SVG 贴纸图标，包含新手引导中的四个学习目标图标；当前实现和图集见 `src/components/icons/StickerIcon.tsx`、`src/components/icons/stickerArtwork.ts` 和 `docs/ICON_STICKER_MIGRATION_SCOPE.md`。下文原有数量按迁移前口径保留。
 
 ## 统计口径
 
@@ -38,8 +40,8 @@
 | 视觉呈现 | 图形和样式特征 | 主要使用位置 | 代表代码 |
 | --- | --- | --- | --- |
 | 标准线性图标 | 图形本体为单色描边、通常不填充；颜色随文本或状态变化。存在局部加粗变体。 | 导航、返回、关闭、搜索、上传、删除、文档、按钮及阅读工具栏 | `src/components/ui.tsx`、`src/screens/SourceReaderScreen.tsx` |
-| 彩色底板徽章 | 线性图标放在浅紫、浅绿、浅蓝等底板上；圆角方形或圆形容器形成双色层次。选中或完成状态也有白色图标配实色底板。 | 章节工具卡、首页快捷入口、笔记类型选择、学习偏好选项 | `src/components/study/ChapterToolCards.tsx:109`、`src/styles/chapter-tools.css:183`、`src/styles/study-notes.css:71` |
-| 贴纸式图标组合 | 视频图标与星星组合，或积分硬币图标；配粉色 / 黄色底板、深色边框、硬阴影和旋转；星星带黄色填充。 | 个人页积分入口、视频生成确认弹窗、视频加载界面 | `src/styles/profile.css:50`、`src/screens/LessonVideoConfirmDialog.tsx:67`、`src/screens/LessonAnimationDialog.tsx:296`、`src/styles/base.css:4331` |
+| 彩色底板徽章 | 线性图标放在浅紫、浅绿、浅蓝等底板上；圆角方形或圆形容器形成双色层次。选中或完成状态也有白色图标配实色底板。 | 章节工具卡、首页快捷入口、笔记类型选择、新手引导、完成和异常状态 | `src/components/study/ChapterToolCards.tsx:109`、`src/styles/chapter-tools.css:183`、`src/styles/study-notes.css:71` |
+| 贴纸式图标组合 | 积分硬币、视频与星星组合，以及学习画像问卷的题头和选项；配多色底板、深色边框、硬阴影和旋转；部分星星带黄色填充。 | 个人页积分入口、视频生成确认弹窗、视频加载界面、学习画像问卷 | `src/styles/profile.css:50`、`src/screens/LessonVideoConfirmDialog.tsx:67`、`src/screens/LessonAnimationDialog.tsx:296`、`src/styles/courses.css:352` |
 | 云朵品牌位图入口 | 多色卡通云朵和对白气泡；图形细节由 PNG / WebP 素材决定。 | 侧栏品牌标识、悬浮 AI 助手、课时 AI 聊天入口 | `src/components/ui.tsx:405`、`src/components/ui.tsx:741`、`src/screens/LessonAiChatEntry.tsx:26` |
 | iOS 系统实心符号 | 信号和 Wi-Fi 为实心路径；电池由 SVG 端帽和 CSS 边框 / 电量构成。 | 设备预览中的状态栏 | `src/components/IosStatusBar.tsx:21` |
 
@@ -164,7 +166,7 @@
 1. **尺寸与描边**：按使用场景定义小图标、常规操作、导航、空状态的尺寸档位及对应线宽，收敛相近的随意取值。
 2. **语义映射**：统一学习计划、闪卡、作业、错题、笔记、原文和 AI 的图标映射。例如错题入口在侧栏使用 `ListChecks`，章节工具使用 `BookX`，首页使用 `CircleAlert`。
 3. **底板规则**：明确哪些图标裸露显示、哪些使用浅色徽章，并统一容器圆角、尺寸和语义色。当前章节工具与笔记入口已有不同颜色体系。
-4. **贴纸组合**：确认个人页积分入口和视频生成处的旋转、硬阴影、黄色实心星星是否作为品牌特例保留，或者跟随常规工具图标统一。
+4. **贴纸组合**：个人页积分、视频生成和学习画像问卷已经使用深色边框、硬阴影和轻微旋转，可以作为彩色徽章迁移到贴纸风格的现有参考。具体修改范围见 `docs/ICON_STICKER_MIGRATION_SCOPE.md`。
 5. **渲染入口和别名**：现有 `IconButton` 管理按钮容器，`Button.icon` 接受任意 ReactNode，尚未统一图标参数。可以集中图标渲染约定并收敛三组别名。
 
 云朵品牌位图、iOS 状态栏、头像插图和进度环承担不同角色，适合单独保留规范。后续业务图标统一可以以现有 Lucide 线性图形为基础展开。

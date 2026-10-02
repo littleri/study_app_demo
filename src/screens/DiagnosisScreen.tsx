@@ -1,9 +1,7 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import type { CSSProperties } from "react";
 import {
-  BookOpenCheck,
-  CheckCircle2,
   ClipboardCheck,
-  Lightbulb,
   RotateCcw,
   Save
 } from "lucide-react";
@@ -90,7 +88,7 @@ export function DiagnosisScreen() {
         data-motion-diagnosis-state={diagnosisMotion.state}
       >
         <span className="diagnosis-status-icon" aria-hidden="true">
-          <CheckCircle2 size={24} />
+          <StickerIcon name="CheckCircle2" size={24} />
         </span>
         <div className="diagnosis-summary-copy">
           <Pill tone={latestDiagnosis.mistake_recorded ? "orange" : "mint"}>
@@ -108,7 +106,7 @@ export function DiagnosisScreen() {
       />
       <Card className="diagnosis-analysis-card">
         <div className="diagnosis-section-heading">
-          <span aria-hidden="true"><BookOpenCheck size={19} /></span>
+          <span aria-hidden="true"><StickerIcon name="BookOpenCheck" size={19} /></span>
           <div>
             <small>为什么会卡住</small>
             <h3>诊断解析</h3>
@@ -142,7 +140,7 @@ export function DiagnosisScreen() {
         <div className="diagnosis-next-steps-column">
       <Card className="ai-feedback-card">
         <div className="diagnosis-section-heading">
-          <span aria-hidden="true"><Lightbulb size={19} /></span>
+          <span aria-hidden="true"><StickerIcon name="Lightbulb" size={19} /></span>
           <div>
             <small>建议先做这一步</small>
             <h3>带着提示再想一次</h3>

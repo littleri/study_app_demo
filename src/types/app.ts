@@ -28,7 +28,8 @@ export type Screen =
   | "source"
   | "export"
   | "report"
-  | "profile";
+  | "profile"
+  | "settings";
 
 export type SheetState =
   | { type: "chat" }
@@ -117,6 +118,7 @@ export type Chapter = {
 export type AppActions = {
   go: (screen: Screen) => void;
   replaceScreen: (screen: Screen) => void;
+  logout: () => void;
   back: () => void;
   openSourcePage: (target: SourcePageTarget) => void;
   startNote: (intent: NoteCaptureIntent) => void;

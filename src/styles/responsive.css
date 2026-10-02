@@ -230,12 +230,12 @@ body {
    Capacitor build uses the operating system's status/navigation bars instead,
    so it must not reserve the fixed iPhone chrome dimensions. */
 .app-shell[data-runtime-platform="android"] {
-  --status-bar-height: env(safe-area-inset-top, 0px);
+  --status-bar-height: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
   --home-indicator-height: 0px;
   --safe-area-top: var(--status-bar-height);
-  --safe-area-right: env(safe-area-inset-right, 0px);
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 }
 
 .ai-overlay-layer {

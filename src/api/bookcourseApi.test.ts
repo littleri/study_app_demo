@@ -19,7 +19,7 @@ describe("demo repository boundary", () => {
   it("returns the fixed local courses without a network request", async () => {
     const courses = await bookcourseApi.listSources();
 
-    expect(courses).toHaveLength(2);
+    expect(courses).toHaveLength(6);
     expect(courses[0]).toMatchObject({
       book_id: "book_biology_2",
       status: "ready",
@@ -32,6 +32,16 @@ describe("demo repository boundary", () => {
       chapter_count: 5,
       rag_index_provider: "toc-screenshot-fixture"
     });
+    expect(courses[2]).toMatchObject({
+      book_id: "catalog_physics_required_3",
+      content_mode: "directory",
+      title: "物理 必修 第三册",
+      chapter_count: 5
+    });
+    expect(courses.slice(3).map((course) => course.title)).toEqual([
+      "化学 必修 第二册", "英语 必修 第三册", "高等数学 上册（第七版）"
+    ]);
+    expect(courses.slice(2).every((course) => course.content_mode === "directory")).toBe(true);
   });
 
   it("builds the mathematics directory from the uploaded catalog screenshots", async () => {

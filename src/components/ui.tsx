@@ -1,3 +1,4 @@
+import { StickerIcon } from "./icons/StickerIcon";
 import { courseRagScope } from "../features/courses/selectors";
 import { courseSourceBookIds } from "../features/courses/model";
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
@@ -6,7 +7,6 @@ import gsap from "gsap";
 import {
   ArrowLeft,
   BookOpenCheck,
-  Bot,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -441,7 +441,7 @@ export function PrimaryNav({
             {item.screen === "study" && expanded && isStudyActive ? (
               <section className="nav-study-context" aria-label="当前课程与学习工具">
                 <div className="nav-course-row">
-                  <span className="nav-course-mark" aria-hidden="true"><BookOpenCheck size={19} /></span>
+                  <span className="nav-course-mark" aria-hidden="true"><StickerIcon name="BookOpenCheck" size={19} /></span>
                   <span className="nav-course-title" title={currentCourseTitle}>{currentCourseTitle}</span>
                   <button
                     className="nav-course-switch"
@@ -633,7 +633,7 @@ export function AppShell({
         {deviceChrome}
         {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" ? (
+        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" && active !== "settings" ? (
           <GlobalAIAssistant
             active={active}
             containerElement={appShellElement}
@@ -1767,7 +1767,7 @@ function AIAssistantDialog({
         <div className="ai-overlay-head">
           <div>
             <span className="ai-avatar">
-              <Bot size={18} aria-hidden="true" />
+              <StickerIcon name="Bot" size={18} aria-hidden="true" />
             </span>
             <h2 id={titleId}>AI 导学助手</h2>
           </div>
@@ -1814,7 +1814,7 @@ function AIAssistantDialog({
                 key={`${message.role}-${index}`}
               >
                 <span className="ai-message-avatar" aria-hidden="true">
-                  {message.role === "ai" ? <Bot size={15} /> : <User size={15} />}
+                  {message.role === "ai" ? <StickerIcon name="Bot" size={15} /> : <StickerIcon name="User" size={15} />}
                 </span>
                 <div className={`ai-message ${message.role}`}>
                   {message.role === "ai" ? <span className="ai-message-author">AI 导学助手</span> : null}
@@ -1867,7 +1867,7 @@ function AIAssistantDialog({
             {loading ? (
               <div className="ai-message-row ai ai-message-row-loading" role="status">
                 <span className="ai-message-avatar" aria-hidden="true">
-                  <Bot size={15} />
+                  <StickerIcon name="Bot" size={15} />
                 </span>
                 <div className="ai-message ai">
                   <span className="ai-message-author">AI 导学助手</span>
@@ -2099,7 +2099,7 @@ export function CitationCard({
   return (
     <article className="citation-card">
       <div className="citation-icon">
-        <BookOpenCheck size={20} aria-hidden="true" />
+        <StickerIcon name="BookOpenCheck" size={20} aria-hidden="true" />
       </div>
       <div>
         <p className="citation-meta">{title} · {page}</p>

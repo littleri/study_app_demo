@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { StickerIcon } from "../components/icons/StickerIcon";
 import {
   FileText,
   Upload
@@ -46,9 +47,7 @@ function CourseReadySuccessMark({ motionKey }: { motionKey: string }) {
         }
       }}
     >
-      <svg className="course-ready-success-check" viewBox="0 0 32 32" width="24" height="24" focusable="false">
-        <path className="course-ready-check-path" d="M8 16.5 13.5 22 24 10.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+      <StickerIcon name="CheckCircle2" size={24} className="course-ready-success-check" checkPathClassName="course-ready-check-path" />
     </span>
   );
 }

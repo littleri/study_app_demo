@@ -1,9 +1,8 @@
+import { StickerIcon } from "../components/icons/StickerIcon";
 import { useState } from "react";
 import {
   ArrowRight,
-  BookOpen,
   CalendarCheck2,
-  Check,
   Clock3,
   Coins,
   Plus
@@ -18,21 +17,12 @@ import type { StudyTask } from "../types/api";
 
 import { courseSourceBookIds, dailyTimes, primaryGoals, type DailyTime, type PrimaryGoal } from "../features/courses/model";
 import { useCoursePlans } from "../features/courses/useCoursePlans";
-import { courseProgress } from "../features/courses/selectors";
 import { creditCosts, useCredits } from "../features/credits/creditStore";
-
-type ProfileCourse = {
-  id: string;
-  title: string;
-  meta: string;
-  status: string;
-  progress: number | null;
-};
 
 function ProfilePortrait({ onClick }: { onClick: () => void }) {
   return (
     <button className="profile-portrait-button" type="button" aria-label="编辑学习偏好" onClick={onClick}>
-      <svg className="profile-portrait-art" viewBox="0 0 280 156" role="img" aria-label="个人画像占位图">
+      <svg className="profile-portrait-art" viewBox="0 0 280 156" aria-hidden="true">
         <path
           className="profile-portrait-outline"
           d="M78 149c5-27 22-47 47-58-16-7-27-23-27-42 0-27 18-43 42-43s42 16 42 43c0 19-11 35-27 42 25 11 42 31 47 58"
@@ -53,7 +43,7 @@ function TodayTaskRow({ task, onClick }: { task: StudyTask; onClick: () => void 
   return (
     <button className="profile-task-row" type="button" onClick={onClick}>
       <span className="profile-task-icon" aria-hidden="true">
-        {task.status === "done" ? <Check size={17} strokeWidth={2.8} /> : <BookOpen size={17} />}
+        {task.status === "done" ? <StickerIcon name="Check" size={17} strokeWidth={2.8} /> : <StickerIcon name="BookOpen" size={17} />}
       </span>
       <span className="profile-task-copy">
         <strong>{task.title}</strong>
@@ -101,9 +91,9 @@ export function ProfileScreen() {
     }
   }
 
-  function switchCourse(courseId: string) {
+  async function switchCourse(courseId: string) {
     try {
-      void selectCourse(courseId);
+      await selectCourse(courseId);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "切换课程失败", "warning");
     }
@@ -113,10 +103,6 @@ export function ProfileScreen() {
   const completedTaskCount = tasks.length - pendingTasks.length;
   const planProgress = tasks.length > 0 ? Math.round((completedTaskCount / tasks.length) * 100) : null;
   const visibleTasks = (pendingTasks.length > 0 ? pendingTasks : tasks).slice(0, 2);
-  const profileCourses: ProfileCourse[] = courses.state.courses.slice(0, 2).map((course) => {
-    const coursePlans = plansForCourse(course);
-    return { id: course.id, title: course.name, meta: `${course.resourceIds.length} 份资料`, status: course.id === courses.state.activeCourseId ? "当前课程" : "可切换课程", progress: coursePlans.length ? courseProgress(coursePlans) : null };
-  });
   const profileMotion = useLocalMotionItem(
     `profile:${uploadedFile?.bookId ?? "guest"}:${currentStudyPlan ? "loaded" : "baseline"}`
   );
@@ -131,19 +117,19 @@ export function ProfileScreen() {
           <div className="profile-portrait-heading">
             <div>
               <span className="profile-eyebrow">PROFILE</span>
-              <h2>个人画像</h2>
             </div>
             <span className="profile-portrait-status">{preferences ? "已完善" : "待完善"}</span>
           </div>
           <ProfilePortrait onClick={openPreferenceEditor} />
-          {preferences ? <div className="profile-learning-summary">
-            <strong>{preferences.displayName}</strong>
-            <span>{primaryGoals.find((item) => item.value === preferences.primaryGoal)?.label ?? "系统学习"} · 每日建议 {dailyTimes.find((item) => item.value === preferences.dailyTime)?.minutes ?? 45} 分钟</span>
-            {courses.state.courses.length > 1 && activeCourseProfile ? <select className="profile-course-space-picker" aria-label="切换课程" value={activeCourseProfile.id} onChange={(event) => switchCourse(event.target.value)}>
-              {courses.state.courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select> : null}
-            {activeCourseProfile ? <button className="profile-course-space-link" type="button" onClick={() => go("courseDetail")}>查看当前课程：{activeCourseProfile.name}</button> : null}
-          </div> : null}
+          <div className="profile-learning-summary">
+            {courses.state.courses.length > 0 ? <>
+              <label htmlFor="profile-current-course">当前课程</label>
+              <select id="profile-current-course" className="profile-course-space-picker" aria-label="切换课程" value={activeCourseProfile?.id ?? ""} onChange={(event) => { void switchCourse(event.target.value); }}>
+                {!activeCourseProfile ? <option value="" disabled>选择课程</option> : null}
+                {courses.state.courses.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </> : <Button variant="secondary" onClick={() => go("library")}>选择课程</Button>}
+          </div>
           {editingPreferences ? <form className="profile-learning-form" onSubmit={(event) => { event.preventDefault(); savePreferences(); }}>
             <label htmlFor="profile-learning-name">称呼</label>
             <input id="profile-learning-name" maxLength={30} value={nameDraft} onChange={(event) => setNameDraft(event.target.value)} />
@@ -210,7 +196,7 @@ export function ProfileScreen() {
               </div>
             ) : (
               <div className="profile-plan-empty">
-                <span className="profile-plan-empty-icon" aria-hidden="true"><CalendarCheck2 size={21} /></span>
+                <span className="profile-plan-empty-icon" aria-hidden="true"><StickerIcon name="CalendarCheck2" size={21} /></span>
                 <div>
                   <strong>今天还没有学习计划</strong>
                   <p>先选择一门课程，再安排今天要完成的内容。</p>
@@ -227,44 +213,6 @@ export function ProfileScreen() {
             </Button>
           </section>
 
-          <section className="profile-courses-card" aria-labelledby="profile-courses-title">
-            <div className="profile-section-heading">
-              <div>
-                <span className="profile-eyebrow">COURSES</span>
-                <h2 id="profile-courses-title">我的课程</h2>
-              </div>
-              <button className="profile-section-link" type="button" onClick={() => go("library")}>查看全部</button>
-            </div>
-
-            {profileCourses.length > 0 ? (
-              <div className="profile-course-list">
-                {profileCourses.map((course) => (
-                  <button className="profile-course-row" type="button" key={course.id} onClick={() => go("library")}>
-                    <span className="profile-course-cover" aria-hidden="true"><BookOpen size={21} /></span>
-                    <span className="profile-course-copy">
-                      <strong>{course.title}</strong>
-                      <small>{course.meta} · {course.status}</small>
-                      {course.progress === null ? null : (
-                        <span className="profile-course-progress" aria-label={`计划完成 ${course.progress}%`}>
-                          <span style={{ transform: `scaleX(${course.progress / 100})` }} />
-                        </span>
-                      )}
-                    </span>
-                    <ArrowRight className="profile-row-arrow" size={17} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="profile-courses-empty">
-                <span aria-hidden="true"><BookOpen size={20} /></span>
-                <div>
-                  <strong>还没有课程</strong>
-                  <p>上传教材或从发现页导入课程后，会展示在这里。</p>
-                </div>
-                <button type="button" onClick={() => go("library")}>去添加</button>
-              </div>
-            )}
-          </section>
         </div>
       </div>
     </div>

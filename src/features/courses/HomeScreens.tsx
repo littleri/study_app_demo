@@ -1,6 +1,7 @@
+import { StickerIcon } from "../../components/icons/StickerIcon";
 import { useCoursePlans } from "./useCoursePlans";
 import { useMemo, useState } from "react";
-import { ArrowRight, BookOpen, CalendarDays, FileDown, FilePlus2, Pencil, Plus, Sparkles, X } from "lucide-react";
+import { ArrowRight, FileDown, Pencil, Plus, Sparkles, X } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import { communityBooks } from "../../data/mockBook";
 import { bookIdFromResourceId, diagnosisQuestions, localResourceId } from "./model";
@@ -10,7 +11,7 @@ import { buildCourseRecommendations, preferredToolIds, type CourseRecommendation
 function RecommendationCard({ recommendation, bookTitle, onOpen }: { recommendation: CourseRecommendation; bookTitle: string; onOpen: () => void }) {
   return (
     <button className="learning-recommendation" type="button" onClick={onOpen}>
-      <span className="learning-recommendation-icon"><CalendarDays size={19} aria-hidden="true" /></span>
+      <span className="learning-recommendation-icon"><StickerIcon name="CalendarDays" size={19} aria-hidden="true" /></span>
       <span className="learning-recommendation-body">
         <strong>{recommendation.title}</strong>
         <small>{bookTitle} · {recommendation.taskType} · 建议 {recommendation.minutes} 分钟{recommendation.originalMinutes > recommendation.minutes ? `（完整任务预计 ${recommendation.originalMinutes} 分钟）` : ""}</small>
@@ -146,8 +147,8 @@ export function CourseDetailScreen() {
             const ready = course?.status === "ready";
             return (
               <article className="course-space-book" key={resourceId}>
-                <span className="course-space-book-icon">{bookId ? <BookOpen size={21} aria-hidden="true" /> : <FilePlus2 size={21} aria-hidden="true" />}</span>
-                <div><strong>{course?.title ?? communityBook?.title ?? resource?.name ?? "资料暂时不可用"}</strong><small>{ready ? "可开始学习" : resource?.status === "processing" ? `正在整理 ${resource.progress ?? 0}%` : resource?.error ?? "待整理 · 原文件已保留"}</small></div>
+                <span className="course-space-book-icon">{bookId ? <StickerIcon name="BookOpen" size={21} aria-hidden="true" /> : <StickerIcon name="FilePlus2" size={21} aria-hidden="true" />}</span>
+                <div><strong>{course?.title ?? communityBook?.title ?? resource?.name ?? "资料暂时不可用"}</strong><small>{course?.content_mode === "directory" ? "演示课程 · 目录预览" : ready ? "可开始学习" : resource?.status === "processing" ? `正在整理 ${resource.progress ?? 0}%` : resource?.error ?? "待整理 · 原文件已保留"}</small></div>
                 {resource && (resource.status === "error" || resource.status === "pending") ? <button type="button" onClick={() => void getLearningResourceFile(resource.id).then((blob) => { if (!blob) throw new Error("原文件不在当前设备上"); return importCourseFile(new File([blob], resource.name, { type: resource.contentType }), courseList.find((item) => item.id === activeCourseId)?.id); }).catch((error: unknown) => showToast(error instanceof Error ? error.message : "整理失败", "warning"))}>重新整理</button> : null}
                 {ready && bookId ? <button type="button" disabled={openingBookId === bookId} onClick={() => void openBook(bookId)}>{openingBookId === bookId ? "打开中…" : "进入"}<ArrowRight size={16} aria-hidden="true" /></button> : null}
                 {resource ? <button type="button" onClick={() => void downloadLocal(resourceId)} aria-label={`下载 ${resource.name}`}><FileDown size={18} aria-hidden="true" /></button> : null}

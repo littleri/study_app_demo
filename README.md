@@ -14,6 +14,8 @@ npm run demo:validate
 npm run dev
 ```
 
+在“我的”页面点击右上角“设置”可查看学习偏好并退出账号。确认退出后立即返回首次引导；再次打开应用也需重新完成引导。当前 Demo 会保留本机已有课程、资料文件、课程草稿、笔记、学习进度和积分，完成引导后即可继续使用。
+
 ## Android debug APK（Capacitor）
 
 仓库已经包含 Capacitor 的 `android/` 原生工程。根路径 `/` 现在始终打开真实 App；仅在需要设计验收时，使用 `/?preview=device-preview` 打开设备预览工作台。

@@ -78,4 +78,13 @@ describe("navigationMachine", () => {
       screen: "chapterConfirm"
     });
   });
+
+  it("clears the account's page history when returning to onboarding", () => {
+    expect(navigate(at("settings", ["home", "profile"]), { type: "reset", screen: "onboarding" })).toEqual({
+      direction: "replace",
+      history: [],
+      nonce: 8,
+      screen: "onboarding"
+    });
+  });
 });

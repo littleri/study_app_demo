@@ -1,7 +1,8 @@
+import { StickerIcon } from "../../components/icons/StickerIcon";
 import { courseRagScope } from "../courses/selectors";
 import { useAppContext } from "../../context/AppContext";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { BookOpenCheck, Sparkles, X } from "lucide-react";
+import { BookOpenCheck, X } from "lucide-react";
 import { Button } from "../../components/ui";
 import { useBookCourseRepository } from "../../context/BookCourseRepositoryContext";
 import { globalMotionFallbackMs, useMotionPresence, useReducedMotion, type MotionAnimationEvent } from "../../motion";
@@ -295,7 +296,7 @@ export function SourceRegionAiPanel({
     >
       <header className="source-region-ai-head">
         <span className="source-region-ai-avatar" aria-hidden="true">
-          <Sparkles size={16} />
+          <StickerIcon name="Sparkles" size={16} />
         </span>
         <div>
           <strong id={REGION_AI_TITLE_ID}>{isTextNote ? "批注 AI 对话" : "提问"}</strong>

@@ -25,9 +25,11 @@ import "./styles/processing.css";
 import "./styles/chapter-confirm.css";
 import "./styles/course-ready.css";
 import "./styles/profile.css";
+import "./styles/settings.css";
 import "./styles/courses.css";
 import "./styles/tablet.css";
 import "./styles/typography.css";
+import "./styles/sticker-icons.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isPreviewStudio = searchParams.get("preview") === "device-preview";
