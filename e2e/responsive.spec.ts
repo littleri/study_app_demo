@@ -1068,8 +1068,7 @@ test.describe("current DemoRepository responsive matrix", () => {
     await openSourceReader(page);
     await expectCurrentScreenGeometry(page, ".source-reader-screen", [
       ".source-reader-note-shortcuts button:not(:disabled)",
-      ".source-page-frame",
-      ".source-voice-fab"
+      ".source-page-frame"
     ], `${project.name} SourceReader`);
     await page.locator(".header-bar .icon-button").click();
     await expect(page.locator(".lesson-screen")).toBeVisible();

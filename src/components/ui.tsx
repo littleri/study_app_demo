@@ -402,7 +402,7 @@ export function PrimaryNav({
       <span ref={selectionRef} className="nav-selection" aria-hidden="true" />
       <div className="nav-topbar">
         <span className="nav-brand">
-          <span className="nav-brand-mark"><img src="/assets/brand/sidebar-cloud-icon.png" alt="" /></span>
+          <span className="nav-brand-mark"><img src="/assets/brand/app-logo.png" alt="" /></span>
           <span className="nav-brand-name">BookCourse AI</span>
         </span>
         <button

@@ -213,7 +213,7 @@ export function CourseSetupScreen() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const answerErrorTimerRef = useRef<number | null>(null);
-  const step = Math.max(-1, Math.min(5, draft?.step ?? -1));
+  const step = Math.max(draft?.editingCourseId ? -1 : 0, Math.min(5, draft?.step ?? 0));
   const previousStepRef = useRef(step);
 
   useLayoutEffect(() => {
@@ -233,16 +233,15 @@ export function CourseSetupScreen() {
         || document.activeElement instanceof HTMLTextAreaElement
         || document.activeElement instanceof HTMLSelectElement) return;
       event.preventDefault();
-      if (!draft || draft.step < 0) {
+      if (!draft || step < 0) {
         replaceScreen(draft?.editingCourseId ? "courseDetail" : "upload");
         return;
       }
       try {
-        if (draft.step === 0 && draft.uploadedCourse && draft.parseCompleted) {
-          replaceScreen("processing");
+        if (step === 0 && !draft.editingCourseId) {
+          replaceScreen(draft.uploadedCourse && draft.parseCompleted ? "processing" : "upload");
         } else {
-          courses.updateDraft({ step: draft.step - 1 });
-          if (draft.step === 0 && !draft.editingCourseId) replaceScreen("upload");
+          courses.updateDraft({ step: step - 1 });
         }
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "草稿保存失败，请重试");
@@ -250,16 +249,19 @@ export function CourseSetupScreen() {
     };
     window.addEventListener("bookcourse:native-back", onNativeBack);
     return () => window.removeEventListener("bookcourse:native-back", onNativeBack);
-  }, [draft, courses, replaceScreen]);
+  }, [draft, courses, replaceScreen, step]);
 
   useEffect(() => {
     if (!draft || draft.editingCourseId) return;
-    if (draft.uploadedCourse && !draft.parseCompleted) {
+    if (!draft.resourceIds.length) {
+      replaceScreen("upload");
+    } else if (draft.uploadedCourse && !draft.parseCompleted) {
       replaceScreen(draft.parseJobId ? "processing" : "parseReady");
     }
   }, [draft, replaceScreen]);
 
   if (!draft) return <div className="learning-flow-loading">课程草稿暂时不可用。<button type="button" onClick={() => replaceScreen("home")}>返回首页</button></div>;
+  if (!draft.editingCourseId && !draft.resourceIds.length) return null;
   const activeDraft = draft;
   const question = step >= 0 ? diagnosisQuestions[step] : null;
   const QuestionIcon = question ? diagnosisQuestionIcons[question.key] : BookOpen;
@@ -285,10 +287,9 @@ export function CourseSetupScreen() {
 
   function previous() {
     if (step < 0) replaceScreen(activeDraft.editingCourseId ? "courseDetail" : "upload");
-    else if (step === 0 && activeDraft.uploadedCourse && activeDraft.parseCompleted) replaceScreen("processing");
+    else if (step === 0 && !activeDraft.editingCourseId) replaceScreen(activeDraft.uploadedCourse && activeDraft.parseCompleted ? "processing" : "upload");
     else {
       update({ step: step - 1 });
-      if (step === 0 && !activeDraft.editingCourseId) replaceScreen("upload");
     }
   }
 
@@ -316,18 +317,18 @@ export function CourseSetupScreen() {
       return;
     }
     try {
+      setCompleting(true);
       const confirmParsedCourse = !activeDraft.editingCourseId && Boolean(activeDraft.uploadedCourse);
       if (confirmParsedCourse) {
         if (!activeDraft.parseCompleted || !activeDraft.uploadedCourse) {
           throw new Error("请先完成教材解析");
         }
-        setCompleting(true);
         const loaded = await selectSource(activeDraft.uploadedCourse.bookId);
         if (!loaded) throw new Error("解析结果暂时无法打开，请稍后重试");
       }
       const completedId = courses.completeDraft();
       if (!confirmParsedCourse) await selectCourse(completedId);
-      replaceScreen(confirmParsedCourse ? "chapterConfirm" : "courseDetail");
+      replaceScreen(confirmParsedCourse ? "chapterConfirm" : activeDraft.editingCourseId ? "courseDetail" : "courseImportProcessing");
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "课程保存失败，请重试");
@@ -372,7 +373,7 @@ export function CourseSetupScreen() {
       <div className="learning-flow-top">
         <button className="learning-flow-back" type="button" onClick={previous} aria-label="上一步"><ArrowLeft size={21} /></button>
         <span className="learning-flow-progress" aria-label={step < 0 ? "课程基本信息" : `第 ${step + 1} 类，共 6 类`}>
-          {step < 0 ? <strong>创建课程</strong> : <><strong>{step + 1}</strong><span>/6</span></>}
+          {step < 0 ? <strong>调整课程</strong> : <><strong>{step + 1}</strong><span>/6</span></>}
         </span>
         <span />
       </div>
@@ -383,7 +384,7 @@ export function CourseSetupScreen() {
       {step < 0 ? (
         <div className="course-space-details">
           <span className="learning-flow-symbol"><StickerIcon name="BookOpen" size={24} aria-hidden="true" /></span>
-          <h1>{draft.editingCourseId ? "调整课程" : "创建课程"}</h1>
+          <h1>调整课程</h1>
           <p>把同一目标下的书籍和资料放在一起，再设定适合自己的学习方式。</p>
           <label className="learning-flow-label" htmlFor="course-space-name">课程名称</label>
           <input
@@ -460,7 +461,7 @@ export function CourseSetupScreen() {
 
       <div className="learning-flow-bottom">
         <FlowError message={error} />
-        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程目录…" : step === 5 ? draft.uploadedCourse ? "完成问卷，查看课程目录" : "完成，进入课程" : "下一页"}</button>
+        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程…" : step === 5 ? draft.uploadedCourse ? "完成问卷，查看课程目录" : draft.editingCourseId ? "保存，返回课程" : "完成，开始导入" : "下一页"}</button>
         {step < 0 ? <button className="learning-flow-skip" type="button" onClick={() => replaceScreen("courseDetail")}>返回课程，草稿已保存</button> : null}
       </div>
     </div>

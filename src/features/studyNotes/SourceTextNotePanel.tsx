@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type Ref, type RefObject } from "react";
-import { Check, MessageSquareText, Pencil, Sparkles, Trash2, X } from "lucide-react";
+import { Check, MessageSquareText, Mic2, Pencil, Sparkles, Trash2, X } from "lucide-react";
 import type { MotionAnimationEvent, MotionPresence } from "../../motion";
 import { deleteStudyNote, updateTextStudyNote } from "./repository";
-import type { NoteAnchor, TextStudyNote } from "./types";
+import type { NoteAnchor, SourceAnnotationNote, TextStudyNote } from "./types";
 import type { TextNoteLocation } from "./SourceTextAnnotationLayer";
+import { VoiceNoteScreen, type VoiceNoteHandle } from "../../screens/VoiceNoteScreen";
 
-export type SourceTextNotePanelHandle = { save: () => Promise<TextStudyNote | undefined>; close: () => Promise<void>; focus: () => void };
+export type SourceTextNotePanelHandle = { save: () => Promise<SourceAnnotationNote | undefined>; close: () => Promise<void>; focus: () => void };
 export const sourceTextNoteAnimationNames = ["motion-text-note-in", "motion-text-note-out"] as const;
 
 type TextNoteMotion = Pick<MotionPresence<unknown>, "state" | "presenceId" | "onAnimationEnd" | "onAnimationCancel">;
@@ -20,32 +21,40 @@ export function SourceTextNotePanel({
   workspaceRef,
   motion,
   ref,
+  onKindChange,
   onAskAi,
   onClose
 }: {
   anchor: NoteAnchor;
-  existing?: TextStudyNote;
+  existing?: SourceAnnotationNote;
   noteId: string;
   location: TextNoteLocation;
   workspaceRef: RefObject<HTMLDivElement | null>;
   motion: TextNoteMotion;
   ref?: Ref<SourceTextNotePanelHandle>;
+  onKindChange: (kind: "text" | "voice") => void;
   onAskAi: (note: TextStudyNote) => void;
   onClose: () => void;
 }) {
+  const existingText = existing?.kind === "text" ? existing : undefined;
   const idRef = useRef(existing?.id ?? noteId);
   const anchorRef = useRef(anchor);
   const positionRef = useRef(location.position);
   const panelRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const [body, setBody] = useState(existing?.body ?? "");
+  const [body, setBody] = useState(existingText?.body ?? (existing?.kind === "voice" ? existing.annotationText : "") ?? "");
   const bodyRef = useRef(body);
   bodyRef.current = body;
   const [editing, setEditing] = useState(!existing);
-  const savedBodyRef = useRef(existing?.body ?? "");
-  const queuedBodyRef = useRef(existing?.body ?? "");
-  const lastSavedNoteRef = useRef(existing);
-  const saveQueueRef = useRef<Promise<TextStudyNote | undefined>>(Promise.resolve(existing));
+  const savedBodyRef = useRef(existingText?.body ?? "");
+  const queuedBodyRef = useRef(existingText?.body ?? "");
+  const lastSavedNoteRef = useRef(existingText);
+  const saveQueueRef = useRef<Promise<TextStudyNote | undefined>>(Promise.resolve(existingText));
+  const voiceRef = useRef<VoiceNoteHandle | null>(null);
+  const [voiceMode, setVoiceMode] = useState(existing?.kind === "voice");
+  const voiceModeRef = useRef(voiceMode);
+  voiceModeRef.current = voiceMode;
+  const [autoStartVoice, setAutoStartVoice] = useState(false);
   const closingRef = useRef(false);
   const deletedRef = useRef(false);
   const timerRef = useRef<number | null>(null);
@@ -124,17 +133,22 @@ export function SourceTextNotePanel({
     closingRef.current = true;
     setBusy(true);
     try {
-      await persist(bodyRef.current);
+      if (voiceMode) await voiceRef.current?.save();
+      else await persist(bodyRef.current);
       onClose();
     } catch {
-      // persist keeps the unsaved editor open and exposes a retry action.
+      if (voiceMode) setError("录音保存失败，内容仍保留在弹窗中，请重试。");
     } finally {
       closingRef.current = false;
       setBusy(false);
     }
-  }, [onClose, persist]);
+  }, [onClose, persist, voiceMode]);
 
-  useImperativeHandle(ref, () => ({ save: () => persist(bodyRef.current), close: requestClose, focus: () => inputRef.current?.focus() }), [persist, requestClose]);
+  useImperativeHandle(ref, () => ({
+    save: () => voiceMode ? voiceRef.current?.save() ?? Promise.resolve(undefined) : persist(bodyRef.current),
+    close: requestClose,
+    focus: () => voiceMode ? panelRef.current?.focus({ preventScroll: true }) : inputRef.current?.focus()
+  }), [persist, requestClose, voiceMode]);
 
   useEffect(() => {
     if (isClosing) return;
@@ -184,15 +198,15 @@ export function SourceTextNotePanel({
   }, [isClosing, requestClose]);
 
   useEffect(() => {
-    if (body === savedBodyRef.current || busy) return;
+    if (voiceMode || body === savedBodyRef.current || busy) return;
     timerRef.current = window.setTimeout(() => { void persist(body).catch(() => undefined); }, 500);
     return () => { if (timerRef.current !== null) window.clearTimeout(timerRef.current); };
-  }, [body, busy, persist]);
+  }, [body, busy, persist, voiceMode]);
 
   useEffect(() => () => {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     // Also flush when navigation unmounts the reader immediately after typing.
-    if (!deletedRef.current && bodyRef.current !== savedBodyRef.current) void persist(bodyRef.current).catch(() => undefined);
+    if (!voiceModeRef.current && !deletedRef.current && bodyRef.current !== savedBodyRef.current) void persist(bodyRef.current).catch(() => undefined);
   }, [persist]);
 
   useEffect(() => {
@@ -208,9 +222,9 @@ export function SourceTextNotePanel({
 
   useEffect(() => {
     if (isClosing) return;
-    if (editing) inputRef.current?.focus({ preventScroll: true });
+    if (editing && !voiceMode) inputRef.current?.focus({ preventScroll: true });
     else panelRef.current?.focus({ preventScroll: true });
-  }, [editing, isClosing, motion.presenceId]);
+  }, [editing, isClosing, motion.presenceId, voiceMode]);
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
@@ -274,6 +288,26 @@ export function SourceTextNotePanel({
     }
   }
 
+  async function startVoice() {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    setBusy(true);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    try {
+      // Keep any typed draft as part of the same annotation when adding audio.
+      await persist(bodyRef.current);
+      inputRef.current?.blur();
+      setAutoStartVoice(true);
+      setVoiceMode(true);
+      onKindChange("voice");
+    } catch {
+      // A failed text save must not hide the draft behind the recorder.
+    } finally {
+      closingRef.current = false;
+      setBusy(false);
+    }
+  }
+
   async function remove() {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -281,7 +315,8 @@ export function SourceTextNotePanel({
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     try {
       await saveQueueRef.current.catch(() => undefined);
-      if (lastSavedNoteRef.current) await deleteStudyNote(idRef.current);
+      if (voiceMode) await voiceRef.current?.save();
+      await deleteStudyNote(idRef.current);
       deletedRef.current = true;
       onClose();
     } catch {
@@ -295,11 +330,12 @@ export function SourceTextNotePanel({
   return (
     <section
       ref={panelRef}
-      className="source-inline-note-panel source-text-note-popover"
-      aria-label="原文文字笔记"
+      className={`source-inline-note-panel source-text-note-popover${voiceMode ? " source-inline-voice-panel" : ""}`}
+      aria-label={voiceMode ? "原文语音批注" : "原文文字笔记"}
       aria-busy={controlsDisabled}
       tabIndex={-1}
-      inert={isClosing}
+      inert={isClosing || busy}
+      data-note-kind={voiceMode ? "voice" : "text"}
       data-editing={editing}
       data-motion-state={motion.state}
       data-motion-presence={motion.presenceId}
@@ -315,21 +351,34 @@ export function SourceTextNotePanel({
       } as CSSProperties}
       onAnimationEnd={(event) => settleAnimation(event, motion.onAnimationEnd)}
       onKeyDown={(event) => {
-        if (event.key === "Escape" || (editing && (event.metaKey || event.ctrlKey) && event.key === "Enter")) {
+        if (event.key === "Escape" || ((editing || voiceMode) && (event.metaKey || event.ctrlKey) && event.key === "Enter")) {
           event.preventDefault();
           void requestClose();
         }
       }}
     >
       <header className="source-text-note-heading">
-        <MessageSquareText size={17} aria-hidden="true" />
-        <strong>文字批注</strong>
+        {voiceMode ? <Mic2 size={17} aria-hidden="true" /> : <MessageSquareText size={17} aria-hidden="true" />}
+        <strong>{voiceMode ? "语音批注" : "文字批注"}</strong>
         <span role="status">{status}</span>
-        <button type="button" aria-label="关闭文字笔记" disabled={controlsDisabled} onClick={() => void requestClose()}><X size={18} aria-hidden="true" /></button>
+        <button type="button" aria-label={voiceMode ? "关闭语音批注" : "关闭文字笔记"} disabled={controlsDisabled} onClick={() => void requestClose()}><X size={18} aria-hidden="true" /></button>
       </header>
       <small>{anchor.chapterTitle ?? anchor.bookTitle ?? "教材原文"} · 第 {anchor.printedPageStart ?? anchor.pageStart} 页</small>
       {anchor.quote ? <blockquote>{anchor.quote}</blockquote> : null}
-      {editing ? (
+      {voiceMode ? (
+        <>
+          {body.trim() ? <p className="source-text-note-body">{body}</p> : null}
+          <VoiceNoteScreen
+            ref={voiceRef}
+            embedded
+            autoStart={autoStartVoice}
+            annotationText={body}
+            captureIntent={{ kind: "voice", existingNoteId: idRef.current, anchor: anchorRef.current, position: positionRef.current, from: "source" }}
+            onStatusChange={setStatus}
+            onClose={() => void requestClose()}
+          />
+        </>
+      ) : editing ? (
         <label className="source-text-note-input">
           <span>我的理解</span>
           <textarea
@@ -341,16 +390,17 @@ export function SourceTextNotePanel({
           />
         </label>
       ) : <p className="source-text-note-body">{body}</p>}
+      {!voiceMode && !existing ? <button className="source-text-note-start-voice" type="button" disabled={controlsDisabled} onClick={() => void startVoice()}><Mic2 size={17} aria-hidden="true" />开始语音批注</button> : null}
       {error ? <p className="source-note-error" role="alert">{error}</p> : null}
-      {error ? <button className="source-note-retry" type="button" disabled={controlsDisabled} onClick={() => void persist(bodyRef.current).catch(() => undefined)}>重试保存</button> : null}
+      {error ? <button className="source-note-retry" type="button" disabled={controlsDisabled} onClick={() => void (voiceMode ? requestClose() : persist(bodyRef.current)).catch(() => undefined)}>重试保存</button> : null}
       <footer className="source-text-note-actions">
         <button className="source-text-note-delete" type="button" aria-label="删除批注" disabled={controlsDisabled} onClick={() => void remove()}><Trash2 size={17} aria-hidden="true" /></button>
-        {editing ? (
+        {editing || voiceMode ? (
           <button type="button" disabled={controlsDisabled} onClick={() => void requestClose()}><Check size={16} aria-hidden="true" />完成</button>
         ) : (
           <button type="button" disabled={controlsDisabled} onClick={() => setEditing(true)}><Pencil size={16} aria-hidden="true" />编辑批注</button>
         )}
-        <button className="source-text-note-ai" type="button" disabled={controlsDisabled || !body.trim()} onClick={() => void askAi()}><Sparkles size={16} aria-hidden="true" />问 AI</button>
+        {!voiceMode ? <button className="source-text-note-ai" type="button" disabled={controlsDisabled || !body.trim()} onClick={() => void askAi()}><Sparkles size={16} aria-hidden="true" />问 AI</button> : null}
       </footer>
     </section>
   );

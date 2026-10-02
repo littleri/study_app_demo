@@ -1,6 +1,7 @@
 /* The Processing workspace mirrors the focused reference composition: one
    calm brand animation, a compact stage panel, one status line, and one exit. */
-.screen-content[data-screen="processing"] {
+.screen-content[data-screen="processing"],
+.screen-content[data-screen="courseImportProcessing"] {
   background: var(--color-surface);
 }
 

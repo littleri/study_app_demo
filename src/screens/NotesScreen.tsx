@@ -15,7 +15,7 @@ type NoteFilter = "all" | NoteKind;
 
 function notePreview(note: StudyNote) {
   if (note.kind === "text") return note.body;
-  if (note.kind === "voice") return note.organizedText ?? note.transcript ?? `录音 ${Math.max(1, Math.round(note.durationMs / 1000))} 秒`;
+  if (note.kind === "voice") return note.organizedText ?? note.transcript ?? note.annotationText ?? `录音 ${Math.max(1, Math.round(note.durationMs / 1000))} 秒`;
   return note.organizedText ?? note.recognizedText ?? `${Object.values(note.pages).reduce((sum, strokes) => sum + strokes.length, 0)} 条手写笔迹`;
 }
 
@@ -222,7 +222,7 @@ export function NotesScreen() {
                 </div>
               </div>
               {selectedNote.anchor?.quote ? <blockquote>{selectedNote.anchor.quote}</blockquote> : null}
-              <p className="study-note-original">{selectedNote.kind === "text" ? selectedNote.body : selectedNote.kind === "voice" ? selectedNote.transcript ?? "录音已保存，尚未生成逐字稿。" : selectedNote.recognizedText ?? "手写笔迹已保存，尚未整理。"}</p>
+              <p className="study-note-original">{selectedNote.kind === "text" ? selectedNote.body : selectedNote.kind === "voice" ? [selectedNote.annotationText, selectedNote.transcript].filter(Boolean).join("\n\n") || "录音已保存，尚未生成逐字稿。" : selectedNote.recognizedText ?? "手写笔迹已保存，尚未整理。"}</p>
               {selectedNote.organizedText ? (
                 <div className="study-note-organized"><strong>独立整理版</strong><p>{selectedNote.organizedText.replace(/^##\s*/u, "").replace(/\n[-\d.\s*]+/gu, " ")}</p></div>
               ) : null}

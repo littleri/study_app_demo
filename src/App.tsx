@@ -118,8 +118,10 @@ const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean
   upload: { title: "创建课程", back: true, hideNav: true },
   parseReady: { title: "解析教材", back: true, hideNav: true },
   processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
+  courseImportProcessing: { title: "正在解析资料", subtitle: "为你准备专属课程", hideNav: true },
   chapterConfirm: { title: "确认目录", subtitle: "核对资料目录与 AI 课时映射", back: true, hideNav: true },
   courseReady: { hideNav: true },
+  courseImportReady: { hideNav: true },
   library: { title: "我的课程", subtitle: "管理课程、教材与学习资料", back: true, hideNav: true },
   community: { title: "发现", subtitle: "发现同学分享的优质课程" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
@@ -145,8 +147,10 @@ const toastQuietScreens = new Set<Screen>([
   "upload",
   "parseReady",
   "processing",
+  "courseImportProcessing",
   "chapterConfirm",
   "courseReady",
+  "courseImportReady",
   "communityImport"
 ]);
 
@@ -1248,10 +1252,14 @@ export default function App() {
         return <ParseReadyScreen />;
       case "processing":
         return <ProcessingScreen />;
+      case "courseImportProcessing":
+        return <ProcessingScreen mockImport />;
       case "chapterConfirm":
         return <ChapterConfirmScreen />;
       case "courseReady":
         return <CourseReadyScreen />;
+      case "courseImportReady":
+        return <CourseReadyScreen imported />;
       case "library":
         return <LibraryScreen />;
       case "community":

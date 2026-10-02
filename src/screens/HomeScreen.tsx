@@ -78,7 +78,7 @@ export function HomeScreen() {
       if (await selectCourse(selected.course.id)) go("chapterConfirm");
     } else go("courseDetail");
   }
-  function createCourse() { courses.startDraft(); go("courseSetup"); }
+  function createCourse() { courses.startDraft(); go("upload"); }
   function prepareNext() {
     if (!nextStep || !loadedBookId) return false;
     setActiveChapterId(nextStep.chapter.chapter_id);

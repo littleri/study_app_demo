@@ -46,10 +46,10 @@ test.describe("production HomeScreen course states", () => {
     await expect(announcement).toHaveCount(0);
   });
 
-  test("creates the first course through its separate setup flow", async ({ page }) => {
+  test("creates the first course through the material import flow", async ({ page }) => {
     await page.evaluate(() => window.__homeScreenStateHarness?.setMode("empty"));
     await page.getByRole("button", { name: "创建第一门课程", exact: true }).click();
-    expect(await page.evaluate(() => window.__homeScreenStateHarness?.getRoutes())).toEqual(["courseSetup"]);
+    expect(await page.evaluate(() => window.__homeScreenStateHarness?.getRoutes())).toEqual(["upload"]);
   });
 
   test("only confirms a source directory after its course loads successfully", async ({ page }) => {

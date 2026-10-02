@@ -5,15 +5,15 @@ import { useMotionPresence } from "../../motion/useMotionPresence";
 import { useReducedMotion } from "../../motion/useReducedMotion";
 import type { MotionAnimationEvent } from "../../motion/useMotionPresence";
 import { textNotePosition } from "./textAnnotations";
-import type { TextNotePosition, TextStudyNote } from "./types";
+import type { SourceAnnotationNote, TextNotePosition } from "./types";
 
 export type TextNoteLocation = {
   position: TextNotePosition;
   pageElement: HTMLElement;
 };
 
-export type TextNoteDraftMarker = { id: string; position: TextNotePosition };
-type TextNoteMarker = TextNoteDraftMarker & { note?: TextStudyNote };
+export type TextNoteDraftMarker = { id: string; position: TextNotePosition; kind?: "text" | "voice" };
+type TextNoteMarker = TextNoteDraftMarker & { note?: SourceAnnotationNote };
 const markerAnimationNames = ["motion-text-note-marker-in", "motion-text-note-marker-out"] as const;
 const markerKey = (marker: TextNoteMarker) => marker.id;
 
@@ -22,7 +22,7 @@ function SourceTextNoteMarker({ marker, present, active, reducedMotion, onOpen, 
   present: boolean;
   active: boolean;
   reducedMotion: boolean;
-  onOpen: (note: TextStudyNote, location: TextNoteLocation) => void;
+  onOpen: (note: SourceAnnotationNote, location: TextNoteLocation) => void;
   onDraftActivate?: () => void;
   onClosed: (id: string) => void;
 }) {
@@ -50,15 +50,19 @@ function SourceTextNoteMarker({ marker, present, active, reducedMotion, onOpen, 
   const rendered = motion.rendered;
   if (!rendered) return null;
   const closing = !present || motion.state === "closing";
+  const voice = rendered.kind === "voice";
+  const preview = rendered.note?.kind === "text" ? rendered.note.body
+    : rendered.note?.annotationText || rendered.note?.transcript || "";
   return (
     <button
       className="source-text-note-marker"
       type="button"
-      aria-label={rendered.note ? `查看文字批注：${rendered.note.body.slice(0, 32)}` : "正在编辑文字批注"}
+      aria-label={rendered.note ? voice ? `查看语音批注：${preview.slice(0, 32) || "播放录音"}` : `查看文字批注：${preview.slice(0, 32)}` : voice ? "正在录制语音批注" : "正在编辑文字批注"}
       aria-expanded={active}
       aria-hidden={closing || undefined}
       disabled={closing}
-      title={rendered.note?.body.slice(0, 80) ?? "正在编辑文字批注"}
+      title={preview.slice(0, 80) || (voice ? "语音批注" : "正在编辑文字批注")}
+      data-note-kind={voice ? "voice" : "text"}
       data-note-id={rendered.id}
       data-note-draft={!rendered.note}
       data-motion-state={motion.state}
@@ -76,7 +80,7 @@ function SourceTextNoteMarker({ marker, present, active, reducedMotion, onOpen, 
       }}
     >
       <span ref={spanRef} onAnimationEnd={(event) => settleAnimation(event, motion.onAnimationEnd)}>
-        <StickerIcon name="MessageSquareText" size={15} aria-hidden="true" />
+        <StickerIcon name={voice ? "Mic2" : "MessageSquareText"} size={15} aria-hidden="true" />
       </span>
     </button>
   );
@@ -95,9 +99,9 @@ export function SourceTextAnnotationLayer({
   activeNoteId?: string;
   draft?: TextNoteDraftMarker;
   enabled: boolean;
-  notes: TextStudyNote[];
+  notes: SourceAnnotationNote[];
   placing: boolean;
-  onOpen: (note: TextStudyNote, location: TextNoteLocation) => void;
+  onOpen: (note: SourceAnnotationNote, location: TextNoteLocation) => void;
   onDraftActivate?: () => void;
   onPlace: (location: TextNoteLocation) => void;
 }) {
@@ -106,8 +110,8 @@ export function SourceTextAnnotationLayer({
   const reducedMotion = useReducedMotion();
   const requested = useMemo<TextNoteMarker[]>(() => {
     if (!enabled) return [];
-    const markers = notes.filter((note) => note.position && note.body.trim())
-      .map((note) => ({ id: note.id, position: note.position!, note }));
+    const markers = notes.filter((note) => note.position && (note.kind === "text" ? note.body.trim() : note.audioId || note.annotationText?.trim()))
+      .map((note) => ({ id: note.id, position: note.position!, kind: draft?.id === note.id ? draft.kind ?? note.kind : note.kind, note }));
     if (draft && !markers.some((marker) => marker.id === draft.id)) return [...markers, draft];
     return markers;
   }, [draft, enabled, notes]);
@@ -133,7 +137,7 @@ export function SourceTextAnnotationLayer({
         <button
           className="source-text-placement-target"
           type="button"
-          aria-label="点击原文添加文字批注"
+          aria-label="点击原文添加批注"
           onPointerDown={(event) => {
             if (event.button !== 0) return;
             if (pointersRef.current.size === 0) multiplePointersRef.current = false;

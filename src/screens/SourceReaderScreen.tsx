@@ -4,7 +4,6 @@ import {
   FileText,
   Hand,
   Highlighter,
-  Mic2,
   MessageSquareText,
   NotebookPen,
   PenLine,
@@ -31,7 +30,7 @@ import { describeRegion, type PageRegion } from "../features/studyNotes/regionAs
 import { createStudyNoteId, getStudyNote, listStudyNotes, putStudyNote } from "../features/studyNotes/repository";
 import { resolveSourceReaderHeading } from "../features/studyNotes/sourceReaderHeading";
 import { pageSwipeDirection, type PageSwipeDirection } from "../features/studyNotes/pageSwipe";
-import { noteAnchorFromSource, type InkStroke, type InkStudyNote, type InkTool, type NoteAnchor, type NotePipelinePhase, type StudyNote, type TextStudyNote } from "../features/studyNotes/types";
+import { noteAnchorFromSource, type InkStroke, type InkStudyNote, type InkTool, type NoteAnchor, type NotePipelinePhase, type SourceAnnotationNote, type StudyNote } from "../features/studyNotes/types";
 import type { SourcePageTarget } from "../types/app";
 import { getLearningResourceFile } from "../features/courses/repository";
 import { readLocalSource, renderLocalSourcePage } from "../services/LocalSources";
@@ -41,7 +40,8 @@ type TextNoteEditor = {
   key: string;
   instanceId: number;
   anchor: NoteAnchor;
-  existing?: TextStudyNote;
+  existing?: SourceAnnotationNote;
+  kind?: "text" | "voice";
   location: TextNoteLocation;
 };
 
@@ -70,7 +70,6 @@ export function SourceReaderScreen() {
     sourcePageTarget,
     sourceReaderCurrentPage: currentPage,
     setSourceReaderCurrentPage: setCurrentPage,
-    startNote,
     showToast,
     uploadedFile
   } = useAppContext();
@@ -168,8 +167,8 @@ export function SourceReaderScreen() {
       ? "loading"
       : "ready";
   const pageMotion = useLocalMotionItem(`source-page:${imageKey}`, "source-page-content", { ready: sourceLoadState !== "loading" || showInlineTextFallback });
-  const pageTextNotes = pageNotes.filter((note): note is TextStudyNote => note.kind === "text" && note.anchor?.bookId === bookId && note.anchor.pageStart === currentPage);
-  const draftTextMarker = textEditor ? { id: textEditor.key, position: textEditor.location.position } : undefined;
+  const pageTextNotes = pageNotes.filter((note): note is SourceAnnotationNote => note.kind !== "ink" && note.anchor?.bookId === bookId && note.anchor.pageStart === currentPage);
+  const draftTextMarker = textEditor ? { id: textEditor.key, position: textEditor.location.position, kind: textEditor.kind ?? textEditor.existing?.kind ?? "text" as const } : undefined;
 
   useEffect(() => {
     setCurrentPage(targetStart);
@@ -300,7 +299,7 @@ export function SourceReaderScreen() {
     }
   }
 
-  async function openTextAt(location: TextNoteLocation, note?: TextStudyNote) {
+  async function openTextAt(location: TextNoteLocation, note?: SourceAnnotationNote) {
     if (switchingTextRef.current || note && note.id === textEditor?.key) return;
     if (textEditor) {
       await textPanelRef.current?.close();
@@ -310,7 +309,7 @@ export function SourceReaderScreen() {
     const anchor = note?.anchor ?? currentNoteAnchor();
     try {
       const stored = note ? await getStudyNote(note.id) : null;
-      const latestNote = stored?.kind === "text" ? stored : note;
+      const latestNote = stored && stored.kind !== "ink" ? stored : note;
       setRegionAsk(null);
       setCommittedRegion(null);
       setShowPageNotes(false);
@@ -323,7 +322,7 @@ export function SourceReaderScreen() {
     }
   }
 
-  function openText(note?: TextStudyNote) {
+  function openText(note?: SourceAnnotationNote) {
     setShowPageNotes(false);
     setRegionAsk(null);
     setCommittedRegion(null);
@@ -392,25 +391,6 @@ export function SourceReaderScreen() {
       label: describeRegion(region, heading.pageLabel),
       region,
       origin
-    });
-  }
-
-  async function openVoice(note?: StudyNote) {
-    if (!await flushTextEditor()) return;
-    if (annotationActive && noteLoaded) {
-      try {
-        await saveDraft();
-      } catch {
-        showToast("本页批注保存失败，请重试", "warning");
-        return;
-      }
-    }
-    startNote({
-      kind: "voice",
-      anchor: note?.anchor ?? currentNoteAnchor(),
-      source: currentSourceTarget(),
-      existingNoteId: note?.kind === "voice" ? note.id : undefined,
-      from: "source"
     });
   }
 
@@ -710,7 +690,7 @@ export function SourceReaderScreen() {
           </button>
         </div>
         <div className="source-reader-note-shortcuts" role="group" aria-label="笔记入口">
-          <button className="ink-tool-secondary" type="button" aria-label="文字笔记" aria-pressed={noteMode === "text"} onClick={() => {
+          <button className="ink-tool-secondary" type="button" aria-label="批注" title="文字或语音批注" aria-pressed={noteMode === "text"} onClick={() => {
             if (noteMode === "text") {
               void flushTextEditor().then((saved) => { if (saved) { setRegionAsk(null); setNoteMode("read"); } });
               return;
@@ -889,7 +869,7 @@ export function SourceReaderScreen() {
       ) : null}
 
       {noteMode === "text" && !textEditor && !regionAsk ? (
-        <p className="source-text-placement-hint" role="status"><MessageSquareText size={15} aria-hidden="true" />点击原文任意位置，写下批注</p>
+        <p className="source-text-placement-hint" role="status"><MessageSquareText size={15} aria-hidden="true" />点击原文任意位置，添加文字或语音批注</p>
       ) : null}
 
       <SourceRegionAiPanel
@@ -913,6 +893,7 @@ export function SourceReaderScreen() {
             location={renderedTextEditor.location}
             workspaceRef={workspaceRef}
             motion={textEditorMotion}
+            onKindChange={(kind) => setTextEditor((current) => current ? { ...current, kind } : current)}
             onAskAi={(note) => {
               const box = renderedTextEditor.location.pageElement.getBoundingClientRect();
               setTextEditor({ ...renderedTextEditor, existing: note, key: note.id, instanceId: ++textEditorInstanceRef.current });
@@ -938,7 +919,6 @@ export function SourceReaderScreen() {
             <button key={note.id} type="button" onClick={() => {
               setShowPageNotes(false);
               if (note.kind === "ink") openInk(note);
-              else if (note.kind === "voice") void openVoice(note);
               else openText(note);
             }}>
               <span>{note.kind === "ink" ? "手写" : note.kind === "voice" ? "语音" : "文字"}</span>
@@ -946,9 +926,6 @@ export function SourceReaderScreen() {
             </button>
           ))}
         </div>
-      ) : null}
-      {noteMode !== "text" ? (
-        <button className="source-voice-fab" type="button" aria-label="语音笔记" title="语音笔记" onClick={() => void openVoice()}><Mic2 size={24} /></button>
       ) : null}
       </div>
     </div>

@@ -53,8 +53,8 @@ function StageCompletionCheck({
   );
 }
 
-export function ProcessingScreen() {
-  const { go, courses, parseJobId, parseJobStatus, parsedChapters, uploadedFile } = useAppContext();
+export function ProcessingScreen({ mockImport = false }: { mockImport?: boolean }) {
+  const { go, replaceScreen, courses, parseJobId, parseJobStatus, parsedChapters, uploadedFile } = useAppContext();
   const draft = courses.state.draft;
   const continuesCourse = Boolean(draft?.parseCompleted && uploadedFile
     && draft.uploadedCourse?.bookId === uploadedFile.bookId);
@@ -62,18 +62,22 @@ export function ProcessingScreen() {
   const reducedMotion = useReducedMotion();
   const stageCompletionSnapshotRef = useRef<StageCompletionSnapshot | null>(null);
   const [enteringStageKeys, setEnteringStageKeys] = useState<ReadonlySet<string>>(() => new Set());
-  const [progress, setProgress] = useState(parseJobId ? 5 : 8);
-  const liveProgress = parseJobStatus ? Math.max(0, Math.min(100, parseJobStatus.progress)) : progress;
-  const jobMessage = parseJobStatus?.message ?? (parseJobId ? "已提交云端解析任务，正在后台运行" : "");
-  const parseError = parseJobStatus?.status === "failed" ? parseJobStatus.error ?? "解析失败，请重新上传或检查文件格式" : null;
-  const isDone = parseJobStatus?.status === "done";
-  const stages = ["解析页面与版面", "抽取标题段落图表", "写入 PostgreSQL", "BGE-M3 embedding", "BM25 + pgvector 索引"];
-  const activeStage = liveProgress <= 0 ? -1 : Math.min(stages.length - 1, Math.floor(liveProgress / 22));
+  const [progress, setProgress] = useState(mockImport ? 0 : parseJobId ? 5 : 8);
+  const processingId = mockImport ? uploadedFile ? `mock-import:${uploadedFile.bookId}` : null : parseJobId;
+  const liveProgress = mockImport ? progress : parseJobStatus ? Math.max(0, Math.min(100, parseJobStatus.progress)) : progress;
+  const jobMessage = mockImport ? "" : parseJobStatus?.message ?? (parseJobId ? "已提交云端解析任务，正在后台运行" : "");
+  const parseError = !mockImport && parseJobStatus?.status === "failed" ? parseJobStatus.error ?? "解析失败，请重新上传或检查文件格式" : null;
+  const isDone = mockImport ? progress === 100 : parseJobStatus?.status === "done";
+  const stages = mockImport
+    ? ["整理课程资料", "识别章节与重点", "结合学习偏好", "安排学习计划", "准备学习内容"]
+    : ["解析页面与版面", "抽取标题段落图表", "写入 PostgreSQL", "BGE-M3 embedding", "BM25 + pgvector 索引"];
+  const activeStage = liveProgress <= 0 ? -1 : Math.min(stages.length - 1, Math.floor(liveProgress / (mockImport ? 20 : 22)));
   const stageCount = stages.length;
   const completedStages = stages.map((_, index) => index < activeStage || (isDone && index === activeStage));
   const progressBucket = Math.max(0, Math.min(100, Math.floor(liveProgress / 10) * 10));
   const processingStatusText = parseError
-    ?? (jobMessage || `已识别 ${parsedChapters?.length ?? 0} 个目录项，正在生成课程结构和检索索引`);
+    ?? (mockImport ? isDone ? "资料已整理完成，即将开启学习之旅。" : "正在为你整理资料，准备专属学习之旅…"
+      : jobMessage || `已识别 ${parsedChapters?.length ?? 0} 个目录项，正在生成课程结构和检索索引`);
   const processingLiveAnnouncement = parseError
     ? `解析失败：${parseError}`
     : isDone
@@ -90,7 +94,7 @@ export function ProcessingScreen() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!parseJobId) {
+    if (!processingId) {
       stageCompletionSnapshotRef.current = null;
       setEnteringStageKeys((current) => current.size === 0 ? current : new Set());
       return;
@@ -103,7 +107,7 @@ export function ProcessingScreen() {
     );
     stageCompletionSnapshotRef.current = {
       completed: currentCompletedStages,
-      jobId: parseJobId
+      jobId: processingId
     };
 
     // The first Processing render establishes the real polling baseline. A
@@ -111,7 +115,7 @@ export function ProcessingScreen() {
     // checks can play once; ordinary rerenders and same-value polls cannot.
     if (!previous) return;
 
-    const isNewJob = previous.jobId !== parseJobId;
+    const isNewJob = previous.jobId !== processingId;
     const previousCompletedStages = !isNewJob
       ? previous.completed
       : Array.from({ length: stageCount }, () => false);
@@ -119,7 +123,7 @@ export function ProcessingScreen() {
 
     currentCompletedStages.forEach((completed, index) => {
       if (!completed || previousCompletedStages[index]) return;
-      const key = `parse:${parseJobId}:stage:${index}`;
+      const key = `parse:${processingId}:stage:${index}`;
       if (consume(key) && !reducedMotion) enteringKeys.push(key);
     });
 
@@ -129,7 +133,7 @@ export function ProcessingScreen() {
       enteringKeys.forEach((key) => next.add(key));
       return next;
     });
-  }, [activeStage, consume, isDone, parseJobId, reducedMotion, stageCount]);
+  }, [activeStage, consume, isDone, processingId, reducedMotion, stageCount]);
 
   useLayoutEffect(() => {
     if (!reducedMotion) return;
@@ -137,11 +141,26 @@ export function ProcessingScreen() {
   }, [reducedMotion]);
 
   useEffect(() => {
-    if (parseJobId) return;
+    if (!mockImport) {
+      if (!parseJobId) setProgress(0);
+      return;
+    }
+    if (!processingId) {
+      replaceScreen("upload");
+      return;
+    }
+    // This is the explicitly requested mock import presentation. Backend parse
+    // jobs keep using their own polling state and never receive this progress.
     setProgress(0);
-  }, [go, parseJobId]);
+    const timers = Array.from({ length: 10 }, (_, index) => window.setTimeout(
+      () => setProgress((index + 1) * 10),
+      (index + 1) * 400
+    ));
+    timers.push(window.setTimeout(() => replaceScreen("courseImportReady"), 4600));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [mockImport, parseJobId, processingId, replaceScreen]);
 
-  if (!parseJobId) {
+  if (!processingId) {
     return (
       <div className="screen-stack processing-flow-screen processing-empty-screen">
         <Card className="parse-empty-card">
@@ -183,8 +202,8 @@ export function ProcessingScreen() {
               <span>
                 {completed ? (
                   <StageCompletionCheck
-                    motionKey={`parse:${parseJobId}:stage:${index}`}
-                    motionState={enteringStageKeys.has(`parse:${parseJobId}:stage:${index}`) ? "entering" : "idle"}
+                    motionKey={`parse:${processingId}:stage:${index}`}
+                    motionState={enteringStageKeys.has(`parse:${processingId}:stage:${index}`) ? "entering" : "idle"}
                     settle={settleStageMotion}
                   />
                 ) : index + 1}
@@ -202,11 +221,11 @@ export function ProcessingScreen() {
       <p className="motion-visually-hidden" role="status" aria-live="polite" aria-atomic="true">
         {processingLiveAnnouncement}
       </p>
-      <div className="processing-flow-actions">
+      {!mockImport ? <div className="processing-flow-actions">
         {parseError ? <Button variant="secondary" onClick={() => go("parseReady")}>返回重新解析</Button> : null}
         {isDone ? <Button onClick={() => go(continuesCourse ? "courseSetup" : "chapterConfirm")}>{continuesCourse ? "填写学习方式问卷" : "查看目录"}</Button> : null}
         {parseJobId && !isDone && !parseError ? <Button variant="secondary" onClick={() => go("home")}>后台运行，先回首页</Button> : null}
-      </div>
+      </div> : null}
     </div>
   );
 }

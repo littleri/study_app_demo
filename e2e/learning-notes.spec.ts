@@ -57,14 +57,15 @@ test.describe("Android tablet learning notes", () => {
     await page.getByRole("button", { name: /^文字笔记/u }).click();
     const reader = page.locator(".source-reader-screen");
     await expect(reader).toHaveAttribute("data-note-mode", "text");
-    const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+    const target = reader.getByRole("button", { name: "点击原文添加批注" });
     await target.click({ position: { x: 100, y: 180 } });
     const editor = reader.getByRole("region", { name: "原文文字笔记" });
     const body = "从学习笔记入口添加的原文批注。";
     await editor.getByLabel("我的理解").fill(body);
     await editor.getByRole("button", { name: "完成", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(reader).toHaveAttribute("data-note-mode", "read");
     await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
-    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
     await page.locator(".header-bar .icon-button").click();
     const hub = page.locator(".study-notes-hub");
     await expect(hub).toBeVisible();

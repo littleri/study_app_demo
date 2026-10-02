@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import type { PluginListenerHandle } from "@capacitor/core";
 import {
@@ -32,6 +32,12 @@ import {
 import type { NoteCaptureIntent, NotePipelinePhase, VoiceStudyNote } from "../features/studyNotes/types";
 
 type RecordingState = "idle" | "requesting" | "recording" | "paused" | "ready";
+export type VoiceNoteHandle = { save: () => Promise<VoiceStudyNote | undefined> };
+type RecordingCompletion = {
+  promise: Promise<VoiceStudyNote | undefined>;
+  resolve: (note: VoiceStudyNote | undefined) => void;
+  reject: (error: unknown) => void;
+};
 
 const maximumDurationMs = 10 * 60 * 1000;
 const maximumSizeBytes = 20 * 1024 * 1024;
@@ -59,9 +65,13 @@ function downsampleWaveform(values: number[], count = 48) {
   return result;
 }
 
-export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
+export function VoiceNoteScreen({ embedded = false, captureIntent, annotationText, autoStart = false, ref, onStatusChange, onClose }: {
   embedded?: boolean;
   captureIntent?: NoteCaptureIntent;
+  annotationText?: string;
+  autoStart?: boolean;
+  ref?: Ref<VoiceNoteHandle>;
+  onStatusChange?: (status: string) => void;
   onClose?: () => void;
 } = {}) {
   const {
@@ -74,6 +84,12 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
   const noteCaptureIntent = captureIntent ?? contextNoteCaptureIntent;
   const noteIdRef = useRef(noteCaptureIntent?.existingNoteId ?? createStudyNoteId("voice"));
   const audioIdRef = useRef<string | undefined>(undefined);
+  const positionRef = useRef(noteCaptureIntent?.position);
+  const annotationTextRef = useRef(annotationText?.trim());
+  const latestSavedNoteRef = useRef<VoiceStudyNote | undefined>(undefined);
+  const recordingCompletionRef = useRef<RecordingCompletion | null>(null);
+  const requestGenerationRef = useRef(0);
+  const processingGenerationRef = useRef(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -123,6 +139,8 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
       kind: "voice",
       title: anchor?.chapterTitle ? `${anchor.chapterTitle} · 语音笔记` : "我的语音笔记",
       anchor,
+      position: positionRef.current,
+      annotationText: annotationTextRef.current || undefined,
       audioId: audioIdRef.current,
       mimeType: audioBlob?.type,
       durationMs,
@@ -162,13 +180,14 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
       updatedAt: Date.now()
     });
     await putStudyNote(next);
+    latestSavedNoteRef.current = next;
     return next;
   }
 
   async function acceptRecordedBlob(blob: Blob, nextDuration: number, nextWaveform: number[]) {
     if (blob.size > maximumSizeBytes) {
       setPermissionError("录音超过 20MB，请缩短后重新录制。");
-      return;
+      throw new Error("录音超过 20MB，请缩短后重新录制。");
     }
     const previousAudioId = audioIdRef.current;
     const nextAudioId = `audio-${noteIdRef.current}-${Date.now()}`;
@@ -186,7 +205,7 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
     setOrganizedText("");
     const nextVersion = noteVersion + 1;
     setNoteVersion(nextVersion);
-    await saveVoiceDraft({
+    return saveVoiceDraft({
       audioId: nextAudioId,
       mimeType: blob.type,
       durationMs: nextDuration,
@@ -204,12 +223,35 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
 
   function stopRecording() {
     const recorder = recorderRef.current;
-    if (!recorder || recorder.state === "inactive") return;
-    if (recorder.state === "paused") recorder.resume();
-    recorder.stop();
+    if (recorder && recorder.state !== "inactive") {
+      if (recorder.state === "paused") {
+        totalPausedRef.current += performance.now() - pausedAtRef.current;
+        recorder.resume();
+      }
+      recorder.stop();
+    }
+    return recordingCompletionRef.current?.promise;
   }
 
+  useImperativeHandle(ref, () => ({
+    async save() {
+      // Complete the current recording before the anchored popup unmounts.
+      // Invalidating a pending permission request also releases any late stream.
+      requestGenerationRef.current += 1;
+      processingGenerationRef.current += 1;
+      const recording = stopRecording();
+      if (recording) return recording;
+      if (!audioBlob) return latestSavedNoteRef.current;
+      // A dismissed local AI task is resumable when this annotation reopens.
+      const nextPhase = ["transcribing", "retrieving", "organizing", "reviewing"].includes(pipelinePhase)
+        ? transcript.trim() ? "needs_confirmation" : "idle" : pipelinePhase;
+      return saveVoiceDraft({ pipelinePhase: nextPhase });
+    }
+  }));
+
   async function startRecording() {
+    if (recorderRef.current?.state === "recording" || recorderRef.current?.state === "paused") return;
+    const generation = ++requestGenerationRef.current;
     setPermissionError("");
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setPermissionError("当前 Android WebView 不支持网页录音，请使用示例录音。");
@@ -218,10 +260,21 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
     setRecordingState("requesting");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      if (generation !== requestGenerationRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       const mimeType = chooseRecordingMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 96_000 } : undefined);
       recorderRef.current = recorder;
+      let resolve!: RecordingCompletion["resolve"];
+      let reject!: RecordingCompletion["reject"];
+      const promise = new Promise<VoiceStudyNote | undefined>((onResolve, onReject) => { resolve = onResolve; reject = onReject; });
+      // The stop event may finish before anyone explicitly closes the editor.
+      void promise.catch(() => undefined);
+      const completion = { promise, resolve, reject };
+      recordingCompletionRef.current = completion;
       chunksRef.current = [];
       discardRecordingRef.current = false;
       waveformRef.current = [];
@@ -231,16 +284,19 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
         if (event.data.size > 0) chunksRef.current.push(event.data);
       });
       recorder.addEventListener("stop", () => {
-        if (discardRecordingRef.current) {
-          stopMediaTracks();
+        if (discardRecordingRef.current || recorder !== recorderRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          completion.resolve(undefined);
           return;
         }
         const elapsed = Math.min(maximumDurationMs, Math.max(0, performance.now() - startedAtRef.current - totalPausedRef.current));
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType || "audio/webm" });
         stopMediaTracks();
-        void acceptRecordedBlob(blob, elapsed, downsampleWaveform(waveformRef.current)).catch(() => {
-          setPermissionError("录音保存失败，请重新录制。");
-          setRecordingState("idle");
+        void acceptRecordedBlob(blob, elapsed, downsampleWaveform(waveformRef.current)).then(completion.resolve, (error: unknown) => {
+          setPermissionError(error instanceof Error ? error.message : "录音保存失败，请重试。");
+          completion.reject(error);
+        }).finally(() => {
+          if (recordingCompletionRef.current === completion) recordingCompletionRef.current = null;
         });
       });
       const audioContext = new AudioContext();
@@ -260,11 +316,15 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
       recorder.start(500);
       setRecordingState("recording");
       timerRef.current = window.setInterval(() => {
-        const elapsed = performance.now() - startedAtRef.current - totalPausedRef.current;
+        const now = recorder.state === "paused" ? pausedAtRef.current : performance.now();
+        const elapsed = now - startedAtRef.current - totalPausedRef.current;
         setDurationMs(Math.min(maximumDurationMs, elapsed));
         if (elapsed >= maximumDurationMs) stopRecording();
       }, 200);
     } catch (error) {
+      if (generation !== requestGenerationRef.current) return;
+      recordingCompletionRef.current?.resolve(undefined);
+      recordingCompletionRef.current = null;
       stopMediaTracks();
       setRecordingState("idle");
       setPermissionError(error instanceof DOMException && error.name === "NotAllowedError"
@@ -299,9 +359,11 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
 
   async function transcribeRecording() {
     if (!audioBlob) return;
+    const generation = ++processingGenerationRef.current;
     setPipelinePhase("transcribing");
     await saveVoiceDraft({ pipelinePhase: "transcribing" });
     await delay(1_000);
+    if (generation !== processingGenerationRef.current) return;
     setTranscript(demoVoiceTranscript);
     setPipelinePhase("needs_confirmation");
     await saveVoiceDraft({ pipelinePhase: "needs_confirmation", transcript: demoVoiceTranscript, recognizedText: demoVoiceTranscript });
@@ -309,14 +371,18 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
 
   async function organizeTranscript() {
     if (!transcript.trim()) return;
+    const generation = ++processingGenerationRef.current;
     try {
       setPipelinePhase("retrieving");
       await saveVoiceDraft({ pipelinePhase: "retrieving", transcript, recognizedText: transcript });
       await delay(700);
+      if (generation !== processingGenerationRef.current) return;
       setPipelinePhase("organizing");
       await delay(900);
+      if (generation !== processingGenerationRef.current) return;
       setPipelinePhase("reviewing");
       await delay(600);
+      if (generation !== processingGenerationRef.current) return;
       setOrganizedText(demoOrganizedVoiceText);
       setPipelinePhase("complete");
       await saveVoiceDraft({
@@ -342,6 +408,9 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
     void getStudyNote(existingId).then(async (note) => {
       if (cancelled || note?.kind !== "voice") return;
       audioIdRef.current = note.audioId;
+      latestSavedNoteRef.current = note;
+      positionRef.current = noteCaptureIntent?.position ?? note.position;
+      annotationTextRef.current = annotationText?.trim() || note.annotationText;
       const blob = note.audioId ? await getAudioBlob(note.audioId) : null;
       if (cancelled) return;
       setAudioBlob(blob);
@@ -373,6 +442,12 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
       if (!isActive && recorderRef.current?.state !== "inactive") stopRecording();
     }).then((next) => { handle = next; });
     const handleNativeBack = (event: Event) => {
+      if (event.defaultPrevented) return;
+      if (embedded) {
+        event.preventDefault();
+        onClose?.();
+        return;
+      }
       if (recorderRef.current?.state === "recording" || recorderRef.current?.state === "paused") {
         event.preventDefault();
         if (window.confirm("正在录音。是否保存已经录下的片段？")) {
@@ -394,18 +469,33 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
         }
         return;
       }
-      if (embedded) {
-        event.preventDefault();
-        onClose?.();
-      }
     };
     window.addEventListener("bookcourse:native-back", handleNativeBack);
     return () => {
       void handle?.remove();
       window.removeEventListener("bookcourse:native-back", handleNativeBack);
+      requestGenerationRef.current += 1;
+      processingGenerationRef.current += 1;
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") {
+        discardRecordingRef.current = true;
+        recorder.stop();
+      }
+      recorderRef.current = null;
       stopMediaTracks();
     };
   }, []);
+
+  useEffect(() => {
+    if (!autoStart) return;
+    // React's development probe must not ask for microphone access twice.
+    let cancelled = false;
+    void Promise.resolve().then(() => { if (!cancelled) void startRecording(); });
+    return () => { cancelled = true; };
+  }, [autoStart]);
+  useEffect(() => {
+    onStatusChange?.({ idle: "待录音", requesting: "开启麦克风…", recording: "正在录音", paused: "已暂停", ready: "已保存" }[recordingState]);
+  }, [onStatusChange, recordingState]);
 
   const processing = ["transcribing", "retrieving", "organizing", "reviewing"].includes(pipelinePhase);
   const processingLabel: Partial<Record<NotePipelinePhase, string>> = {
@@ -417,7 +507,7 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
 
   return (
     <div className={`screen-stack voice-note-screen${embedded ? " is-embedded" : ""}`}>
-      <section className="voice-anchor-card">
+      {!embedded ? <section className="voice-anchor-card">
         <Pill tone="purple">真实录音 · 本地整理演示</Pill>
         <div>
           <BookOpenCheck size={20} aria-hidden="true" />
@@ -427,7 +517,7 @@ export function VoiceNoteScreen({ embedded = false, captureIntent, onClose }: {
           </span>
         </div>
         {anchor?.quote ? <blockquote>{anchor.quote}</blockquote> : null}
-      </section>
+      </section> : null}
 
       <div className="voice-note-workspace">
         <Card className={`voice-recorder-card is-${recordingState}`}>

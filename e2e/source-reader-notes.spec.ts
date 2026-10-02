@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "playwright/test";
 import type { RagQuery } from "../src/types/api";
 import type { InkStroke, TextNoteMessage, TextNotePosition } from "../src/features/studyNotes/types";
+import { createSilentWavBlob } from "../src/features/studyNotes/repository";
 
 test.use({ colorScheme: "light", locale: "zh-CN", reducedMotion: "reduce", timezoneId: "Asia/Hong_Kong" });
 
@@ -12,7 +13,7 @@ async function readStoredNotes(page: Page) {
       request.onerror = () => reject(request.error);
     });
     const transaction = database.transaction("notes", "readonly");
-    const notes = await new Promise<Array<{ id: string; kind: string; body?: string; position?: TextNotePosition; conversation?: TextNoteMessage[]; pages?: Record<string, unknown[]> }>>((resolve, reject) => {
+    const notes = await new Promise<Array<{ id: string; kind: string; body?: string; annotationText?: string; audioId?: string; durationMs?: number; sizeBytes?: number; position?: TextNotePosition; conversation?: TextNoteMessage[]; pages?: Record<string, unknown[]> }>>((resolve, reject) => {
       const result = transaction.objectStore("notes").getAll();
       result.onsuccess = () => resolve(result.result);
       result.onerror = () => reject(result.error);
@@ -47,7 +48,7 @@ async function swipeSourcePage(page: Page, direction: "left" | "right") {
 }
 
 async function placeTextNote(page: Page, reader: Locator, x: number, y: number, body: string) {
-  const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+  const target = reader.getByRole("button", { name: "点击原文添加批注" });
   const box = await target.boundingBox();
   if (!box) throw new Error("Missing textbook annotation target");
   await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
@@ -59,7 +60,7 @@ async function placeTextNote(page: Page, reader: Locator, x: number, y: number, 
 }
 
 async function clickOutsideTextNote(page: Page, reader: Locator) {
-  const panel = await reader.getByRole("region", { name: "原文文字笔记" }).boundingBox();
+  const panel = await reader.locator(".source-text-note-popover").boundingBox();
   const image = await reader.locator(".source-annotation-page > img").boundingBox();
   const viewport = page.viewportSize();
   if (!panel || !image || !viewport) throw new Error("Missing visible annotation geometry");
@@ -71,8 +72,63 @@ async function clickOutsideTextNote(page: Page, reader: Locator) {
   const candidates = [{ x: right, y: top }, { x: left, y: top }, { x: right, y: bottom }, { x: left, y: bottom }];
   const point = candidates.find(({ x, y }) => [panel, ...markers].every((box) => !box
     || x < box.x - 4 || x > box.x + box.width + 4 || y < box.y - 4 || y > box.y + box.height + 4));
-  if (!point) throw new Error("No visible original-page point outside the annotation");
+  if (!point) {
+    // A tall voice editor can cover the original page on a small phone. The
+    // toolbar remains outside the popup and its first tap only completes it.
+    await reader.getByRole("button", { name: "批注", exact: true }).click();
+    return;
+  }
   await page.mouse.click(point.x, point.y);
+}
+
+async function installSyntheticRecorder(page: Page, deferPermission = false) {
+  const wav = Array.from(new Uint8Array(await createSilentWavBlob(1).arrayBuffer()));
+  await page.addInitScript(({ bytes, deferred }) => {
+    const fixture = { requested: 0, stopped: 0, recordings: 0, resolvePermission: () => {} };
+    Object.assign(window, { annotationRecorderFixture: fixture });
+    const createStream = () => {
+      const track = { readyState: "live", stop() { if (this.readyState === "live") fixture.stopped += 1; this.readyState = "ended"; } };
+      return { getTracks: () => [track] } as unknown as MediaStream;
+    };
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {
+      getUserMedia: () => {
+        fixture.requested += 1;
+        return deferred ? new Promise<MediaStream>((resolve) => { fixture.resolvePermission = () => resolve(createStream()); })
+          : Promise.resolve(createStream());
+      }
+    } });
+    class SyntheticRecorder extends EventTarget {
+      static isTypeSupported() { return true; }
+      state = "inactive";
+      mimeType = "audio/wav";
+      start() { this.state = "recording"; fixture.recordings += 1; }
+      pause() { this.state = "paused"; }
+      resume() { this.state = "recording"; }
+      stop() {
+        this.state = "inactive";
+        window.setTimeout(() => {
+          const event = new Event("dataavailable");
+          Object.assign(event, { data: new Blob([new Uint8Array(bytes)], { type: "audio/wav" }) });
+          this.dispatchEvent(event);
+          this.dispatchEvent(new Event("stop"));
+        }, 30);
+      }
+    }
+    Object.defineProperty(window, "MediaRecorder", { configurable: true, value: SyntheticRecorder });
+    class SyntheticAudioContext {
+      createAnalyser() { return { fftSize: 256, frequencyBinCount: 128, getByteTimeDomainData(samples: Uint8Array) { samples.fill(128); } }; }
+      createMediaStreamSource() { return { connect() {} }; }
+      close() { return Promise.resolve(); }
+    }
+    Object.defineProperty(window, "AudioContext", { configurable: true, value: SyntheticAudioContext });
+  }, { bytes: wav, deferred: deferPermission });
+}
+
+function recorderFixture(page: Page) {
+  return page.evaluate(() => {
+    const fixture = (window as unknown as { annotationRecorderFixture: { requested: number; stopped: number; recordings: number } }).annotationRecorderFixture;
+    return { requested: fixture.requested, stopped: fixture.stopped, recordings: fixture.recordings };
+  });
 }
 
 test.describe("text annotation popup motion", () => {
@@ -86,13 +142,13 @@ test.describe("text annotation popup motion", () => {
 
   test("completes one text annotation on an outside tap and exits placement without opening another", async ({ page }, testInfo) => {
     const { reader } = await openLessonSource(page);
-    const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+    const textTool = reader.getByRole("button", { name: "批注", exact: true });
     await textTool.click();
     const body = "点击弹窗外应保存这条批注，然后继续阅读。";
     const editor = await placeTextNote(page, reader, .22, .35, body);
     const marker = reader.locator(".source-text-note-marker");
     const id = await marker.getAttribute("data-note-id");
-    await expect(reader.getByRole("button", { name: "点击原文添加文字批注" })).toHaveCount(0);
+    await expect(reader.getByRole("button", { name: "点击原文添加批注" })).toHaveCount(0);
     await editor.getByLabel("我的理解").click();
     await expect(editor.getByLabel("我的理解")).toBeFocused();
     await clickOutsideTextNote(page, reader);
@@ -133,8 +189,8 @@ test.describe("text annotation popup motion", () => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
     await page.addStyleTag({ content: ".source-text-note-marker > span { animation-play-state: paused !important; }" });
-    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
-    const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+    await reader.getByRole("button", { name: "批注", exact: true }).click();
+    const target = reader.getByRole("button", { name: "点击原文添加批注" });
     const box = await target.boundingBox();
     if (!box) throw new Error("Missing annotation target");
     const point = { x: box.x + box.width * .22, y: box.y + box.height * .3 };
@@ -165,8 +221,8 @@ test.describe("text annotation popup motion", () => {
     expect((await readStoredNotes(page)).filter((note) => note.kind === "text")).toHaveLength(0);
     await expect(panel).toHaveCount(0);
 
-    if (await reader.getByRole("button", { name: "文字笔记", exact: true }).getAttribute("aria-pressed") !== "true") {
-      await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    if (await reader.getByRole("button", { name: "批注", exact: true }).getAttribute("aria-pressed") !== "true") {
+      await reader.getByRole("button", { name: "批注", exact: true }).click();
     }
     await page.mouse.click(point.x, point.y);
     await dispatchMotion(marker.locator("span"), "animationend", "motion-text-note-marker-in");
@@ -228,8 +284,8 @@ test.describe("text annotation popup motion", () => {
     await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
     await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
     await page.addStyleTag({ content: ".source-text-note-popover { animation-play-state: paused !important; }" });
-    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
-    const target = reader.getByRole("button", { name: "点击原文添加文字批注" });
+    await reader.getByRole("button", { name: "批注", exact: true }).click();
+    const target = reader.getByRole("button", { name: "点击原文添加批注" });
     const box = await target.boundingBox();
     if (!box) throw new Error("The original page has no measurable annotation target");
     const point = { x: box.x + box.width * .45, y: box.y + box.height * .4 };
@@ -303,7 +359,7 @@ test.describe("text annotation popup motion", () => {
         if (panel) phases.push([panel.dataset.motionState, getComputedStyle(panel).animationName]);
       }).observe(document.body, { attributes: true, attributeFilter: ["data-motion-state"], childList: true, subtree: true });
     });
-    await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+    await reader.getByRole("button", { name: "批注", exact: true }).click();
     await placeTextNote(page, reader, .65, .42, "这里的同源染色体如何分离？");
     const panel = reader.locator(".source-text-note-popover");
     await expect(panel).toHaveAttribute("data-motion-state", "idle");
@@ -369,14 +425,14 @@ test("anchors selected text on the original page and reopens it for reading and 
 
 test("exits text annotation mode after completion so later page taps do not create another note", async ({ page }, testInfo) => {
   const { reader } = await openLessonSource(page);
-  const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+  const textTool = reader.getByRole("button", { name: "批注", exact: true });
   await textTool.click();
   const editor = await placeTextNote(page, reader, .22, .35, "完成后应该继续阅读原文。");
   await editor.getByRole("button", { name: "完成", exact: true }).click();
   await expect(editor).toHaveCount(0);
   await expect(reader).toHaveAttribute("data-note-mode", "read");
   await expect(textTool).toHaveAttribute("aria-pressed", "false");
-  await expect(reader.getByRole("button", { name: "点击原文添加文字批注" })).toHaveCount(0);
+  await expect(reader.getByRole("button", { name: "点击原文添加批注" })).toHaveCount(0);
   await expect(reader.locator(".source-text-placement-hint")).toHaveCount(0);
   await expect(reader.locator(".source-text-note-marker")).toHaveCount(1);
 
@@ -408,7 +464,7 @@ test("exits text annotation mode after completion so later page taps do not crea
 
 test("uses a tap on another annotation only to complete the current note before reopening a saved one", async ({ page }) => {
   const { reader } = await openLessonSource(page);
-  const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+  const textTool = reader.getByRole("button", { name: "批注", exact: true });
   await textTool.click();
   const firstBody = "先前保存的批注。";
   const editor = await placeTextNote(page, reader, .12, .08, firstBody);
@@ -432,7 +488,7 @@ test("uses a tap on another annotation only to complete the current note before 
 test("places independent text markers, restores them across pages and resizing, and deletes one", async ({ page }) => {
   await page.setViewportSize({ width: 834, height: 1194 });
   const { reader } = await openLessonSource(page);
-  const textTool = reader.getByRole("button", { name: "文字笔记", exact: true });
+  const textTool = reader.getByRole("button", { name: "批注", exact: true });
   await textTool.click();
   await expect(reader.locator(".source-text-placement-hint")).toBeVisible();
   await expect(reader.getByRole("region", { name: "原文文字笔记" })).toHaveCount(0);
@@ -493,8 +549,8 @@ test("places independent text markers, restores them across pages and resizing, 
 test("keeps touch swipes distinct from taps and fits the editor at a phone page edge", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { reader } = await openLessonSource(page);
-  await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
-  await reader.getByRole("button", { name: "点击原文添加文字批注" }).evaluate((element) => {
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
+  await reader.getByRole("button", { name: "点击原文添加批注" }).evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     const y = bounds.top + bounds.height * .5;
     element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 31, pointerType: "touch", button: 0, clientX: bounds.right - 40, clientY: y }));
@@ -502,7 +558,7 @@ test("keeps touch swipes distinct from taps and fits the editor at a phone page 
   });
   await expect(page.locator(".header-title p")).toHaveText("第 17 页");
   await expect(reader.getByRole("region", { name: "原文文字笔记" })).toHaveCount(0);
-  await reader.getByRole("button", { name: "点击原文添加文字批注" }).evaluate((element) => {
+  await reader.getByRole("button", { name: "点击原文添加批注" }).evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     const coordinates = { clientX: bounds.right - 8, clientY: bounds.bottom - 8 };
     element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, pointerId: 32, pointerType: "touch", button: 0, ...coordinates }));
@@ -536,11 +592,11 @@ test("includes the saved annotation in each AI question and restores its own con
       return { answer: "你的批注指出了减数第一次分裂中同源染色体的分离。", citations: [], related_assets: [], confidence: "high" };
     };
   });
-  await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
   const body = "为什么减数第一次分裂后染色体数目会减半？";
   let editor = await placeTextNote(page, reader, .45, .4, body);
   await editor.getByRole("button", { name: "完成", exact: true }).click();
-  await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
   await reader.locator(".source-text-note-marker").click();
   editor = reader.getByRole("region", { name: "原文文字笔记" });
   await editor.getByRole("button", { name: "问 AI", exact: true }).click();
@@ -579,7 +635,7 @@ test("keeps an unsaved annotation open when storage fails and saves it on retry"
       return original.call(this, value, key);
     };
   });
-  await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
   const body = "这条批注在保存失败后仍然保留。";
   const editor = await placeTextNote(page, reader, .3, .3, body);
   await editor.getByRole("button", { name: "完成", exact: true }).click();
@@ -613,7 +669,7 @@ test("preserves a newer edit when a pending annotation AI answer finishes", asyn
       (window as unknown as { __finishNoteAnswer: () => void }).__finishNoteAnswer = () => resolve({ answer: "同源染色体的分离使染色体数目减半。", citations: [], related_assets: [], confidence: "high" });
     });
   });
-  await reader.getByRole("button", { name: "文字笔记", exact: true }).click();
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
   let editor = await placeTextNote(page, reader, .36, .36, "关于染色体数目减半的疑问。");
   await editor.getByRole("button", { name: "问 AI", exact: true }).click();
   const chat = reader.getByRole("dialog", { name: "批注 AI 对话" });
@@ -736,13 +792,28 @@ test("does not create an empty handwriting note when the pen is opened and close
   expect(after).toBe(before);
 });
 
-test("opens the independent voice workflow with the current textbook anchor", async ({ page }) => {
+test("records a voice annotation in the shared popup and retains its original-page position", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {
+      getUserMedia: async () => { throw new DOMException("Microphone unavailable in this test", "NotAllowedError"); }
+    } });
+  });
   await page.setViewportSize({ width: 834, height: 1194 });
   const { reader } = await openLessonSource(page);
-  await reader.getByRole("button", { name: "语音笔记" }).click();
-  const voicePage = page.locator(".voice-note-screen");
+  await expect(reader.locator(".source-voice-fab")).toHaveCount(0);
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
+  const draft = "这条文字也应随语音批注一起保留。";
+  const textPanel = await placeTextNote(page, reader, .4, .5, draft);
+  const marker = reader.locator(".source-text-note-marker");
+  const id = await marker.getAttribute("data-note-id");
+  await textPanel.getByRole("button", { name: "开始语音批注", exact: true }).click();
+  const popup = reader.getByRole("region", { name: "原文语音批注" });
+  const voicePage = popup.locator(".voice-note-screen");
   await expect(voicePage).toBeVisible();
-  await expect(voicePage).toContainText("教材第 16 页");
+  await expect(popup).toContainText("第 16 页");
+  await expect(popup.locator(".source-text-note-body")).toHaveText(draft);
+  await expect(marker).toHaveAttribute("data-note-kind", "voice");
+  await expect(reader.getByRole("button", { name: "点击原文添加批注" })).toHaveCount(0);
   await voicePage.getByRole("button", { name: "使用示例录音" }).click();
   await expect(voicePage.getByText("00:08", { exact: true })).toBeVisible();
   await voicePage.getByRole("button", { name: "完成并整理" }).click();
@@ -751,10 +822,116 @@ test("opens the independent voice workflow with the current textbook anchor", as
   await transcript.fill("我想确认减数分裂中同源染色体分离发生的时期。");
   await voicePage.getByRole("button", { name: "确认并继续整理" }).click();
   await expect(voicePage.getByRole("heading", { name: "独立整理版" })).toBeVisible({ timeout: 4_000 });
-  await page.locator(".header-bar .icon-button").click();
-  await expect(reader).toBeVisible();
+  await clickOutsideTextNote(page, reader);
+  await expect(popup).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(marker).toHaveCount(1);
+  expect((await readStoredNotes(page)).filter((note) => note.id === id)).toEqual([
+    expect.objectContaining({ kind: "voice", annotationText: draft, audioId: expect.any(String), sizeBytes: expect.any(Number), position: expect.objectContaining({ x: expect.closeTo(.4, 2), y: expect.closeTo(.5, 2) }) })
+  ]);
+  await marker.click();
+  await expect(popup.locator("audio")).toBeVisible();
+  await expect(popup.getByText("00:08", { exact: true })).toBeVisible();
+  await expect(popup.locator(".source-text-note-body")).toHaveText(draft);
+  await popup.getByRole("button", { name: "关闭语音批注", exact: true }).click();
   await reader.getByRole("button", { name: /本页笔记/ }).click();
   await expect(reader.locator(".source-page-notes")).toContainText("语音");
+});
+
+test("finishes a paused recording on an outside tap, restores playback, and deletes without restarting capture", async ({ page }, testInfo) => {
+  await installSyntheticRecorder(page);
+  const { reader } = await openLessonSource(page);
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
+  const textPanel = await placeTextNote(page, reader, .45, .45, "");
+  await page.screenshot({ path: testInfo.outputPath("unified-text-entry.png") });
+  await textPanel.getByRole("button", { name: "开始语音批注", exact: true }).click();
+  const popup = reader.getByRole("region", { name: "原文语音批注" });
+  const marker = reader.locator(".source-text-note-marker");
+  const id = await marker.getAttribute("data-note-id");
+  await expect(popup.getByRole("button", { name: "结束录音", exact: true })).toBeVisible();
+  const popupBounds = await popup.boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(popupBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(popupBounds!.y).toBeGreaterThanOrEqual(0);
+  expect(popupBounds!.x + popupBounds!.width).toBeLessThanOrEqual(viewport.width);
+  expect(popupBounds!.y + popupBounds!.height).toBeLessThanOrEqual(viewport.height);
+  await page.screenshot({ path: testInfo.outputPath("unified-voice-recording.png") });
+  await expect.poll(() => recorderFixture(page)).toMatchObject({ requested: 1, recordings: 1 });
+  await popup.getByRole("button", { name: "暂停录音", exact: true }).click();
+  await expect(popup).toContainText("录音已暂停");
+  await clickOutsideTextNote(page, reader);
+  await expect(popup).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(marker).toHaveCount(1);
+  await expect(marker).toHaveAttribute("data-note-kind", "voice");
+  await expect.poll(() => recorderFixture(page)).toMatchObject({ stopped: 1, recordings: 1 });
+  expect((await readStoredNotes(page)).filter((note) => note.id === id)).toEqual([
+    expect.objectContaining({ kind: "voice", audioId: expect.any(String), sizeBytes: 16044, durationMs: expect.any(Number) })
+  ]);
+
+  await page.reload();
+  await page.getByRole("button", { name: "继续学习", exact: true }).click();
+  await page.locator(".lesson-source-link").first().click();
+  await marker.click();
+  await expect(popup.getByLabel("语音笔记录音")).toBeVisible();
+  const playbackWidth = await popup.evaluate((element) => ({ content: element.scrollWidth, viewport: element.clientWidth }));
+  expect(playbackWidth.content).toBeLessThanOrEqual(playbackWidth.viewport);
+  expect(await recorderFixture(page)).toMatchObject({ requested: 0, recordings: 0 });
+  await popup.getByRole("button", { name: "重新录制", exact: true }).click();
+  await popup.getByRole("button", { name: "开始录音", exact: true }).click();
+  await expect(popup.getByRole("button", { name: "结束录音", exact: true })).toBeVisible();
+  await popup.getByRole("button", { name: "删除批注", exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(marker).toHaveCount(0);
+  await expect.poll(() => recorderFixture(page)).toMatchObject({ stopped: 1, recordings: 1 });
+  expect((await readStoredNotes(page)).filter((note) => note.id === id)).toHaveLength(0);
+});
+
+test("releases a late microphone permission result after cancelling an empty voice annotation", async ({ page }) => {
+  await installSyntheticRecorder(page, true);
+  const { reader } = await openLessonSource(page);
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
+  const textPanel = await placeTextNote(page, reader, .45, .45, "");
+  await textPanel.getByRole("button", { name: "开始语音批注", exact: true }).click();
+  const popup = reader.getByRole("region", { name: "原文语音批注" });
+  await expect(popup.getByRole("button", { name: "开始录音", exact: true })).toBeDisabled();
+  await clickOutsideTextNote(page, reader);
+  await expect(popup).toHaveCount(0);
+  await expect(reader).toHaveAttribute("data-note-mode", "read");
+  await expect(reader.locator(".source-text-note-marker")).toHaveCount(0);
+  await page.evaluate(() => (window as unknown as { annotationRecorderFixture: { resolvePermission: () => void } }).annotationRecorderFixture.resolvePermission());
+  await expect.poll(() => recorderFixture(page)).toMatchObject({ stopped: 1, recordings: 0 });
+  expect((await readStoredNotes(page)).filter((note) => note.kind === "voice")).toHaveLength(0);
+});
+
+test("reopens interrupted voice processing at a resumable step", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: {
+      getUserMedia: async () => { throw new DOMException("Synthetic permission denial", "NotAllowedError"); }
+    } });
+  });
+  const { reader } = await openLessonSource(page);
+  await reader.getByRole("button", { name: "批注", exact: true }).click();
+  const textPanel = await placeTextNote(page, reader, .45, .45, "");
+  await textPanel.getByRole("button", { name: "开始语音批注", exact: true }).click();
+  const popup = reader.getByRole("region", { name: "原文语音批注" });
+  await popup.getByRole("button", { name: "使用示例录音", exact: true }).click();
+  await popup.getByRole("button", { name: "完成并整理", exact: true }).click();
+  await expect(popup).toContainText("正在生成逐字稿");
+  await clickOutsideTextNote(page, reader);
+  await expect(popup).toHaveCount(0);
+  await reader.locator(".source-text-note-marker").click();
+  await expect(popup.getByRole("button", { name: "完成并整理", exact: true })).toBeVisible();
+  await popup.getByRole("button", { name: "完成并整理", exact: true }).click();
+  await expect(popup.getByLabel("语音笔记逐字稿")).toBeVisible({ timeout: 3_000 });
+  await popup.getByLabel("语音笔记逐字稿").fill("减数分裂为什么连续分裂两次？");
+  await popup.getByRole("button", { name: "确认并继续整理", exact: true }).click();
+  await expect(popup).toContainText("正在查找教材依据");
+  await clickOutsideTextNote(page, reader);
+  await expect(popup).toHaveCount(0);
+  await reader.locator(".source-text-note-marker").click();
+  await expect(popup.getByLabel("语音笔记逐字稿")).toHaveValue("减数分裂为什么连续分裂两次？");
+  await expect(popup.getByRole("button", { name: "确认并继续整理", exact: true })).toBeEnabled();
 });
 
 test("keeps the full-page reader and saved ink usable in landscape", async ({ page }) => {
@@ -785,13 +962,13 @@ test("fits one source page without vertical scrolling and keeps note controls on
   await expect(reader.getByRole("button", { name: "上一页" })).toHaveCount(0);
   await expect(reader.getByRole("button", { name: "下一页" })).toHaveCount(0);
   await expect(reader.getByRole("button", { name: "批注本页" })).toHaveCount(0);
-  await expect(reader.getByRole("button", { name: "文字笔记" })).toBeVisible();
-  await expect(reader.getByRole("button", { name: "语音笔记" })).toBeVisible();
+  await expect(reader.getByRole("button", { name: "批注", exact: true })).toBeVisible();
+  await expect(reader.getByRole("button", { name: "语音笔记", exact: true })).toHaveCount(0);
   const geometry = await reader.evaluate((element) => {
     const content = element.closest<HTMLElement>(".screen-content")!;
     const toolbar = element.querySelector<HTMLElement>(".source-reader-topbar")!;
     const pen = element.querySelector<HTMLElement>('button[aria-label="钢笔"]')!;
-    const text = element.querySelector<HTMLElement>('button[aria-label="文字笔记"]')!;
+    const text = element.querySelector<HTMLElement>('button[aria-label="批注"]')!;
     const pageFrame = element.querySelector<HTMLElement>(".source-page-frame")!;
     return {
       scrollable: content.scrollHeight > content.clientHeight + 1,

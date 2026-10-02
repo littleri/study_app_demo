@@ -241,9 +241,12 @@ export function deleteStudyNote(noteId: string) {
 export async function saveAudioBlob(id: string, blob: Blob) {
   memoryAudio.set(id, blob);
   try {
+    // ArrayBuffer is supported by IndexedDB even in WebViews that cannot clone
+    // Blob objects. Keep the MIME type so playback can reconstruct the audio.
+    const buffer = await blob.arrayBuffer();
     const database = await readyDatabase();
     const transaction = database.transaction("audio", "readwrite");
-    transaction.objectStore("audio").put({ id, blob, updatedAt: Date.now() });
+    transaction.objectStore("audio").put({ id, buffer, mimeType: blob.type, updatedAt: Date.now() });
     await transactionComplete(transaction);
     return true;
   } catch {
@@ -255,8 +258,9 @@ export async function getAudioBlob(id: string) {
   try {
     const database = await readyDatabase();
     const transaction = database.transaction("audio", "readonly");
-    const result = await requestResult(transaction.objectStore("audio").get(id)) as { id: string; blob: Blob } | undefined;
-    return result?.blob ?? null;
+    const result = await requestResult(transaction.objectStore("audio").get(id)) as { id: string; blob?: Blob; buffer?: ArrayBuffer; mimeType?: string } | undefined;
+    // Read recordings saved by both the old Blob format and the portable one.
+    return result?.blob ?? (result?.buffer ? new Blob([result.buffer], { type: result.mimeType }) : memoryAudio.get(id) ?? null);
   } catch {
     return memoryAudio.get(id) ?? null;
   }

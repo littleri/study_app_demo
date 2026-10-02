@@ -1,17 +1,19 @@
 import { expect, test, type Page } from "playwright/test";
 import { zipSync, strToU8 } from "fflate";
+import type { CourseDraft } from "../src/features/courses/model";
 
 test.use({ locale: "zh-CN", reducedMotion: "reduce" });
 const diagnosis = { urgency: "steady", timePattern: "block", goals: ["systematic"], contentFoci: ["principles"], aids: ["chat"], reviews: ["periodic"] };
 const biology = "book_biology_2";
 const math = "book_math_human_a_1";
-async function seedLegacy(page: Page) {
-  await page.addInitScript((diagnosis) => {
+async function seedLegacy(page: Page, draft: CourseDraft | null = null) {
+  await page.addInitScript(({ diagnosis, draft }) => {
     if (localStorage.getItem("bookcourse.courses.v2")) return;
-    localStorage.setItem("bookcourse.learning-sets.v1", JSON.stringify({ version: 1, preferences: { displayName: "小明", primaryGoal: "exam", dailyTime: "under30", completedAt: 1 }, onboardingDraft: { displayName: "", primaryGoal: null, dailyTime: null, step: 0 }, sets: [{ id: "legacy-biology", name: "期末生物复习", resourceIds: ["course:book_biology_2"], diagnosis, createdAt: 1, updatedAt: 2 }], resources: [], draft: null, activeSetId: "legacy-biology" }));
-  }, diagnosis);
+    localStorage.setItem("bookcourse.learning-sets.v1", JSON.stringify({ version: 1, preferences: { displayName: "小明", primaryGoal: "exam", dailyTime: "under30", completedAt: 1 }, onboardingDraft: { displayName: "", primaryGoal: null, dailyTime: null, step: 0 }, sets: [{ id: "legacy-biology", name: "期末生物复习", resourceIds: ["course:book_biology_2"], diagnosis, createdAt: 1, updatedAt: 2 }], resources: [], draft, activeSetId: "legacy-biology" }));
+  }, { diagnosis, draft });
   await page.goto("/?embedded=device-preview");
-  await expect(page.locator('.home-book-workspace[data-loaded="true"]')).toBeVisible();
+  if (draft) await expect(page.getByRole("listbox", { name: "选择课程" })).toBeVisible();
+  else await expect(page.locator('.home-book-workspace[data-loaded="true"]')).toBeVisible();
 }
 async function study(page: Page) {
   await page.locator(".nav-study").click();
@@ -26,6 +28,13 @@ async function addSheet(page: Page) {
 async function closeSheet(page: Page) { await page.getByRole("dialog").getByRole("button", { name: "关闭" }).click(); }
 async function state(page: Page) { return page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.courses.v2") || "{}")); }
 async function details(page: Page) { await page.locator(".course-source-heading").first().getByRole("button", { name: /管理资料/ }).click(); }
+async function completeCreationQuestions(page: Page) {
+  const answers = ["正常节奏，按计划来", "整块固定时间", "系统学习", "原理和逻辑", "AI 对话讲解", "定期复盘"];
+  for (const [index, answer] of answers.entries()) {
+    await page.getByRole("button", { name: answer, exact: true }).click();
+    await page.getByRole("button", { name: index === 5 ? "完成，开始导入" : "下一页", exact: true }).click();
+  }
+}
 
 function pdfFile() {
   const stream = "BT /F1 20 Tf 40 160 Td (Energy is conserved.) Tj ET";
@@ -130,19 +139,84 @@ test("reads Office file text and keeps a failed import available for retry and d
   await expect(failed.getByRole("button", { name: /下载/ })).toBeVisible();
 });
 
-test("creates a named course with existing materials and restores its separate identity", async ({ page }) => {
+test("creates a course from mock materials and restores its separate identity", async ({ page }) => {
   await seedLegacy(page);
   await page.getByRole("button", { name: "创建课程", exact: true }).click();
-  await page.getByLabel("课程名称").fill("跨资料复习课");
-  await page.locator(".course-space-picker").getByRole("button", { name: /数学/ }).click();
-  await page.getByRole("button", { name: "下一页", exact: true }).click();
-  const answers = ["正常节奏，按计划来", "整块固定时间", "系统学习", "原理和逻辑", "AI 对话讲解", "定期复盘"];
-  for (const [index, answer] of answers.entries()) { await page.getByRole("button", { name: answer, exact: true }).click(); await page.getByRole("button", { name: index === 5 ? "完成，进入课程" : "下一页", exact: true }).click(); }
-  await expect(page.locator(".course-space-detail-hero h1")).toHaveText("跨资料复习课");
-  const saved = await state(page); const course = saved.courses.find((course: { name: string }) => course.name === "跨资料复习课");
+  const importer = page.locator(".upload-flow-screen");
+  await expect(importer.getByRole("heading", { name: "添加课程资料", exact: true })).toBeVisible();
+  await expect(page.getByLabel("课程名称", { exact: true })).toHaveCount(0);
+  const continueButton = importer.getByRole("button", { name: "保存资料并继续", exact: true });
+  await expect(continueButton).toBeDisabled();
+  await importer.getByRole("button", { name: "选择课程资料", exact: true }).click();
+  await expect(importer.locator('.upload-add-icon [data-sticker-icon="FileText"]')).toBeVisible();
+  await expect(importer.locator(".course-upload-files")).toHaveText("示例课程资料.txt");
+  await expect(continueButton).toBeEnabled();
+  await importer.getByRole("button", { name: "已添加示例课程资料", exact: true }).click();
+  await expect(importer.locator(".course-upload-files > div")).toHaveCount(1);
+  await importer.getByRole("button", { name: "移除 示例课程资料.txt", exact: true }).click();
+  await expect(continueButton).toBeDisabled();
+  await expect(importer.locator(".course-upload-files > div")).toHaveCount(0);
+  await importer.getByRole("button", { name: "选择课程资料", exact: true }).click();
+  await importer.getByRole("button", { name: "保存资料并继续", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "你当前学习的紧迫程度？", exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator(".course-space-details")).toHaveCount(0);
+  await page.getByRole("button", { name: "上一步", exact: true }).click();
+  await expect(importer).toBeVisible();
+  await importer.getByRole("button", { name: "继续设置课程", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "你当前学习的紧迫程度？", exact: true })).toBeVisible();
+  await completeCreationQuestions(page);
+  await expect(page.locator('main[data-screen="courseImportProcessing"]')).toBeVisible();
+  await expect(page.locator(".processing-sprite-strip")).toHaveAttribute("src", "/assets/brand/loading/cloud-course-loading-strip-v1.png");
+  await expect(page.locator(".course-space-detail-hero")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "课程导入完成", exact: true })).toBeVisible({ timeout: 8_000 });
+  await expect(page.locator(".course-ready-focus")).toHaveAttribute("data-course-ready-phase", "settled");
+  await expect(page.locator(".course-space-detail-hero")).toHaveCount(0);
+  const saved = await state(page); const course = saved.courses.find((course: { name: string }) => course.name === "示例课程资料");
   expect(course.id).not.toBe(math); expect(course.id).not.toBe(biology); expect(saved.activeCourseId).toBe(course.id);
+  const resource = saved.resources.find((resource: { name: string }) => resource.name === "示例课程资料.txt");
+  expect(resource.status).toBe("ready");
+  expect(course.resourceIds).toEqual([`local:${resource.id}`]);
+  await page.getByRole("button", { name: "进入学习", exact: true }).click();
+  await expect(page.locator(".study-book-switch strong")).toHaveText("示例课程资料");
   await page.reload(); await page.locator(".nav-study").click();
-  await expect(page.locator(".study-book-switch strong")).toHaveText("跨资料复习课");
+  await expect(page.locator(".study-book-switch strong")).toHaveText("示例课程资料");
+});
+
+test("plays the parsing and import-completion animations before opening the learning plan", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await seedLegacy(page);
+  await page.getByRole("button", { name: "创建课程", exact: true }).click();
+  await page.getByRole("button", { name: "选择课程资料", exact: true }).click();
+  await page.getByRole("button", { name: "保存资料并继续", exact: true }).click();
+  await completeCreationQuestions(page);
+  const loadingSprite = page.locator(".processing-sprite-strip");
+  await expect(loadingSprite).toBeVisible();
+  await expect(loadingSprite).toHaveCSS("animation-name", "processing-cloud-sprite-loading");
+  await expect(page.locator('.stage-row[data-stage-status="done"]')).not.toHaveCount(0);
+  const completion = page.locator(".course-ready-focus");
+  await expect(completion).toBeVisible({ timeout: 8_000 });
+  await expect(completion).toHaveAttribute("data-course-ready-phase", "celebrating");
+  await expect(page.locator(".course-ready-success-sprite-strip")).toHaveAttribute("src", "/assets/brand/success/cloud-mascot-success-strip-v1.png");
+  await expect(page.locator(".course-ready-success-sprite-strip")).toHaveCSS("animation-name", "course-ready-success-sprite");
+  await expect(completion).toHaveAttribute("data-course-ready-phase", "settled", { timeout: 6_000 });
+  await expect(page.getByRole("heading", { name: "课程导入完成", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "查看学习计划", exact: true }).click();
+  await expect(page.locator('main[data-screen="plan"]')).toBeVisible();
+  await expect(page.locator(".course-ready-focus")).toHaveCount(0);
+});
+
+test("resumes a legacy creation draft without reopening the removed basics page", async ({ page }) => {
+  await seedLegacy(page, { id: "legacy-draft", name: "", resourceIds: [`course:${biology}`], diagnosis: {}, step: -1, editingCourseId: null });
+  await page.getByRole("button", { name: "创建课程", exact: true }).click();
+  await expect(page.locator(".upload-flow-screen")).toBeVisible();
+  await page.getByRole("button", { name: "继续设置课程", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "你当前学习的紧迫程度？", exact: true })).toBeVisible();
+  await expect(page.getByLabel("课程名称", { exact: true })).toHaveCount(0);
+  const resumed = (await state(page)).draft;
+  expect(resumed.id).toBe("legacy-draft");
+  expect(resumed.name.trim()).not.toBe("");
+  expect(resumed.resourceIds).toEqual([`source:${biology}`]);
+  expect(resumed.step).toBe(0);
 });
 
 test("retrieves two course files on the same page and opens the cited file", async ({ page }) => {

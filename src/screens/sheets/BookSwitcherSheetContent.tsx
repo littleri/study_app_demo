@@ -28,7 +28,7 @@ export function BookSwitcherSheetContent() {
     })}</div>
     {courses.state.courses.length === 0 ? <p className="book-switcher-empty">还没有课程，创建课程并添加资料后即可学习。</p> : null}
     <div className="book-switcher-actions">
-      <Button icon={<Plus size={18} />} onClick={() => { try { courses.startDraft(); closeSheet(); go("courseSetup"); } catch (error) { showToast(error instanceof Error ? error.message : "创建失败", "warning"); } }}>创建新课程</Button>
+      <Button icon={<Plus size={18} />} onClick={() => { try { courses.startDraft(); closeSheet(); go("upload"); } catch (error) { showToast(error instanceof Error ? error.message : "创建失败", "warning"); } }}>创建新课程</Button>
       <Button variant="secondary" icon={<LibraryBig size={18} />} onClick={() => { closeSheet(); go("library"); }}>管理全部课程</Button>
     </div>
   </div>;

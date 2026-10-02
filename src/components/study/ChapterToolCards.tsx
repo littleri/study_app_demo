@@ -74,7 +74,7 @@ export function ChapterToolCards({
                 <span className="study-assignment-preview">
                   <small>{assignmentKicker}</small>
                   <strong>{assignmentPrompt}</strong>
-                  <span><b>A</b>{assignmentOptionLabel}</span>
+                  <span><b>A</b><span className="study-assignment-option-label">{assignmentOptionLabel}</span></span>
                 </span>
               ) : tool.id === "mistakes" ? (
                 <span className="study-mistake-preview">
@@ -84,7 +84,7 @@ export function ChapterToolCards({
                   </span>
                   {mistakeItems.slice(0, 2).map((item) => (
                     <span className="study-mistake-preview-row" key={`${item.label}:${item.status}`}>
-                      <i />{item.label} <b>{item.status}</b>
+                      <i /><span className="study-mistake-preview-label">{item.label}</span><b>{item.status}</b>
                     </span>
                   ))}
                 </span>

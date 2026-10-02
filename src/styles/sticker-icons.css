@@ -37,7 +37,8 @@
   .chapter-status-mark,
   .course-ready-success-mark,
   .chapter-conflict-icon,
-  .parse-ready-cover-icon
+  .parse-ready-cover-icon,
+  .upload-add-icon
 ):has(> .sticker-icon, > .stage-completion-check > .sticker-icon) {
   --sticker-ink: #252436;
   box-sizing: border-box;
@@ -86,7 +87,8 @@
 .learning-flow-symbol:has(> .sticker-icon),
 .learning-goal-icon:has(> .sticker-icon),
 .study-empty-icon:has(> .sticker-icon),
-.parse-ready-cover-icon:has(> .sticker-icon) {
+.parse-ready-cover-icon:has(> .sticker-icon),
+.upload-add-icon:has(> .sticker-icon) {
   --sticker-corner: 13px;
   --sticker-shadow: 3px;
   border-width: 2px;

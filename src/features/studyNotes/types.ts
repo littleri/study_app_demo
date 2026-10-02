@@ -22,6 +22,7 @@ export type NoteCaptureIntent = {
   anchor?: NoteAnchor;
   source?: SourcePageTarget;
   existingNoteId?: string;
+  position?: TextNotePosition;
   from?: Screen;
 };
 
@@ -111,6 +112,9 @@ export type InkStudyNote = StudyNoteBase & {
 
 export type VoiceStudyNote = StudyNoteBase & {
   kind: "voice";
+  /** Uses the same page coordinates as a text annotation. */
+  position?: TextNotePosition;
+  annotationText?: string;
   audioId?: string;
   mimeType?: string;
   durationMs: number;
@@ -119,6 +123,7 @@ export type VoiceStudyNote = StudyNoteBase & {
   transcript?: string;
 };
 
+export type SourceAnnotationNote = TextStudyNote | VoiceStudyNote;
 export type StudyNote = TextStudyNote | InkStudyNote | VoiceStudyNote;
 
 export function noteAnchorFromSource(source: SourcePageTarget, quote?: string): NoteAnchor {

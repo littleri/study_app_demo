@@ -14,7 +14,8 @@
   font-display: swap;
 }
 
-/* One typeface and four text sizes for the app, including compact previews.
+/* Shared typography for app pages. Titles use a single 80% scale; compact
+   preview text and card geometry respond to their container width.
    The source-page OCR layer represents printed document geometry, not UI text. */
 .app-shell,
 .app-shell :where(*) {
@@ -40,19 +41,19 @@
 }
 
 .app-shell :is(h1, h1 *, .home-welcome-title) {
-  font-size: var(--type-title) !important;
+  font-size: calc(var(--type-title) * var(--type-heading-scale)) !important;
   font-weight: 700 !important;
   line-height: 1.2 !important;
 }
 
 .app-shell :is(h2, h2 *, .screen-title) {
-  font-size: var(--type-subtitle) !important;
+  font-size: calc(var(--type-subtitle) * var(--type-heading-scale)) !important;
   font-weight: 700 !important;
   line-height: 1.25 !important;
 }
 
 .app-shell :is(h3, h3 *, h4, h4 *, h5, h5 *, h6, h6 *, strong, b) {
-  font-size: var(--type-body) !important;
+  font-size: calc(var(--type-body) * var(--type-heading-scale)) !important;
   font-weight: 700 !important;
   line-height: 1.3 !important;
 }
@@ -148,20 +149,156 @@
   margin-bottom: 12px;
 }
 
+/* Tool titles retain the shared heading scale. Preview text, spacing and
+   geometry respond to each tile, including the home screen's tool rail. */
+.app-shell .study-tools-heading {
+  --type-caption: clamp(10px, 3cqw, 14px);
+  gap: 8px;
+}
+
+.app-shell .study-tools-heading > div {
+  min-width: 0;
+}
+
+.app-shell .study-tools-heading :is(strong, small),
+.app-shell .study-enter-button {
+  font-size: calc(var(--type-body) * var(--type-heading-scale)) !important;
+  white-space: nowrap;
+}
+
+.app-shell .study-enter-button {
+  min-width: 0;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding-inline: 12px;
+}
+
+.app-shell .study-enter-button > svg {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+}
+
 .app-shell .study-tool-card {
-  min-height: 210px;
+  --type-caption: clamp(9px, 6.1cqw, 14px);
+  container-type: inline-size;
+  min-height: 0;
 }
 
 .app-shell .study-tool-cover {
-  min-height: 130px;
+  height: clamp(84px, 66cqw, 154px);
+  min-height: 0;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr);
+  padding: clamp(8px, 5.2cqw, 12px) clamp(6px, 4.3cqw, 10px) 0;
 }
 
 .app-shell .study-tool-card-footer {
-  min-height: 80px;
+  --tool-icon-size: clamp(14px, 12cqw, 28px);
+  --tool-arrow-size: clamp(8px, 7.4cqw, 17px);
+  min-height: clamp(56px, 41cqw, 94px);
+  grid-template-columns: var(--tool-icon-size) minmax(0, 1fr) var(--tool-arrow-size);
+  gap: clamp(3px, 2.6cqw, 6px);
+  padding: clamp(6px, 4cqw, 9px) clamp(5px, 4cqw, 9px);
+}
+
+.app-shell .study-tool-card-icon {
+  width: var(--tool-icon-size);
+  height: var(--tool-icon-size);
+}
+
+.app-shell .study-tool-card-icon > svg {
+  width: 65%;
+  height: 65%;
+}
+
+.app-shell .study-tool-card-footer > svg {
+  width: var(--tool-arrow-size);
+  height: var(--tool-arrow-size);
 }
 
 .app-shell .study-tool-copy strong {
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.app-shell :is(.study-assignment-preview, .study-mistake-preview) {
+  min-width: 0;
+  min-height: clamp(66px, 48cqw, 110px);
+  gap: clamp(4px, 3cqw, 7px);
+  padding: clamp(6px, 4.3cqw, 10px);
+}
+
+.app-shell .study-assignment-preview > span {
+  gap: clamp(3px, 2.2cqw, 5px);
+  padding: clamp(3px, 2.2cqw, 5px) clamp(4px, 2.6cqw, 6px);
+}
+
+.app-shell .study-assignment-preview b {
+  width: clamp(12px, 7.4cqw, 17px);
+  height: clamp(12px, 7.4cqw, 17px);
+}
+
+.app-shell :is(.study-assignment-option-label, .study-mistake-preview-label) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .study-assignment-option-label {
+  font-size: inherit !important;
+}
+
+.app-shell .study-mistake-preview-head {
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.app-shell .study-mistake-preview-row {
+  gap: clamp(3px, 2.2cqw, 5px);
+  padding: clamp(3px, 1.7cqw, 4px) clamp(4px, 2.2cqw, 5px);
+}
+
+.app-shell .study-mistake-preview-row,
+.app-shell .study-mistake-preview-row :is(span, b) {
+  font-size: clamp(9px, 8.7cqw, 20px) !important;
+}
+
+.app-shell .study-mistake-preview-row b {
+  flex: 0 0 auto;
+}
+
+.app-shell .study-mistake-preview-row i {
+  width: clamp(3px, 2.2cqw, 5px);
+  height: clamp(3px, 2.2cqw, 5px);
+}
+
+.app-shell .study-flashcard-preview {
+  height: clamp(42px, 33cqw, 76px);
+  margin-bottom: clamp(8px, 5.2cqw, 12px);
+  padding: clamp(6px, 4.3cqw, 10px);
+}
+
+.app-shell .study-note-preview {
+  min-width: 0;
+  min-height: clamp(54px, 44cqw, 100px);
+  gap: clamp(4px, 3.5cqw, 8px);
+  padding: clamp(6px, 5.6cqw, 13px);
+}
+
+.app-shell .study-note-preview i {
+  height: clamp(3px, 2.2cqw, 5px);
+}
+
+@media (max-width: 390px) {
+  .app-shell .study-section-region {
+    margin-left: 8px;
+  }
+
+  .app-shell .study-tools-panel {
+    margin-left: 0;
+    padding: 12px;
+  }
 }
 
 .app-shell .study-plan-details {

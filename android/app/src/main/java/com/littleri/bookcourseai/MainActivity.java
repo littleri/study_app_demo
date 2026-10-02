@@ -1,5 +1,6 @@
 package com.littleri.bookcourseai;
 
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -23,7 +24,21 @@ public class MainActivity extends BridgeActivity {
             () -> SystemClock.uptimeMillis() - splashStartedAt < MINIMUM_SPLASH_DURATION_MS
         );
         super.onCreate(savedInstanceState);
+        configureWebViewTextScale();
         configureSystemBars();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        configureWebViewTextScale();
+    }
+
+    private void configureWebViewTextScale() {
+        if (bridge != null) {
+            // Match the shared CSS typography used by the desktop device preview.
+            bridge.getWebView().getSettings().setTextZoom(100);
+        }
     }
 
     @SuppressWarnings("deprecation")

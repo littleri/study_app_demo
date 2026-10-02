@@ -9,6 +9,9 @@ html {
   -webkit-font-smoothing: antialiased;
   font-synthesis: none;
   text-rendering: geometricPrecision;
+  /* Keep mobile text inflation from changing the shared typography scale. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   color: var(--color-text);
   letter-spacing: 0;

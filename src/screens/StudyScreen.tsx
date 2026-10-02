@@ -355,7 +355,7 @@ function StudyChapter({
 }
 
 function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
-  const { go } = useAppContext();
+  const { courses, go } = useAppContext();
   return (
     <section className="study-empty-state">
       <span className="study-empty-icon" aria-hidden="true">
@@ -363,7 +363,7 @@ function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
       </span>
       <h2>{kind === "empty" ? "开始你的第一门课程" : "课程资料还在准备中"}</h2>
       <p>{kind === "empty" ? "添加教材后，这里会按原书目录整理章节和每个小节的学习入口。" : "你可以查看解析进度，或先选择另一门已经就绪的课程。"}</p>
-      <Button onClick={() => go("library")}>
+      <Button onClick={() => { if (kind === "empty") { courses.startDraft(); go("upload"); } else go("library"); }}>
         {kind === "empty" ? "创建课程" : "查看课程资料"}
       </Button>
     </section>
@@ -600,7 +600,7 @@ export function StudyScreen() {
             <span><small>当前课程</small><strong>{activeCourse?.name ?? "尚未选择"}</strong></span>
             <ChevronDown size={19} aria-hidden="true" />
           </button>
-          <button type="button" className="study-add-button" onClick={() => { if (activeCourse) openSheet({ type: "addMaterials", courseId: activeCourse.id }); else { courses.startDraft(); go("courseSetup"); } }}>
+          <button type="button" className="study-add-button" onClick={() => { if (activeCourse) openSheet({ type: "addMaterials", courseId: activeCourse.id }); else { courses.startDraft(); go("upload"); } }}>
             <Plus size={18} aria-hidden="true" />{activeCourse ? "添加资料" : "创建课程"}
           </button>
         </header>

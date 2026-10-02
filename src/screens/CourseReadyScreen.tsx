@@ -264,8 +264,8 @@ export function CourseCompletionScreen({
   );
 }
 
-export function CourseReadyScreen() {
-  const { generatedLessons, go, lessonBuildJobId, parsedAssets, parsedChapters, parsedChunks, setActiveChapterId, uploadedFile } = useAppContext();
+export function CourseReadyScreen({ imported = false }: { imported?: boolean }) {
+  const { generatedLessons, go, replaceScreen, lessonBuildJobId, parsedAssets, parsedChapters, parsedChunks, setActiveChapterId, uploadedFile } = useAppContext();
   const courseTitle = uploadedFile?.name ?? "未选择教材";
   const chapterCount = parsedChapters?.length ?? 0;
   const lessonCount = generatedLessons?.length ?? 0;
@@ -286,16 +286,17 @@ export function CourseReadyScreen() {
     <CourseCompletionScreen
       assetCount={parsedAssets?.length ?? 0}
       chapterCount={chapterCount}
+      completionMessage={imported ? "资料已整理好，专属学习计划也准备好了。" : undefined}
       courseTitle={courseTitle}
       lessonCount={lessonCount}
-      motionKey={`course-ready:${uploadedFile.bookId}:${lessonBuildJobId ?? "current"}`}
+      motionKey={`${imported ? "course-import" : "course-ready"}:${uploadedFile.bookId}:${lessonBuildJobId ?? "current"}`}
       onEnterStudy={() => {
         setActiveChapterId(generatedLessons?.[0]?.chapter_id ?? null);
-        go("study");
+        (imported ? replaceScreen : go)("study");
       }}
-      onViewPlan={() => go("plan")}
+      onViewPlan={() => (imported ? replaceScreen : go)("plan")}
       ragChunkCount={parsedChunks?.length ?? 0}
-      statusTitle="生成成功"
+      statusTitle={imported ? "课程导入完成" : "生成成功"}
       focused
     />
   );

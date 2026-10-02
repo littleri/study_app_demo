@@ -87,6 +87,10 @@ test.describe("home course cover layout", () => {
     await expect(controls).toBeVisible();
     await controls.getByRole("button", { name: "创建课程", exact: true }).click();
     await expect(page.getByRole("heading", { name: "创建课程", exact: true })).toBeVisible();
-    await expect(page.getByLabel("课程名称", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "添加课程资料", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "选择课程资料", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "保存资料并继续", exact: true })).toBeDisabled();
+    await expect(page.getByLabel("课程名称", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("group", { name: "选择已有书籍资料", exact: true })).toHaveCount(0);
   });
 });

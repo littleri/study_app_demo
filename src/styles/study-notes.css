@@ -835,6 +835,24 @@
 .voice-evidence-list span { display: grid; gap: 3px; padding: 10px 12px; border-radius: 12px; color: var(--color-text-secondary); background: #f3f8ff; font-size: 12px; line-height: 1.5; }
 .voice-evidence-list strong { color: var(--color-primary); }
 
+/* Keep the fixed notes title and safe area opaque while notes scroll below. */
+.app-shell[data-active-screen="notes"] .header-bar {
+  top: 0;
+  right: 0;
+  left: 0;
+  box-sizing: border-box;
+  padding:
+    calc(var(--safe-area-top) + var(--space-layout))
+    calc(var(--safe-area-right) + var(--space-inline))
+    var(--space-layout)
+    calc(var(--safe-area-left) + var(--space-inline));
+  background: var(--color-bg);
+}
+
+.app-shell[data-active-screen="notes"] .header-glass {
+  background: var(--color-bg);
+}
+
 .notes-hub-toolbar {
   display: flex;
   align-items: center;
@@ -926,12 +944,13 @@
 }
 
 /* Full-height source reader: one brush row, one fitted textbook page, swipe to turn. */
-.screen-content.with-header[data-screen="source"] {
+.app-shell .screen-content.with-header[data-screen="source"] {
   height: 100%;
   overflow: hidden;
   /* Edge to edge: the brush row is a full-width band under the header and the
      page area runs from that band to the bottom of the surface with no gutter. */
-  padding-top: calc(var(--safe-area-top) + var(--header-block-size));
+  /* Outrank shared typography spacing and include the header's bottom hairline. */
+  padding-top: calc(var(--safe-area-top) + var(--header-block-size) + 1px);
   padding-bottom: 0;
   padding-inline: 0;
 }
@@ -1118,24 +1137,6 @@
   overflow-y: auto;
   box-shadow: 0 10px 28px rgba(32, 38, 58, .17);
 }
-.source-voice-fab {
-  position: absolute;
-  z-index: 6;
-  right: 16px;
-  bottom: 16px;
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border: 1px solid rgba(255, 255, 255, .75);
-  border-radius: 50%;
-  color: #fff;
-  background: var(--color-primary);
-  box-shadow: 0 6px 18px rgba(95, 51, 225, .26);
-}
-.source-voice-fab:hover,
-.source-voice-fab:focus-visible { background: #692bd3; }
-
 @media (max-width: 719px), (max-height: 599px) {
   .source-reader-screen[data-note-mode="text"] .source-reader-workspace .source-reader-side-panel {
     width: min(380px, 100%);
@@ -1576,6 +1577,37 @@
 .source-text-note-popover button:disabled { cursor: wait; opacity: .5; }
 .source-text-note-popover button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .source-text-note-popover .source-note-error { font-size: 12px; }
+.source-text-note-start-voice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: var(--color-primary-pressed);
+  background: var(--color-primary-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+.source-text-note-start-voice:hover:not(:disabled) { background: var(--color-surface-soft); }
+.source-text-note-popover.source-inline-voice-panel .voice-recorder-card,
+.source-text-note-popover.source-inline-voice-panel .voice-transcript-card,
+.source-text-note-popover.source-inline-voice-panel .voice-organized-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.source-text-note-popover.source-inline-voice-panel .voice-waveform { min-height: 64px; border-radius: 8px; }
+.source-text-note-popover.source-inline-voice-panel .voice-recorder-card { gap: 10px; }
+.source-text-note-popover.source-inline-voice-panel .voice-recorder-controls .voice-record-main { width: 56px; height: 56px; }
+.source-text-note-popover.source-inline-voice-panel .voice-recorder-controls > button { flex-shrink: 0; }
+.source-text-note-popover.source-inline-voice-panel .voice-audio-player { flex: 1; min-width: 0; }
+.source-text-note-popover.source-inline-voice-panel .voice-note-result-column:empty { display: none; }
 .source-note-retry { min-height: 44px; border-radius: 8px; color: var(--color-primary-pressed); background: var(--color-primary-soft); font-size: 13px; }
 
 .source-text-ai-reference {

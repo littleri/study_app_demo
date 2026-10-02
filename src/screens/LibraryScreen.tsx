@@ -12,7 +12,7 @@ export function LibraryScreen() {
   const { plans } = useCoursePlans();
   const [opening, setOpening] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  function create() { courses.startDraft(); go("courseSetup"); }
+  function create() { courses.startDraft(); go("upload"); }
   async function open(id: string) {
     setOpening(id);
     try { if (await selectCourse(id)) go("study"); }

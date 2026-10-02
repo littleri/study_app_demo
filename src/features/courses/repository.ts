@@ -177,7 +177,7 @@ export function useCourseStore() {
         name: options?.suggestedName?.trim() ?? "",
         resourceIds: [],
         diagnosis: {},
-        step: -1,
+        step: 0,
         editingCourseId: null,
         uploadedCourse: null,
         parseJobId: null,
@@ -186,6 +186,7 @@ export function useCourseStore() {
       const updatedDraft = {
         ...draft,
         name: draft.name || options?.suggestedName?.trim() || "",
+        step: Math.max(0, draft.step),
         uploadedCourse: options && "uploadedCourse" in options ? options.uploadedCourse : draft.uploadedCourse
       };
       return {
