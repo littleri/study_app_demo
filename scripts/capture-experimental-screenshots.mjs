@@ -184,6 +184,11 @@ try {
   await waitForScreen(".community-detail-screen");
   await capture("15-community-book");
   await app.getByRole("button", { name: "导入到我的课程", exact: true }).click();
+  const importAnswers = ["正常节奏，按计划来", "整块固定时间", "系统学习", "原理和逻辑", "AI 对话讲解", "定期复盘"];
+  for (const [index, answer] of importAnswers.entries()) {
+    await app.getByRole("button", { name: answer, exact: true }).click();
+    await app.getByRole("button", { name: index === 5 ? "完成，导入课程" : "下一页", exact: true }).click();
+  }
   await waitForScreen(".community-import-screen");
   await capture("16-community-import");
 

@@ -480,17 +480,20 @@ export default function App() {
 
   const beginCommunityImport = useCallback(() => {
     const book = communityBooks.find((item) => item.id === selectedCommunityBookId);
-    if (book) {
-      try {
-        coursesRef.current.importCatalogCourse(book.id, book.title);
-      } catch (error) {
-        showToast(error instanceof Error ? error.message : "课程添加失败", "warning");
-        return;
-      }
+    if (!book) return;
+    try {
+      coursesRef.current.startCatalogDraft(book.id, book.title);
+      replaceScreen("courseSetup");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "课程添加失败", "warning");
     }
+  }, [replaceScreen, selectedCommunityBookId, showToast]);
+
+  const completeCommunityImport = useCallback((bookId: string) => {
+    setSelectedCommunityBookId(bookId);
     setCommunityImportGeneration((current) => current + 1);
-    go("communityImport");
-  }, [go, selectedCommunityBookId, showToast]);
+    replaceScreen("communityImport");
+  }, [replaceScreen]);
 
   const finishNoteCapture = useCallback(() => {
     setNoteCaptureIntent(null);
@@ -1243,7 +1246,7 @@ export default function App() {
       case "onboarding":
         return <OnboardingScreen />;
       case "courseSetup":
-        return <CourseSetupScreen />;
+        return <CourseSetupScreen onCatalogImportComplete={completeCommunityImport} />;
       case "courseDetail":
         return <CourseDetailScreen />;
       case "upload":

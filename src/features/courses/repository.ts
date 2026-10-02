@@ -17,8 +17,7 @@ import {
   type CourseDraft,
   type CourseState,
   type OnboardingDraft,
-  type CourseDiagnosis,
-  type Course
+  type CourseDiagnosis
 } from "./model";
 
 const resourceDatabaseName = "bookcourse-learning-resources";
@@ -172,7 +171,7 @@ export function useCourseStore() {
 
   const startDraft = useCallback((resourceId?: string, options?: { suggestedName?: string; uploadedCourse?: UploadedCourseFile | null }) => {
     commit((current) => {
-      const draft = (current.draft?.editingCourseId ? null : current.draft) ?? {
+      const draft = (current.draft?.editingCourseId || current.draft?.catalogBookId ? null : current.draft) ?? {
         id: crypto.randomUUID(),
         name: options?.suggestedName?.trim() ?? "",
         resourceIds: [],
@@ -409,16 +408,24 @@ export function useCourseStore() {
     });
   }, [commit]);
 
-  const importCatalogCourse = useCallback((bookId: string, name: string) => {
+  const startCatalogDraft = useCallback((bookId: string, name: string) => {
     const id = `catalog:${bookId}`;
     commit((current) => {
+      if (current.draft?.catalogBookId === bookId) return current;
       const existing = current.courses.find((course) => course.id === id);
-      if (existing) return { ...current, activeCourseId: id };
-      const now = Date.now();
-      const course: Course = { id, name, resourceIds: [sourceResourceId(bookId)], activeResourceId: sourceResourceId(bookId), diagnosis: defaultCourseDiagnosis(), createdAt: now, updatedAt: now };
-      return { ...current, courses: [...current.courses, course], activeCourseId: id };
+      return {
+        ...current,
+        draft: {
+          id,
+          name: existing?.name ?? name,
+          resourceIds: [...new Set([...(existing?.resourceIds ?? []), sourceResourceId(bookId)])],
+          diagnosis: {},
+          step: 0,
+          editingCourseId: existing?.id ?? null,
+          catalogBookId: bookId
+        }
+      };
     });
-    return id;
   }, [commit]);
 
   return useMemo(() => ({
@@ -439,13 +446,13 @@ export function useCourseStore() {
     setActiveResource,
     syncSources,
     removeCourse,
-    importCatalogCourse,
+    startCatalogDraft,
     addExistingResource,
     removeResource,
     addLocalFile
   }), [
     state, getState, updateOnboardingDraft, completeOnboarding, updatePreferences, logout, startDraft,
     editCourse, updateDraft, completeDraft, clearDraft, setActiveCourse,
-    addSource, addExistingResource, removeResource, addLocalFile, updateResource, setActiveResource, syncSources, removeCourse, importCatalogCourse
+    addSource, addExistingResource, removeResource, addLocalFile, updateResource, setActiveResource, syncSources, removeCourse, startCatalogDraft
   ]);
 }

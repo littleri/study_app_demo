@@ -1,4 +1,5 @@
 import { expect, test as base, type Locator, type Page } from "playwright/test";
+import { completeCommunityImportQuestions } from "./fixtures/community-import";
 
 type RuntimeAudit = {
   consoleErrors: string[];
@@ -1585,7 +1586,7 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
       { message: "releasing the Community card restores its entry pill" }
     ).toBeCloseTo(1, 2);
 
-    await page.locator(".community-book-card").first().click();
+    await page.locator(".community-book-enter").first().click();
     await expect(page.locator(".community-detail-screen")).toBeVisible();
     await settleScreen(page);
     const detail = page.locator(".community-detail-overview");
@@ -1678,13 +1679,14 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
       reducedEnterPillBox.y + (reducedEnterPillBox.height / 2)
     );
     await page.mouse.down();
-    await expect(reducedEnterPill).toHaveCSS("transform", "none");
+    await expect(reducedEnterPill).toHaveCSS("transform", /^(none|matrix\(1, 0, 0, 1, 0, 0\))$/);
     await page.mouse.move(1, 1);
     await page.mouse.up();
-    await page.locator(".community-book-card").first().click();
+    await page.locator(".community-book-enter").first().click();
     await expect(detail).toHaveAttribute("data-motion-item-state", "idle");
     expect((await readAnimation(detail)).name).toBe("none");
     await page.locator(".community-detail-actions .button").first().click();
+    await completeCommunityImportQuestions(page);
     const imported = page.locator(".community-import-screen .course-ready-success-mark");
     await expect(imported).toHaveAttribute("data-motion-course-ready-state", "idle");
     expect((await readAnimation(imported)).name).toBe("none");
@@ -1696,10 +1698,11 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     await page.locator(".primary-nav .nav-item").nth(2).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
-    await page.locator(".community-book-card").first().click();
+    await page.locator(".community-book-enter").first().click();
     await expect(page.locator(".community-detail-screen")).toBeVisible();
     await settleScreen(page);
     await page.locator(".community-detail-actions .button").click();
+    await completeCommunityImportQuestions(page);
     await settleScreen(page);
 
     const imported = page.locator(".community-import-screen.course-ready-focus");
@@ -1759,15 +1762,16 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     );
 
     await enterStudy.click();
-    await expect(page.locator(".book-course-screen")).toBeVisible();
+    await expect(page.locator(".course-space-detail")).toBeVisible();
     await settleScreen(page);
     await page.locator(".primary-nav .nav-item").nth(2).click();
     await expect(page.locator(".community-screen")).toBeVisible();
     await settleScreen(page);
-    await page.locator(".community-book-card").first().click();
+    await page.locator(".community-book-enter").first().click();
     await expect(page.locator(".community-detail-screen")).toBeVisible();
     await settleScreen(page);
     await page.locator(".community-detail-actions .button").click();
+    await completeCommunityImportQuestions(page);
     await settleScreen(page);
 
     const repeatedImport = page.locator(".community-import-screen.course-ready-focus");

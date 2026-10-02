@@ -1,6 +1,7 @@
 import type { Page } from "playwright/test";
 import { expect, test } from "./fixtures";
 import { getResponsiveProject } from "./fixtures/viewports";
+import { communityImportDiagnosis, completeCommunityImportQuestions } from "./fixtures/community-import";
 
 async function openCommunity(page: Page) {
   await page.goto("/?embedded=device-preview");
@@ -682,7 +683,7 @@ test.describe("community discovery", () => {
   test("keeps the selected mathematics book through detail and import", async ({ page }) => {
     await openCommunity(page);
     await page.getByRole("button", { name: "数学", exact: true }).click();
-    await page.locator('[data-community-book-id="community_functions"]').click();
+    await page.locator('[data-community-book-id="community_functions"] .community-book-enter').click();
 
     await expect(page.locator(".community-detail-screen").getByRole("heading", { name: "函数与导数系统提升课", exact: true })).toBeVisible();
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
@@ -695,6 +696,12 @@ test.describe("community discovery", () => {
     await expect(detail.getByRole("button", { name: "返回社区", exact: true })).toHaveCount(0);
     await expect(detail.locator(".community-detail-stats > div")).toHaveCount(4);
     await expect(detail.getByRole("button", { name: "导入到我的课程", exact: true })).toHaveCount(1);
+    const importButton = detail.getByRole("button", { name: "导入到我的课程", exact: true });
+    const importAlignment = await importButton.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2);
+    });
+    expect(importAlignment, "the single import action is centered in the viewport").toBeLessThanOrEqual(1);
 
     const overviewTab = detail.getByRole("tab", { name: "课程简介", exact: true });
     const commentsTab = detail.getByRole("tab", { name: "评论", exact: true });
@@ -869,6 +876,7 @@ test.describe("community discovery", () => {
     }
 
     await page.getByRole("button", { name: "导入到我的课程", exact: true }).click();
+    await completeCommunityImportQuestions(page);
     const imported = page.locator(".community-import-screen");
     await expect(imported).toHaveClass(/course-ready-focus/);
     await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
@@ -888,7 +896,7 @@ test.describe("community discovery", () => {
     await openCommunity(page);
     const categoryRail = page.getByRole("group", { name: "按学科筛选书籍" });
     await categoryRail.getByRole("button", { name: "化学", exact: true }).click();
-    await page.locator('[data-community-book-id="community_high_school_chemistry_2"]').click();
+    await page.locator('[data-community-book-id="community_high_school_chemistry_2"] .community-book-enter').click();
 
     const detail = page.locator(".community-detail-screen");
     await expect(detail.getByRole("heading", { name: "化学必修第二册同步课", exact: true })).toBeVisible();
@@ -897,6 +905,7 @@ test.describe("community discovery", () => {
     await expect(detail.locator('[data-stat="flashcards"] dd')).toHaveText("26 张");
 
     await detail.getByRole("button", { name: "导入到我的课程", exact: true }).click();
+    await completeCommunityImportQuestions(page);
     const imported = page.locator(".community-import-screen");
     await expect(imported).toHaveAttribute("data-course-ready-phase", "settled");
     await expect(imported.getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
@@ -911,6 +920,111 @@ test.describe("community discovery", () => {
     });
     expect(importedCourse.id).toBe("catalog:community_high_school_chemistry_2");
     expect(importedCourse.resourceIds).toContain("source:community_high_school_chemistry_2");
+    expect(importedCourse.diagnosis).toEqual(communityImportDiagnosis);
+  });
+
+  test("centers the import action at the reported viewport and resumes questions without creating a course early", async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 573, height: 1138 });
+    await openCommunity(page);
+    await page.locator('[data-community-book-id="community_genetics"]').click();
+    const detail = page.locator(".community-detail-screen");
+    await expect(detail).toBeVisible();
+    await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
+    const importButton = detail.getByRole("button", { name: "导入到我的课程", exact: true });
+    const alignment = await importButton.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const label = element.querySelector("span")!;
+      return {
+        centerOffset: Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2),
+        labelHeight: label.getBoundingClientRect().height,
+        lineHeight: Number.parseFloat(getComputedStyle(label).lineHeight)
+      };
+    });
+    expect(alignment.centerOffset).toBeLessThanOrEqual(1);
+    expect(alignment.labelHeight).toBeLessThanOrEqual(alignment.lineHeight + 1);
+    if (testInfo.project.name === "iphone-17-pro") await page.screenshot({ path: "output/community-import-detail-573.png" });
+
+    const readState = () => page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.courses.v2") ?? "{}"));
+    const before = await readState();
+    await importButton.click();
+    const flow = page.locator(".course-space-flow");
+    await expect(flow.getByRole("heading", { name: "你当前学习的紧迫程度？", exact: true })).toBeVisible();
+    if (testInfo.project.name === "iphone-17-pro") await page.screenshot({ path: "output/community-import-questions-573.png" });
+    await flow.getByRole("button", { name: "下一页", exact: true }).click();
+    await expect(flow.getByRole("alert")).toHaveText("请至少选择一项再继续");
+    expect((await readState()).courses).toEqual(before.courses);
+    await expect(page.locator(".community-import-screen")).toHaveCount(0);
+
+    await flow.getByRole("button", { name: "很紧急，短期要学完", exact: true }).click();
+    await flow.getByRole("button", { name: "下一页", exact: true }).click();
+    await expect(flow.getByRole("heading", { name: "你的学习时间是哪种类型？", exact: true })).toBeVisible();
+    await flow.getByRole("button", { name: "上一步", exact: true }).click();
+    await flow.getByRole("button", { name: "上一步", exact: true }).click();
+    await expect(detail).toBeVisible();
+    await expect(detail.getByRole("heading", { name: "遗传与进化高频考点课", exact: true })).toBeVisible();
+    expect((await readState()).courses).toEqual(before.courses);
+    await page.getByRole("button", { name: "返回", exact: true }).click();
+    await expect(page.locator(".community-screen")).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: "发现", exact: true }).click();
+    await page.locator('[data-community-book-id="community_genetics"]').click();
+    await importButton.click();
+    await expect(flow.getByRole("button", { name: "很紧急，短期要学完", exact: true })).toHaveAttribute("aria-pressed", "true");
+    const handledNativeBack = await page.evaluate(() => !window.dispatchEvent(new CustomEvent("bookcourse:native-back", { cancelable: true })));
+    expect(handledNativeBack).toBe(true);
+    await expect(detail).toBeVisible();
+    await importButton.click();
+    await completeCommunityImportQuestions(page);
+    await expect(page.locator(".community-import-screen").getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
+    if (testInfo.project.name === "iphone-17-pro") await page.screenshot({ path: "output/community-import-success-573.png" });
+    await expect(page.locator(".processing-screen, .chapter-confirm-screen")).toHaveCount(0);
+    const after = await readState();
+    expect(after.draft).toBeNull();
+    expect(after.courses).toHaveLength(before.courses.length + 1);
+    expect(after.courses.find((course: { id: string }) => course.id === after.activeCourseId)).toMatchObject({
+      id: "catalog:community_genetics",
+      name: "遗传与进化高频考点课",
+      resourceIds: ["source:community_genetics"],
+      diagnosis: communityImportDiagnosis
+    });
+  });
+
+  test("reimporting a course saves new answers while retaining its identity and added materials", async ({ page }) => {
+    await openCommunity(page);
+    await page.locator('[data-community-book-id="community_genetics"] .community-book-enter').click();
+    await page.getByRole("button", { name: "导入到我的课程", exact: true }).click();
+    await completeCommunityImportQuestions(page);
+    await expect(page.locator(".community-import-screen")).toBeVisible();
+
+    const existing = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem("bookcourse.courses.v2") ?? "{}");
+      const course = state.courses.find((item: { id: string }) => item.id === "catalog:community_genetics");
+      course.name = "我的遗传复习课";
+      course.resourceIds.push("source:book_math_human_a_1");
+      course.activeResourceId = "source:book_math_human_a_1";
+      course.diagnosis.urgency = "relaxed";
+      localStorage.setItem("bookcourse.courses.v2", JSON.stringify(state));
+      return course;
+    });
+    await openCommunity(page);
+    await page.locator('[data-community-book-id="community_genetics"] .community-book-enter').click();
+    await page.getByRole("button", { name: "导入到我的课程", exact: true }).click();
+    await completeCommunityImportQuestions(page);
+    await expect(page.locator(".community-import-screen").getByRole("heading", { name: "导入成功", exact: true })).toBeVisible();
+    const repeated = await page.evaluate(() => {
+      const state = JSON.parse(localStorage.getItem("bookcourse.courses.v2") ?? "{}");
+      return state.courses.filter((course: { id: string }) => course.id === "catalog:community_genetics");
+    });
+    expect(repeated).toHaveLength(1);
+    expect(repeated[0]).toMatchObject({
+      id: existing.id,
+      name: existing.name,
+      createdAt: existing.createdAt,
+      resourceIds: existing.resourceIds,
+      activeResourceId: existing.activeResourceId,
+      diagnosis: communityImportDiagnosis
+    });
   });
 
   test("keeps card geometry stable when generated covers fail", async ({ page }) => {

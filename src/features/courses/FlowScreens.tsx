@@ -202,8 +202,8 @@ export function OnboardingScreen() {
   );
 }
 
-export function CourseSetupScreen() {
-  const { sourceSummaries, courses, replaceScreen, selectSource, importCourseFile, selectCourse } = useAppContext();
+export function CourseSetupScreen({ onCatalogImportComplete }: { onCatalogImportComplete: (bookId: string) => void }) {
+  const { sourceSummaries, courses, replaceScreen, selectSource, importCourseFile, selectCourse, selectCommunityBook } = useAppContext();
   const { draft, resources } = courses.state;
   const [error, setError] = useState<string | null>(null);
   const [savingFile, setSavingFile] = useState(false);
@@ -238,7 +238,10 @@ export function CourseSetupScreen() {
         return;
       }
       try {
-        if (step === 0 && !draft.editingCourseId) {
+        if (step === 0 && draft.catalogBookId) {
+          selectCommunityBook(draft.catalogBookId);
+          replaceScreen("communityBook");
+        } else if (step === 0 && !draft.editingCourseId) {
           replaceScreen(draft.uploadedCourse && draft.parseCompleted ? "processing" : "upload");
         } else {
           courses.updateDraft({ step: step - 1 });
@@ -249,7 +252,7 @@ export function CourseSetupScreen() {
     };
     window.addEventListener("bookcourse:native-back", onNativeBack);
     return () => window.removeEventListener("bookcourse:native-back", onNativeBack);
-  }, [draft, courses, replaceScreen, step]);
+  }, [draft, courses, replaceScreen, selectCommunityBook, step]);
 
   useEffect(() => {
     if (!draft || draft.editingCourseId) return;
@@ -287,7 +290,10 @@ export function CourseSetupScreen() {
 
   function previous() {
     if (step < 0) replaceScreen(activeDraft.editingCourseId ? "courseDetail" : "upload");
-    else if (step === 0 && !activeDraft.editingCourseId) replaceScreen(activeDraft.uploadedCourse && activeDraft.parseCompleted ? "processing" : "upload");
+    else if (step === 0 && activeDraft.catalogBookId) {
+      selectCommunityBook(activeDraft.catalogBookId);
+      replaceScreen("communityBook");
+    } else if (step === 0 && !activeDraft.editingCourseId) replaceScreen(activeDraft.uploadedCourse && activeDraft.parseCompleted ? "processing" : "upload");
     else {
       update({ step: step - 1 });
     }
@@ -318,6 +324,11 @@ export function CourseSetupScreen() {
     }
     try {
       setCompleting(true);
+      if (activeDraft.catalogBookId) {
+        courses.completeDraft();
+        onCatalogImportComplete(activeDraft.catalogBookId);
+        return;
+      }
       const confirmParsedCourse = !activeDraft.editingCourseId && Boolean(activeDraft.uploadedCourse);
       if (confirmParsedCourse) {
         if (!activeDraft.parseCompleted || !activeDraft.uploadedCourse) {
@@ -461,7 +472,7 @@ export function CourseSetupScreen() {
 
       <div className="learning-flow-bottom">
         <FlowError message={error} />
-        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程…" : step === 5 ? draft.uploadedCourse ? "完成问卷，查看课程目录" : draft.editingCourseId ? "保存，返回课程" : "完成，开始导入" : "下一页"}</button>
+        <button className="learning-flow-primary" type="button" disabled={completing} onClick={() => void next()}>{completing ? "正在准备课程…" : step === 5 ? draft.catalogBookId ? "完成，导入课程" : draft.uploadedCourse ? "完成问卷，查看课程目录" : draft.editingCourseId ? "保存，返回课程" : "完成，开始导入" : "下一页"}</button>
         {step < 0 ? <button className="learning-flow-skip" type="button" onClick={() => replaceScreen("courseDetail")}>返回课程，草稿已保存</button> : null}
       </div>
     </div>

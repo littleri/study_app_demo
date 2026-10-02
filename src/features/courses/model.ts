@@ -148,6 +148,7 @@ export type CourseDraft = {
   diagnosis: Partial<CourseDiagnosis>;
   step: number;
   editingCourseId: string | null;
+  catalogBookId?: string | null;
   uploadedCourse?: UploadedCourseFile | null;
   parseJobId?: string | null;
   parseCompleted?: boolean;
