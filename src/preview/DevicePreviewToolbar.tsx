@@ -1,11 +1,10 @@
-import type { DeviceId, Orientation, PreviewSettings, QualityId } from "./devicePreview";
-import { DEVICE_PRESETS, QUALITY_LABELS } from "./devicePreview";
+import type { DeviceId, Orientation, PreviewSettings } from "./devicePreview";
+import { DEVICE_PRESETS } from "./devicePreview";
 
 type DevicePreviewToolbarProps = Readonly<{
   settings: PreviewSettings;
   onDeviceChange: (device: DeviceId) => void;
   onOrientationChange: (orientation: Orientation) => void;
-  onQualityChange: (quality: QualityId) => void;
 }>;
 
 function ToggleButton({
@@ -35,8 +34,7 @@ function ToggleButton({
 export function DevicePreviewToolbar({
   settings,
   onDeviceChange,
-  onOrientationChange,
-  onQualityChange
+  onOrientationChange
 }: DevicePreviewToolbarProps) {
   return (
     <header className="device-preview-toolbar" data-testid="device-preview-toolbar">
@@ -79,21 +77,6 @@ export function DevicePreviewToolbar({
             >
               横屏
             </ToggleButton>
-          </div>
-        </fieldset>
-        <fieldset className="device-preview-control-group">
-          <legend>输出清晰度</legend>
-          <div className="device-preview-toggle-row">
-            {(Object.keys(QUALITY_LABELS) as QualityId[]).map((quality) => (
-              <ToggleButton
-                key={quality}
-                active={settings.quality === quality}
-                testId={`device-preview-quality-${quality}`}
-                onClick={() => onQualityChange(quality)}
-              >
-                {QUALITY_LABELS[quality]}
-              </ToggleButton>
-            ))}
           </div>
         </fieldset>
       </div>

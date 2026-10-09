@@ -14,6 +14,7 @@ import { ChapterToolCards, type ChapterToolId } from "../study/ChapterToolCards"
 import type { HomeBookListState, HomeBookModel } from "../../screens/homeBookModel";
 import type { HomeBookStudyPreview } from "../../screens/homeBookPreview";
 import type { HomeNextStep } from "../../screens/homeNextStep";
+import { HomeWorkspaceMotion } from "./HomeWorkspaceMotion";
 
 export type HomeBookPreviewAction = "lesson" | "source" | ChapterToolId;
 
@@ -216,7 +217,18 @@ function LoadingBookWorkspace({ book }: Readonly<{ book: HomeBookModel | null }>
   );
 }
 
-export function SelectedBookWorkspace({
+export function SelectedBookWorkspace(props: SelectedBookWorkspaceProps) {
+  const { book, listState, pendingBookId, loadedBookId, selectionError, nextStep } = props;
+  if (listState === "error") return null;
+  const pending = listState === "loading" || Boolean(book && !selectionError
+    && (pendingBookId === book.bookId || (book.status === "ready" && book.bookId !== loadedBookId)));
+  const transitionKey = `${book?.bookId ?? listState}:${pending ? "loading" : book?.status ?? "empty"}:${loadedBookId}:${nextStep?.chapter.chapter_id}:${selectionError ?? ""}`;
+  return <HomeWorkspaceMotion transitionKey={transitionKey} pending={pending}>
+    <WorkspaceContent {...props} />
+  </HomeWorkspaceMotion>;
+}
+
+function WorkspaceContent({
   book,
   canOpenOriginal,
   hasLocalUploadSession,

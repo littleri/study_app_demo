@@ -168,6 +168,7 @@
 }
 
 .home-book-carousel {
+  position: relative;
   --home-cover-fade-width: min(64px, 15%);
   min-width: 0;
   display: flex;
@@ -193,8 +194,12 @@
   mask-image: linear-gradient(to right, #000 calc(100% - var(--home-cover-fade-width)), transparent 100%);
 }
 
-.home-book-carousel.is-dragging {
+.home-book-carousel.is-dragging,
+.home-book-carousel.is-centering {
   scroll-snap-type: none;
+}
+
+.home-book-carousel.is-dragging {
   cursor: grabbing;
 }
 
@@ -262,7 +267,7 @@
   box-shadow: 0 4px 8px rgba(32, 38, 58, .15);
   text-align: left;
   filter: blur(1.5px);
-  transition: filter var(--motion-duration-local-base) var(--motion-ease-local-state);
+  /* Keep the depth cue, but do not rerasterize the blur on every frame. */
 }
 
 .home-book-option.is-selected .home-book-cover {
@@ -525,6 +530,16 @@
 .home-focus-panel {
   box-shadow: none;
   backdrop-filter: none;
+}
+
+.home-workspace-transition {
+  min-width: 0;
+  grid-column: 1 / -1;
+  border-radius: 16px;
+}
+
+.home-workspace-transition[data-workspace-motion="transitioning"] {
+  overflow: clip;
 }
 
 .home-book-workspace {

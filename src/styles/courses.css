@@ -510,8 +510,12 @@
 /* Courses contain independently addressable original files. */
 .course-library-heading, .course-library-actions, .course-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .course-library-heading > .button { width: auto; }
-.course-library-list { display: grid; gap: 16px; }
+.course-library-list { display: grid; gap: 16px; overflow-anchor: none; }
 .course-library-card { display: grid; gap: 16px; padding: 18px; }
+.course-library-row, .course-library-row-content { min-width: 0; }
+/* Keep the collapsed region in the DOM without reserving a card-grid gap. */
+.course-library-confirm-region { margin-top: -16px; }
+.course-library-delete-confirm { margin-top: 16px; }
 .course-library-open { display: flex; align-items: center; gap: 16px; border: 0; padding: 0; background: transparent; text-align: left; color: inherit; cursor: pointer; }
 .course-library-open img { width: 64px; height: 86px; object-fit: cover; border-radius: 10px; background: var(--surface-soft, #eef1f8); }
 .course-library-open > span { display: grid; gap: 6px; min-width: 0; }

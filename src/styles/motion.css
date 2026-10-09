@@ -88,6 +88,12 @@
   overflow: clip;
 }
 
+/* Home's cover rail reaches into the page inset. Keep that edge visible for
+   the entire entrance; the screen scroller still clips at the viewport. */
+.motion-screen-transition[data-motion-state="transitioning"][data-screen="home"] {
+  overflow: visible;
+}
+
 .motion-screen-transition[data-motion-state="transitioning"]
   > .motion-screen-surface[data-motion-surface="current"] {
   position: relative;

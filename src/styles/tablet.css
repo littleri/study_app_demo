@@ -2,8 +2,13 @@
    Keep these overrides after screen styles so page-specific desktop grids do not
    turn the content area into a second master/detail layout. */
 .nav-topbar,
-.nav-study-context {
+.nav-study-context,
+.nav-rail-surface {
   display: none;
+}
+
+.primary-nav .nav-expand-toggle {
+  transition: transform var(--motion-duration-local-fast) var(--motion-ease-local-state);
 }
 
 @media (min-width: 720px) and (min-height: 600px) {
@@ -41,12 +46,23 @@
     gap: 4px;
     padding: 8px 7px 20px calc(var(--safe-area-left) + 7px);
     border: 0;
-    border-right: 1px solid #29292b;
     border-radius: 0;
-    background: #19191b;
+    background: transparent;
+    overflow: visible;
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  .primary-nav .nav-rail-surface {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    border-right: 1px solid #29292b;
+    background: #19191b;
+    pointer-events: none;
+    transform-origin: top left;
   }
 
   .app-shell[data-device-layout="pad"][data-embedded-preview="true"] .primary-nav.glass-nav[data-lg-variant="prominent"] {
@@ -66,6 +82,8 @@
   }
 
   .primary-nav .nav-topbar {
+    position: relative;
+    z-index: 2;
     width: 44px;
     min-height: 80px;
     display: flex;
@@ -100,7 +118,13 @@
   }
 
   .primary-nav .nav-brand-name {
-    display: none;
+    position: absolute;
+    left: 39px;
+    display: block;
+    width: 120px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
     overflow: hidden;
     color: #f8f8f8;
     font-weight: 700;
@@ -122,6 +146,10 @@
     cursor: pointer;
   }
 
+  .primary-nav .nav-expand-toggle:active {
+    transform: scale(.96);
+  }
+
   .primary-nav .nav-expand-toggle:hover,
   .primary-nav .nav-expand-toggle:focus-visible {
     color: #fff;
@@ -136,6 +164,7 @@
   }
 
   .primary-nav .nav-selection {
+    transform-origin: top left;
     border: 0;
     border-radius: 17px;
     background: #353538;
@@ -172,7 +201,30 @@
   }
 
   .primary-nav .nav-label {
-    display: none;
+    position: absolute;
+    top: 50%;
+    left: 44px;
+    display: block;
+    width: clamp(136px, calc(var(--nav-rail-width) - 70px), 162px);
+    transform: translateY(-50%);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .primary-nav .nav-study-context {
+    position: absolute;
+    top: 148px;
+    left: 8px;
+    z-index: 2;
+    width: calc(clamp(208px, 22vw, 232px) - 16px);
+    display: grid;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .primary-nav .nav-item:focus-visible {
@@ -193,7 +245,8 @@
   }
 
   .app-shell[data-nav-expanded="true"] .primary-nav .nav-brand-name {
-    display: block;
+    opacity: 1;
+    visibility: visible;
   }
 
   .app-shell[data-nav-expanded="true"] .primary-nav .nav-item {
@@ -218,9 +271,18 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    opacity: 1;
+    visibility: visible;
   }
 
   .app-shell[data-nav-expanded="true"] .primary-nav .nav-study-context {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
     min-width: 0;
     display: grid;
     gap: 3px;

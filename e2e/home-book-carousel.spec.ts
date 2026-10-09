@@ -394,14 +394,57 @@ test.describe("home book carousel", () => {
     await expect(options.first()).toHaveAttribute("aria-selected", "true");
   });
 
+  test("settles on the latest course after rapid animated selections and an interrupted drag", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    const listbox = page.getByRole("listbox", { name: "选择课程" });
+    const options = listbox.getByRole("option");
+    await options.first().focus();
+    // Interrupt an in-flight scroll in both directions without waiting for it.
+    for (const key of ["End", "Home", "End", "ArrowLeft", "Home", "ArrowRight"]) {
+      await page.keyboard.press(key);
+    }
+    await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
+    const bounds = await listbox.boundingBox();
+    if (!bounds) throw new Error("The carousel did not mount");
+    const x = bounds.x + bounds.width * .42;
+    const y = bounds.y + bounds.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 32, y, { steps: 4 });
+    await page.mouse.up();
+    await expect(options.nth(2)).toHaveAttribute("aria-selected", "true");
+    await expect.poll(() => listbox.evaluate((element) => {
+      const selected = element.querySelector('[aria-selected="true"]')!;
+      const rail = element.getBoundingClientRect();
+      const cover = selected.getBoundingClientRect();
+      return Math.abs(cover.left + cover.width / 2 - (rail.left + rail.width * .42));
+    })).toBeLessThanOrEqual(2);
+    // An abandoned animation must not move the rail or restore its selection.
+    const finalState = await listbox.evaluate(async (element) => {
+      const scrollLeft = element.scrollLeft;
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+      return {
+        distance: Math.abs(element.scrollLeft - scrollLeft),
+        selected: element.querySelector('[aria-selected="true"]')?.getAttribute("data-book-id")
+      };
+    });
+    expect(finalState.distance).toBeLessThanOrEqual(2);
+    expect(finalState.selected).toBe("book-c");
+  });
+
   test("commits the nearest book after real scrolling and clamps Home/End boundaries", async ({ page }) => {
     const listbox = page.getByRole("listbox", { name: "选择课程" });
     const options = listbox.getByRole("option");
     await expect(listbox).toHaveCSS("scroll-snap-type", "x mandatory");
     await expect(options.first()).toHaveCSS("scroll-snap-align", "center");
-    const selectedDuringScroll = await listbox.evaluate((element) => {
+    await listbox.evaluate(async (element) => {
       element.style.width = "320px";
       element.style.marginInline = "auto";
+      // Let the resize observer recenter before exercising native scrolling.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    });
+    const selectedDuringScroll = await listbox.evaluate((element) => {
       element.scrollTo({ left: element.scrollWidth, behavior: "auto" });
       element.dispatchEvent(new Event("scroll"));
       return element.querySelector('[role="option"][aria-selected="true"]')?.getAttribute("data-book-id");

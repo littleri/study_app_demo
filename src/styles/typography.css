@@ -106,8 +106,30 @@
 }
 
 /* Dense book and tool tiles need a little more room at the new text scale. */
-.app-shell .home-book-workspace.is-ready[data-loaded="true"] {
+.app-shell .home-book-workspace.is-ready[data-loaded="true"],
+.app-shell .home-book-workspace.is-loading {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell .home-workspace-loading-copy {
+  min-height: 84px;
+  align-content: center;
+}
+
+.app-shell .home-workspace-loading-actions {
+  grid-column: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell .home-workspace-loading-tools > div {
+  display: flex;
+  padding: 9px 12px 12px;
+  overflow: hidden;
+}
+
+.app-shell .home-workspace-loading-tools > div > span {
+  height: 194px;
+  flex: 0 0 clamp(174px, 52%, 210px);
 }
 
 .app-shell .home-book-workspace.is-ready[data-loaded="true"] .home-workspace-actions,

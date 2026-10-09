@@ -1,3 +1,4 @@
+import { platform } from "node:process";
 import { expect, test } from "playwright/test";
 
 test.describe("device preview studio", () => {
@@ -172,7 +173,6 @@ test.describe("device preview studio", () => {
 
     await page.getByTestId("device-preview-device-ipad-pro-11").click();
     await page.getByTestId("device-preview-orientation-landscape").click();
-    await page.getByTestId("device-preview-quality-retina-3x").click();
 
     await expect.poll(() => iframeHandle.evaluate((element) => element.isConnected)).toBe(true);
     await expect.poll(() => iframeHandle.evaluate((element) => (
@@ -530,41 +530,27 @@ test.describe("device preview studio", () => {
     }), { timeout: 2_000 }).toEqual({ matchesFinalGeometry: true, mutationCount: 1 });
   });
 
-  test("uses a side control rail on wide workspaces and stacks controls on narrow screens", async ({ page }) => {
-    await page.setViewportSize({ width: 603, height: 903 });
-    await page.goto("/?preview=device-preview&quality=fit");
-
-    await expect.poll(() => page.evaluate(() => {
-      const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
-      const summary = document.querySelector<HTMLElement>(".device-preview-output-summary");
-      const canvasArea = document.querySelector<HTMLElement>(".device-preview-canvas-area");
-      const studio = document.querySelector<HTMLElement>(".device-preview-studio");
-      if (!toolbar || !summary || !canvasArea || !studio) return false;
-      const toolbarRect = toolbar.getBoundingClientRect();
-      const summaryRect = summary.getBoundingClientRect();
-      const canvasRect = canvasArea.getBoundingClientRect();
-      return toolbarRect.x === 0
-        && toolbarRect.y === 0
-        && toolbarRect.height === studio.getBoundingClientRect().height
-        && summaryRect.x >= toolbarRect.right - 1
-        && canvasRect.x >= toolbarRect.right - 1
-        && canvasRect.y >= summaryRect.bottom - 1;
-    })).toBe(true);
-
-    await page.setViewportSize({ width: 420, height: 903 });
-    await expect.poll(() => page.evaluate(() => {
-      const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
-      const summary = document.querySelector<HTMLElement>(".device-preview-output-summary");
-      const canvasArea = document.querySelector<HTMLElement>(".device-preview-canvas-area");
-      if (!toolbar || !summary || !canvasArea) return false;
-      const toolbarRect = toolbar.getBoundingClientRect();
-      const summaryRect = summary.getBoundingClientRect();
-      const canvasRect = canvasArea.getBoundingClientRect();
-      return toolbarRect.x === 0
-        && toolbarRect.width === window.innerWidth
-        && summaryRect.y >= toolbarRect.bottom - 1
-        && canvasRect.y >= summaryRect.bottom - 1;
-    })).toBe(true);
+  test("keeps controls in a compact top toolbar across workspace sizes", async ({ page }) => {
+    for (const width of [1440, 608, 420, 320]) {
+      await page.setViewportSize({ width, height: 903 });
+      await page.goto("/?preview=device-preview&quality=fit");
+      await expect.poll(() => page.evaluate(() => {
+        const toolbar = document.querySelector<HTMLElement>(".device-preview-toolbar");
+        const summary = document.querySelector<HTMLElement>(".device-preview-output-summary");
+        const canvasArea = document.querySelector<HTMLElement>(".device-preview-canvas-area");
+        if (!toolbar || !summary || !canvasArea) return false;
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const summaryRect = summary.getBoundingClientRect();
+        const canvasRect = canvasArea.getBoundingClientRect();
+        return toolbarRect.x === 0
+          && toolbarRect.width === window.innerWidth
+          && toolbarRect.height <= (window.innerWidth < 380 ? 180 : 110)
+          && summaryRect.y >= toolbarRect.bottom - 1
+          && canvasRect.x === 0
+          && canvasRect.y >= summaryRect.bottom - 1
+          && document.documentElement.scrollWidth === window.innerWidth;
+      })).toBe(true);
+    }
   });
 
   test("makes chrome-free HD output an exact viewport canvas and restores chrome with Escape", async ({ page }) => {
@@ -621,11 +607,11 @@ test.describe("device preview studio", () => {
     ))).toBe(true);
   });
 
-  test("updates output geometry and recording URL without changing the logical viewport", async ({ page }) => {
+  test("reads recording quality from the URL and updates device geometry", async ({ page }) => {
     await page.goto("/?preview=device-preview");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", /\d+/);
 
-    await page.getByTestId("device-preview-quality-hd-2x").click();
+    await page.goto("/?preview=device-preview&quality=hd-2x");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", "804");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-height", "1748");
     await expect(page).toHaveURL(/quality=hd-2x/);
@@ -637,7 +623,7 @@ test.describe("device preview studio", () => {
 
     await page.getByTestId("device-preview-device-ipad-pro-11").click();
     await page.getByTestId("device-preview-orientation-portrait").click();
-    await page.getByTestId("device-preview-quality-retina-3x").click();
+    await page.goto("/?preview=device-preview&device=ipad-pro-11&orientation=portrait&quality=retina-3x");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", "2502");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-height", "3582");
     await expect.poll(() => page.evaluate(() => {
@@ -667,7 +653,7 @@ test.describe("device preview studio", () => {
       return frame ? await frame.evaluate(() => ({ height: window.innerHeight, width: window.innerWidth })) : null;
     }).toEqual({ height: 1194, width: 834 });
 
-    await page.getByTestId("device-preview-quality-4k").click();
+    await page.goto("/?preview=device-preview&device=ipad-pro-11&orientation=portrait&quality=4k");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-width", "2160");
     await expect(page.getByTestId("device-preview-canvas")).toHaveAttribute("data-canvas-height", "3840");
     await expect.poll(() => page.evaluate(() => {
@@ -744,20 +730,22 @@ test.describe("device preview studio", () => {
     await expect(page).toHaveURL(/chrome=1/);
     await expect(page.getByTestId("device-preview-device-ipad-pro-11")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("device-preview-orientation-landscape")).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByTestId("device-preview-quality-retina-3x")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".device-preview-studio")).toHaveAttribute("data-preview-quality", "retina-3x");
   });
 
-  test("exposes labeled groups, pressed state, focus rings, and minimum hit targets", async ({ page }) => {
+  test("exposes labeled groups, pressed state, focus rings, and minimum hit targets", async ({ page, browserName }) => {
     await page.goto("/?preview=device-preview");
     await expect(page.getByRole("group", { name: "设备" })).toBeVisible();
     await expect(page.getByRole("group", { name: "方向" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "输出清晰度" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "输出清晰度" })).toHaveCount(0);
     await expect(page.getByTestId("device-preview-device-iphone-17-pro")).toHaveAttribute("aria-pressed", "true");
     await expect(page.locator("iframe.device-preview-iframe")).toHaveAttribute("title", /设备预览/);
 
     const iphoneToggle = page.getByTestId("device-preview-device-iphone-17-pro");
     const ipadToggle = page.getByTestId("device-preview-device-ipad-pro-11");
-    await page.keyboard.press("Tab");
+    // macOS WebKit uses Option+Tab to include buttons in keyboard traversal.
+    const tabKey = browserName === "webkit" && platform === "darwin" ? "Alt+Tab" : "Tab";
+    await page.keyboard.press(tabKey);
     await expect(iphoneToggle).toBeFocused();
     const focusOutline = await iphoneToggle.evaluate((element) => {
       const styles = getComputedStyle(element);
@@ -766,7 +754,7 @@ test.describe("device preview studio", () => {
     expect(focusOutline.style).not.toBe("none");
     expect(focusOutline.width).toBeGreaterThan(0);
 
-    await page.keyboard.press("Tab");
+    await page.keyboard.press(tabKey);
     await expect(ipadToggle).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(ipadToggle).toHaveAttribute("aria-pressed", "true");

@@ -36,6 +36,8 @@ import { useMouseDragScroll } from "../hooks/useMouseDragScroll";
 import { useAppContext } from "../context/AppContext";
 import { useBookCourseRepository } from "../context/BookCourseRepositoryContext";
 import { IosStatusBar } from "./IosStatusBar";
+import { usePadSidebarMotion } from "../motion/usePadSidebarMotion";
+import { MotionIconSwap } from "../motion/MotionIconSwap";
 import { getRuntimePlatform } from "../platform/nativeApp";
 import { getTextbookRetriever } from "../services/TextbookRetriever";
 import { getCitationSourceText } from "../screens/sheets/citationSource";
@@ -399,6 +401,7 @@ export function PrimaryNav({
       data-lg-variant="prominent"
       aria-label="主导航"
     >
+      <span className="nav-rail-surface" aria-hidden="true" />
       <span ref={selectionRef} className="nav-selection" aria-hidden="true" />
       <div className="nav-topbar">
         <span className="nav-brand">
@@ -413,7 +416,7 @@ export function PrimaryNav({
           title={expanded ? "收起侧边栏" : "展开侧边栏"}
           onClick={onToggleExpanded}
         >
-          {expanded ? <PanelLeftClose size={20} aria-hidden="true" /> : <PanelLeftOpen size={20} aria-hidden="true" />}
+          <MotionIconSwap state={expanded ? "expanded" : "collapsed"} firstState="collapsed" secondState="expanded" firstIcon={<PanelLeftOpen size={20} />} secondIcon={<PanelLeftClose size={20} />} />
         </button>
       </div>
       {items.map((item, index) => {
@@ -438,8 +441,8 @@ export function PrimaryNav({
               </span>
               <span className="nav-label">{item.label}</span>
             </button>
-            {item.screen === "study" && expanded && isStudyActive ? (
-              <section className="nav-study-context" aria-label="当前课程与学习工具">
+            {item.screen === "study" && isStudyActive ? (
+              <section className="nav-study-context" aria-label="当前课程与学习工具" aria-hidden={!expanded} inert={!expanded}>
                 <div className="nav-course-row">
                   <span className="nav-course-mark" aria-hidden="true"><StickerIcon name="BookOpenCheck" size={19} /></span>
                   <span className="nav-course-title" title={currentCourseTitle}>{currentCourseTitle}</span>
@@ -531,6 +534,7 @@ export function AppShell({
   });
   const appShellRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement | null>(null);
+  const prepareSidebarMotion = usePadSidebarMotion({ shellRef: appShellRef, mainRef, expanded: isNavExpanded, enabled: deviceLayout === "pad" && !hideNav, reducedMotion: motionReduced });
   const [appShellElement, setAppShellElement] = useState<HTMLDivElement | null>(null);
   const setAppShellNode = useCallback((node: HTMLDivElement | null) => {
     appShellRef.current = node;
@@ -647,7 +651,10 @@ export function AppShell({
             active={active}
             expanded={isNavExpanded}
             go={go}
-            onToggleExpanded={() => setNavExpanded((value) => !value)}
+            onToggleExpanded={() => {
+              prepareSidebarMotion();
+              setNavExpanded((value) => !value);
+            }}
           />
         ) : null}
         {overlays}

@@ -11,8 +11,7 @@ import {
   parsePreviewSettings,
   type DeviceId,
   type Orientation,
-  type PreviewSettings,
-  type QualityId
+  type PreviewSettings
 } from "./devicePreview";
 
 type AvailableSize = Readonly<{ height: number; width: number }>;
@@ -161,7 +160,6 @@ export function DevicePreviewStudio() {
     orientation: DEFAULT_PREVIEW_SETTINGS.orientation
   }), [updateSettings]);
   const handleOrientationChange = useCallback((orientation: Orientation) => updateSettings({ orientation }), [updateSettings]);
-  const handleQualityChange = useCallback((quality: QualityId) => updateSettings({ quality }), [updateSettings]);
 
   const frameStyle = {
     height: `${geometry.logicalHeight}px`,
@@ -183,7 +181,6 @@ export function DevicePreviewStudio() {
           settings={settings}
           onDeviceChange={handleDeviceChange}
           onOrientationChange={handleOrientationChange}
-          onQualityChange={handleQualityChange}
         />
       ) : null}
       {settings.chrome ? (

@@ -1,5 +1,5 @@
 import { StickerIcon } from "../icons/StickerIcon";
-import { useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { ArrowRight, Plus, Upload } from "lucide-react";
 import { useReducedMotion } from "../../motion/useReducedMotion";
 import type { HomeBookListState, HomeBookModel } from "../../screens/homeBookModel";
@@ -17,12 +17,8 @@ type HomeBookCarouselProps = Readonly<{
 const selectionAnchorRatio = .42;
 
 function centeredScrollLeft(scroller: HTMLDivElement, option: HTMLButtonElement) {
-  const scrollerBounds = scroller.getBoundingClientRect();
-  const optionBounds = option.getBoundingClientRect();
-  const optionCenterInsideScroller = scroller.scrollLeft
-    + optionBounds.left
-    - scrollerBounds.left
-    + optionBounds.width / 2;
+  // Layout coordinates stay fixed while the cover's transform is animating.
+  const optionCenterInsideScroller = option.offsetLeft + option.offsetWidth / 2;
   const maximumScrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
   return Math.max(0, Math.min(
     maximumScrollLeft,
@@ -44,6 +40,7 @@ export function HomeBookCarousel({
   const optionRefs = useRef(new Map<string, HTMLButtonElement>());
   const scrollSettleTimerRef = useRef<number | null>(null);
   const programmaticScrollBookIdRef = useRef<string | null>(null);
+  const positionedRef = useRef(false);
   const dragStateRef = useRef<{
     moved: boolean;
     pointerId: number;
@@ -53,10 +50,9 @@ export function HomeBookCarousel({
   const suppressClickRef = useRef(false);
   const selectedIndex = Math.max(0, books.findIndex((book) => book.bookId === selectedBookId));
 
-  useEffect(() => {
-    if (!selectedBookId) return;
+  const scrollToBook = useCallback((bookId: string, animate: boolean) => {
     const scroller = scrollerRef.current;
-    const option = optionRefs.current.get(selectedBookId);
+    const option = optionRefs.current.get(bookId);
     if (!scroller || !option) return;
     if (scrollSettleTimerRef.current !== null) {
       window.clearTimeout(scrollSettleTimerRef.current);
@@ -64,15 +60,27 @@ export function HomeBookCarousel({
     }
     const nextScrollLeft = centeredScrollLeft(scroller, option);
     if (Math.abs(scroller.scrollLeft - nextScrollLeft) < .5) {
+      scroller.scrollTo({ behavior: "auto", left: nextScrollLeft });
       programmaticScrollBookIdRef.current = null;
+      scroller.classList.remove("is-centering");
       return;
     }
-    programmaticScrollBookIdRef.current = selectedBookId;
+    // Native snap and smooth scrolling must not compete during a selection.
+    programmaticScrollBookIdRef.current = bookId;
+    scroller.classList.add("is-centering");
     scroller.scrollTo({
-      behavior: reducedMotion ? "auto" : "smooth",
+      behavior: animate && !reducedMotion ? "smooth" : "auto",
       left: nextScrollLeft
     });
-  }, [reducedMotion, selectedBookId]);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    if (!selectedBookId || !scrollerRef.current) return;
+    if (programmaticScrollBookIdRef.current !== selectedBookId) {
+      scrollToBook(selectedBookId, positionedRef.current);
+    }
+    positionedRef.current = true;
+  }, [listState, scrollToBook, selectedBookId]);
 
   useEffect(() => () => {
     if (scrollSettleTimerRef.current !== null) {
@@ -89,16 +97,11 @@ export function HomeBookCarousel({
       width = scroller.clientWidth;
       const option = optionRefs.current.get(selectedBookId);
       if (!option) return;
-      if (scrollSettleTimerRef.current !== null) {
-        window.clearTimeout(scrollSettleTimerRef.current);
-        scrollSettleTimerRef.current = null;
-      }
-      programmaticScrollBookIdRef.current = selectedBookId;
-      scroller.scrollTo({ behavior: "auto", left: centeredScrollLeft(scroller, option) });
+      scrollToBook(selectedBookId, false);
     });
     observer.observe(scroller);
     return () => observer.disconnect();
-  }, [selectedBookId]);
+  }, [listState, scrollToBook, selectedBookId]);
 
   function selectByIndex(index: number, focus = false) {
     const book = books[Math.max(0, Math.min(books.length - 1, index))];
@@ -119,32 +122,35 @@ export function HomeBookCarousel({
   }
 
   function settleSelectionFromScroll() {
+    if (scrollSettleTimerRef.current !== null) {
+      window.clearTimeout(scrollSettleTimerRef.current);
+      scrollSettleTimerRef.current = null;
+    }
     const scroller = scrollerRef.current;
-    if (!scroller || books.length < 2) return;
+    if (!scroller || dragStateRef.current) return;
     const programmaticBookId = programmaticScrollBookIdRef.current;
     if (programmaticBookId) {
       const programmaticOption = optionRefs.current.get(programmaticBookId);
       if (programmaticOption) {
-        const remainingDistance = Math.abs(
-          scroller.scrollLeft - centeredScrollLeft(scroller, programmaticOption)
-        );
-        if (remainingDistance <= 2) {
-          programmaticScrollBookIdRef.current = null;
-          return;
+        const target = centeredScrollLeft(scroller, programmaticOption);
+        if (Math.abs(scroller.scrollLeft - target) > 2) {
+          scroller.scrollTo({ behavior: "auto", left: target });
         }
-        scrollSettleTimerRef.current = window.setTimeout(settleSelectionFromScroll, 120);
+        programmaticScrollBookIdRef.current = null;
+        scroller.classList.remove("is-centering");
         return;
       }
       programmaticScrollBookIdRef.current = null;
+      scroller.classList.remove("is-centering");
     }
-    const scrollerAnchor = scroller.getBoundingClientRect().left + scroller.clientWidth * selectionAnchorRatio;
+    if (books.length < 2) return;
+    const scrollerAnchor = scroller.scrollLeft + scroller.clientWidth * selectionAnchorRatio;
     let nearestBookId = selectedBookId;
     let nearestDistance = Number.POSITIVE_INFINITY;
     for (const book of books) {
       const option = optionRefs.current.get(book.bookId);
       if (!option) continue;
-      const bounds = option.getBoundingClientRect();
-      const distance = Math.abs(bounds.left + bounds.width / 2 - scrollerAnchor);
+      const distance = Math.abs(option.offsetLeft + option.offsetWidth / 2 - scrollerAnchor);
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestBookId = book.bookId;
@@ -161,8 +167,20 @@ export function HomeBookCarousel({
     scrollSettleTimerRef.current = window.setTimeout(settleSelectionFromScroll, 120);
   }
 
-  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+  function interruptCentering() {
+    if (scrollSettleTimerRef.current !== null) {
+      window.clearTimeout(scrollSettleTimerRef.current);
+      scrollSettleTimerRef.current = null;
+    }
+    const scroller = scrollerRef.current;
+    if (!scroller || !programmaticScrollBookIdRef.current) return;
     programmaticScrollBookIdRef.current = null;
+    scroller.scrollTo({ behavior: "auto", left: scroller.scrollLeft });
+    scroller.classList.remove("is-centering");
+  }
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    interruptCentering();
     if (event.pointerType !== "mouse" || event.button !== 0 || books.length < 2) return;
     if (scrollSettleTimerRef.current !== null) {
       window.clearTimeout(scrollSettleTimerRef.current);
@@ -203,17 +221,14 @@ export function HomeBookCarousel({
     }
     suppressClickRef.current = dragState.moved;
     if (shouldSwitchBook) {
-      selectByIndex(selectedIndex + (dragDistance < 0 ? 1 : -1));
-      window.requestAnimationFrame(() => scroller.classList.remove("is-dragging"));
-    } else {
+      const index = Math.max(0, Math.min(books.length - 1, selectedIndex + (dragDistance < 0 ? 1 : -1)));
+      const book = books[index];
+      if (book) scrollToBook(book.bookId, true);
       scroller.classList.remove("is-dragging");
-      const selectedOption = selectedBookId ? optionRefs.current.get(selectedBookId) : null;
-      if (selectedOption) {
-        scroller.scrollTo({
-          behavior: reducedMotion ? "auto" : "smooth",
-          left: centeredScrollLeft(scroller, selectedOption)
-        });
-      }
+      if (index !== selectedIndex) selectByIndex(index);
+    } else {
+      if (selectedBookId) scrollToBook(selectedBookId, true);
+      scroller.classList.remove("is-dragging");
     }
     window.setTimeout(() => {
       suppressClickRef.current = false;
@@ -289,6 +304,8 @@ export function HomeBookCarousel({
             onPointerMove={handlePointerMove}
             onPointerUp={(event) => finishPointerDrag(event, true)}
             onScroll={handleScroll}
+            onScrollEnd={settleSelectionFromScroll}
+            onWheel={interruptCentering}
           >
             {books.map((book, index) => {
               const selected = book.bookId === selectedBookId;
@@ -318,7 +335,8 @@ export function HomeBookCarousel({
                         src={book.coverUrl}
                         alt=""
                         draggable="false"
-                        loading={selected ? "eager" : "lazy"}
+                        loading={Math.abs(index - selectedIndex) <= 1 ? "eager" : "lazy"}
+                        decoding="async"
                       />
                     ) : (
                       <>
