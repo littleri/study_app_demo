@@ -1,4 +1,5 @@
 import { StickerIcon } from "./icons/StickerIcon";
+import { NavigationIcon } from "./icons/NavigationIcon";
 import { courseRagScope } from "../features/courses/selectors";
 import { courseSourceBookIds } from "../features/courses/model";
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
@@ -12,7 +13,6 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileText,
-  Home,
   Layers3,
   ListChecks,
   Loader2,
@@ -23,7 +23,6 @@ import {
   RefreshCw,
   SendHorizontal,
   Upload,
-  User,
   X
 } from "lucide-react";
 import type { Screen, SheetState, ToastMessage } from "../types/app";
@@ -217,13 +216,11 @@ export function ProgressBar({ value, label }: { value: number; label?: string })
 
 export function HeaderBar({
   title,
-  subtitle,
   showBack,
   onBack,
   rightAction
 }: {
   title: string;
-  subtitle?: string;
   showBack?: boolean;
   onBack: () => void;
   rightAction?: ReactNode;
@@ -240,35 +237,10 @@ export function HeaderBar({
         )}
         <div className="header-title">
           <h1>{title}</h1>
-          {subtitle ? <p>{subtitle}</p> : null}
         </div>
         <div className="header-right">{rightAction ?? <div className="header-spacer" />}</div>
       </div>
     </header>
-  );
-}
-
-function DiscoveryCompassIcon({
-  size = 24,
-  ...props
-}: ComponentPropsWithoutRef<"svg"> & { size?: number | string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="m15.6 8.4-2.2 5-5 2.2 2.2-5 5-2.2Z" />
-      <circle cx="12" cy="12" r="0.75" fill="currentColor" stroke="none" />
-    </svg>
   );
 }
 
@@ -291,7 +263,7 @@ export function PrimaryNav({
   const [layoutVersion, setLayoutVersion] = useState(0);
   const reducedMotion = useReducedMotion();
   const { loadedBookId, openSheet, uploadedFile, courses: courseStore } = useAppContext();
-  const isStudyActive = active === "study" || active === "book";
+  const isStudyActive = active === "study";
   const currentCourse = courseStore.state.courses.find((course) => course.id === courseStore.state.activeCourseId);
   const currentCourseTitle = currentCourse?.name
     ?? (uploadedFile?.bookId === loadedBookId ? uploadedFile.name : null)
@@ -301,22 +273,22 @@ export function PrimaryNav({
     {
       screen: "home" as Screen,
       label: "首页",
-      icon: Home,
+      icon: "home" as const,
       active: active === "home" || active === "library" || active === "courseDetail"
     },
     {
       screen: "study" as Screen,
       label: "学习",
-      icon: BookOpenCheck,
-      active: active === "study" || active === "book"
+      icon: "study" as const,
+      active: isStudyActive
     },
     {
       screen: "community" as Screen,
       label: "发现",
-      icon: DiscoveryCompassIcon,
+      icon: "community" as const,
       active: active === "community" || active === "communityBook" || active === "communityImport"
     },
-    { screen: "profile" as Screen, label: "我的", icon: User, active: active === "profile" }
+    { screen: "profile" as Screen, label: "我的", icon: "profile" as const, active: active === "profile" }
   ];
   const studyLinks = [
     { screen: "plan" as Screen, label: "学习计划", icon: CalendarDays },
@@ -420,7 +392,6 @@ export function PrimaryNav({
         </button>
       </div>
       {items.map((item, index) => {
-        const Icon = item.icon;
         return (
           <Fragment key={item.screen}>
             <button
@@ -436,7 +407,7 @@ export function PrimaryNav({
             >
               <span className="nav-icon">
                 <span className="nav-icon-motion">
-                  <Icon size={22} aria-hidden="true" />
+                  <NavigationIcon name={item.icon} selected={item.active} />
                 </span>
               </span>
               <span className="nav-label">{item.label}</span>
@@ -498,7 +469,6 @@ export function AppShell({
   onClickCapture,
   overlays,
   title,
-  subtitle,
   rightAction,
   showBack,
   onBack,
@@ -514,7 +484,6 @@ export function AppShell({
   onClickCapture?: (event: MouseEvent<HTMLDivElement>) => void;
   overlays?: ReactNode;
   title?: string;
-  subtitle?: string;
   rightAction?: ReactNode;
   showBack?: boolean;
   onBack: () => void;
@@ -529,7 +498,7 @@ export function AppShell({
   const isNativeAndroid = runtimePlatform === "android";
   const isEmbeddedPreview = new URLSearchParams(window.location.search).get("embedded") === "device-preview";
   const mouseDragScroll = useMouseDragScroll({
-    enableVerticalMomentum: !motionReduced && (active === "study" || active === "book" || active === "community"),
+    enableVerticalMomentum: !motionReduced && (active === "study" || active === "community"),
     momentumScopeKey: active
   });
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -635,9 +604,9 @@ export function AppShell({
         onWheelCapture={mouseDragScroll.onWheelCapture}
       >
         {deviceChrome}
-        {title ? <HeaderBar title={title} subtitle={subtitle} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
+        {title ? <HeaderBar title={title} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
-        {active !== "study" && active !== "book" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" && active !== "settings" ? (
+        {active !== "profile" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" && active !== "settings" ? (
           <GlobalAIAssistant
             active={active}
             containerElement={appShellElement}

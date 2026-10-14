@@ -516,7 +516,6 @@
     .mistake-workspace,
     .mistake-review-workspace,
     .notes-workspace,
-    .report-workspace,
     .profile-workspace,
     .community-detail-workspace,
     .community-import-workspace,
@@ -562,7 +561,7 @@
   }
 
   .study-directory {
-    padding-top: 12px;
+    padding-top: 8px;
   }
 
   .library-course-grid,
@@ -677,7 +676,6 @@
   .diagnosis-next-steps-column,
   .mistake-list,
   .mistake-review-analysis,
-  .report-summary-column,
   .profile-summary-column,
   .profile-card.profile-portrait-card,
   .community-detail-workspace .community-detail-card {

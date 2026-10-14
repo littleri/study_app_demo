@@ -530,9 +530,17 @@
 .course-source-chapter { display: flex; align-items: center; gap: 12px; padding: 16px; width: 100%; border: 0; border-radius: 16px; background: white; color: inherit; text-align: left; margin-bottom: 8px; cursor: pointer; }
 .course-source-chapter > span { flex: 1; font-weight: 650; }
 .course-source-chapter > small { color: var(--text-muted, #64748b); white-space: nowrap; }
-.course-materials-sheet { display: grid; gap: 18px; }
-.course-materials-sheet h3 { margin: 0; font-size: 16px; }
-.course-materials-sheet .course-space-picker { max-height: 42dvh; overflow-y: auto; overscroll-behavior: contain; }
+.course-materials-sheet { width: 100%; min-width: 0; }
+.sheet-overlay[data-sheet-type="addMaterials"] .sheet-header { justify-content: flex-end; }
+.sheet-overlay[data-sheet-type="addMaterials"] .sheet-header h2 { display: none; }
+.course-materials-sheet .upload-sheet-card.upload-flow-primary {
+  min-height: 0;
+  padding: 12px 10px 24px;
+  border-radius: 0;
+}
+.course-materials-sheet h3 { margin: 18px 0 0; font-size: 18px; }
+.course-materials-sheet p { max-width: 34ch; color: var(--color-text-secondary); }
+.course-materials-sheet .status-error-copy { color: var(--color-danger); }
 .course-upload-files { display: grid; gap: 10px; width: 100%; }
 .course-upload-files > div { display: flex; align-items: center; gap: 10px; padding: 12px; background: #f3f4fa; border-radius: 12px; }
 .course-upload-files > div > span { flex: 1; overflow-wrap: anywhere; }

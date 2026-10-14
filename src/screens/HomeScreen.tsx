@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StickerIcon } from "../components/icons/StickerIcon";
-import { Upload } from "lucide-react";
 import { HomeBookCarousel } from "../components/home/HomeBookCarousel";
 import { SelectedBookWorkspace } from "../components/home/SelectedBookWorkspace";
 import type { ChapterToolId } from "../components/study/ChapterToolCards";
@@ -98,7 +97,6 @@ export function HomeScreen() {
     ...(selected ? [{ icon: <StickerIcon name="Upload" size={20} />, title: "课程资料", helper: "管理文件与教材", target: "courseDetail" as const, id: "upload" }] : [])
   ];
   return <div className="home-dashboard">
-    <header className="home-topline"><div><h1>Hi，{courses.state.preferences?.displayName ?? "同学"}</h1><p>每天学一点，让进步慢慢发生。</p></div>{listState === "error" ? <button className="home-import-course-action" type="button" onClick={createCourse}><Upload size={16} /><span>创建课程</span></button> : null}</header>
     {ctx.sourceSummariesError ? <div className="home-course-error" role="alert"><span><strong>课程资料暂时无法更新</strong><small>{ctx.sourceSummariesError}</small></span><button type="button" onClick={() => void ctx.refreshSources()}>重新加载</button></div> : null}
     <HomeBookCarousel books={models.map((item) => item.model)} selectedBookId={selected?.course.id ?? null} listState={listState} onSelectBook={(id) => void choose(id)} onOpenBook={(id) => void choose(id, true)} onAddBook={createCourse} onOpenLibrary={() => go("library")} />
     <SelectedBookWorkspace book={workspaceBook} canOpenOriginal={loaded} hasLocalUploadSession={false} listState={listState} loadedBookId={loaded ? loadedBookId : null} pendingBookId={openingId ? selectedSourceId : null} selectionError={error} nextStep={nextStep} studyPreview={null} onContinue={() => { if (prepareNext()) go("lesson"); }} onOpenOriginal={() => openSource()} onOpenSource={() => openSource(true)} onRestart={() => go("courseDetail")} onRetrySelection={() => failedCourseId && void choose(failedCourseId)} onSelectTool={openTool} onViewStatus={() => void openStatus()} onUpload={() => { if (selected) ctx.openSheet({ type: "addMaterials", courseId: selected.course.id }); else createCourse(); }} onPreviewAction={() => {}} />

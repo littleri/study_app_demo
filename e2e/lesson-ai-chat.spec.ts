@@ -3,6 +3,49 @@ import { expect, test } from "playwright/test";
 test.describe("lesson AI chat entry", () => {
   test.use({ colorScheme: "light", locale: "zh-CN", timezoneId: "Asia/Hong_Kong" });
 
+  test("restores mascot focus without a rectangular outline and exposes the assistant on Study instead of Profile", async ({ page }) => {
+    await page.goto("/?embedded=device-preview");
+    const entry = page.getByRole("button", { name: "打开 AI 助手", exact: true });
+    const dialog = page.getByRole("dialog", { name: "AI 导学助手", exact: true });
+    await expect(entry).toBeVisible();
+
+    await entry.click();
+    await expect(dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true })).toBeFocused();
+    await dialog.getByRole("button", { name: "收起 AI 助手", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(entry).toBeFocused();
+    await expect(entry).toHaveCSS("outline-style", "none");
+
+    await entry.press("Enter");
+    const input = dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true });
+    await expect(input).toBeFocused();
+    await input.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(entry).toBeFocused();
+    expect(await entry.evaluate((button) => button.matches(":focus-visible"))).toBe(true);
+    await expect(entry).toHaveCSS("outline-style", "none");
+    expect(await entry.locator("img").evaluate((image) => getComputedStyle(image).filter), "keyboard focus stays visible on the cloud silhouette").not.toBe("none");
+
+    await page.getByRole("button", { name: "学习", exact: true }).click();
+    await expect(page.locator(".study-screen")).toBeVisible();
+    await expect(entry).toBeVisible();
+    await expect(page.locator(".ai-orb")).toHaveCount(1);
+    await entry.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator(".ai-current-book")).toContainText("当前课程");
+    await dialog.getByRole("button", { name: "收起 AI 助手", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(entry).toBeFocused();
+    await expect(entry).toHaveCSS("outline-style", "none");
+
+    await page.getByRole("button", { name: "我的", exact: true }).click();
+    await expect(page.locator(".profile-screen")).toBeVisible();
+    await expect(page.locator(".ai-orb")).toHaveCount(0);
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "首页", exact: true }).click();
+    await expect(entry).toBeVisible();
+  });
+
   test("switches mascot states, docks across edges, and opens the shared course-aware AI dialog", async ({ page }) => {
     test.slow();
     let directDeepSeekRequests = 0;

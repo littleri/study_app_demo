@@ -345,9 +345,6 @@ button:disabled {
   .ai-explain-card,
   .concept-flash-card,
   .diagnosis-card,
-  .knowledge-map-card,
-  .ai-suggestion-card,
-  .report-card,
   .profile-card,
   .community-detail-card,
   .community-import-success,
@@ -434,8 +431,7 @@ button:disabled {
 .screen-content .quick-action,
 .screen-content .metric-card,
 .screen-content .course-action-grid .quick-action,
-.screen-content .concept-card-grid button,
-.screen-content .suggestion-grid button {
+.screen-content .concept-card-grid button {
   color: var(--color-text);
   background: var(--color-surface-soft);
   border: 1px solid var(--color-border);
@@ -445,8 +441,7 @@ button:disabled {
 
 .screen-content .quick-action:hover,
 .screen-content .course-action-grid .quick-action:hover,
-.screen-content .concept-card-grid button:hover,
-.screen-content .suggestion-grid button:hover {
+.screen-content .concept-card-grid button:hover {
   background: var(--color-primary-soft);
   border-color: var(--color-primary);
 }
@@ -687,12 +682,6 @@ button:disabled {
 
 .screen-content .daily-task-card::after {
   background: linear-gradient(90deg, #f2f5fb 0%, rgba(242, 245, 251, 0.92) 40%, transparent 78%);
-}
-
-.screen-content .report-card[data-surface="celebration"] {
-  background: #f1f4fb var(--brand-cloud-report) right 16px top 16px / min(165px, 42%) auto no-repeat;
-  border-color: var(--color-primary-light);
-  box-shadow: none;
 }
 
 .course-ready-primary[data-brand-moment="course-ready"] {

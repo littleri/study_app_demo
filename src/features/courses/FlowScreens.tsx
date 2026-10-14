@@ -134,7 +134,6 @@ export function OnboardingScreen() {
         {step === 0 ? (
           <div className="learning-flow-question">
             <span className="learning-flow-symbol"><StickerIcon name="Sparkles" size={28} aria-hidden="true" /></span>
-            <h1>我们怎么称呼你</h1>
             <label className="learning-flow-label" htmlFor="learner-name">你的称呼</label>
             <input
               ref={nameRef}
@@ -151,8 +150,6 @@ export function OnboardingScreen() {
         ) : step === 1 ? (
           <div className="learning-flow-question">
             <span className="learning-flow-symbol"><StickerIcon name="BookOpen" size={28} aria-hidden="true" /></span>
-            <h1>你使用云径的主要目标是</h1>
-            <p>选择此刻最重要的一项，之后可以修改。</p>
             <div className="learning-goal-grid" role="group" aria-label="主要学习目标">
               {primaryGoals.map((option) => (
                 <button
@@ -174,8 +171,6 @@ export function OnboardingScreen() {
         ) : (
           <div className="learning-flow-question">
             <span className="learning-flow-symbol"><StickerIcon name="Clock3" size={28} aria-hidden="true" /></span>
-            <h1>你每天能投入多少学习时间</h1>
-            <p>只用于安排建议，不会限制你自由学习。</p>
             <div className="learning-time-grid" role="group" aria-label="每日学习时间">
               {dailyTimes.map((option) => (
                 <button
@@ -395,8 +390,6 @@ export function CourseSetupScreen({ onCatalogImportComplete }: { onCatalogImport
       {step < 0 ? (
         <div className="course-space-details">
           <span className="learning-flow-symbol"><StickerIcon name="BookOpen" size={24} aria-hidden="true" /></span>
-          <h1>调整课程</h1>
-          <p>把同一目标下的书籍和资料放在一起，再设定适合自己的学习方式。</p>
           <label className="learning-flow-label" htmlFor="course-space-name">课程名称</label>
           <input
             ref={nameRef}
@@ -449,8 +442,6 @@ export function CourseSetupScreen({ onCatalogImportComplete }: { onCatalogImport
         <div className="learning-flow-center">
           <div className="learning-flow-question learning-diagnosis-question">
             <span className="learning-flow-symbol"><QuestionIcon size={24} aria-hidden="true" /></span>
-            <h1>{question!.title}</h1>
-            <p>{question!.helper}</p>
             <div className="learning-diagnosis-options" data-question={question!.key} data-option-count={question!.options.length} role="group" aria-label={question!.title}>
               {question!.options.map((option) => {
                 const answer = draft.diagnosis[question!.key];

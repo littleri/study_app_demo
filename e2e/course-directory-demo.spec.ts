@@ -37,7 +37,6 @@ test.describe("textbook covers and directory demonstration", () => {
     await page.getByRole("button", { name: "查看课程目录", exact: true }).click();
     await expect(page.locator('.study-screen[data-directory-only="true"]')).toBeVisible();
     await expect(page.locator(".study-book-switch img")).toHaveAttribute("src", "/assets/book-covers/physics-required-3.webp");
-    await expect(page.locator(".study-directory-heading")).toContainText("5 章 · 23 节");
     await expect(page.locator(".study-chapter")).toHaveCount(5);
     await expect(page.locator(".study-directory-reference")).toHaveCount(2);
     await expect(page.locator(".study-directory-reference").last()).toContainText("教材第 135 页");
@@ -60,11 +59,11 @@ test.describe("textbook covers and directory demonstration", () => {
   test("browses chemistry, English and calculus using their own covers and original directories", async ({ page }) => {
     await openHome(page);
     const courses = [
-      { title: "化学 必修 第二册", cover: "chemistry-required-2", count: "4 章 · 22 个目录项", chapters: 4, references: 4,
+      { title: "化学 必修 第二册", cover: "chemistry-required-2", chapters: 4, references: 4,
         chapterId: "chemistry-c1", sectionId: "chemistry-c1-s5", sectionTitle: "实验活动 4 用化学沉淀法去除粗盐中的杂质离子", pages: "教材第 29 页" },
-      { title: "英语 必修 第三册", cover: "english-required-3", count: "5 单元 · 40 个目录项", chapters: 5, references: 10,
+      { title: "英语 必修 第三册", cover: "english-required-3", chapters: 5, references: 10,
         chapterId: "english-c5", sectionId: "english-c5-s4", sectionTitle: "Viewing and Talking", pages: "教材第 55 页" },
-      { title: "高等数学 上册（第七版）", cover: "advanced-mathematics-1", count: "7 章 · 46 个目录项", chapters: 7, references: 5,
+      { title: "高等数学 上册（第七版）", cover: "advanced-mathematics-1", chapters: 7, references: 5,
         chapterId: "calculus-c1", sectionId: "calculus-c1-s1", sectionTitle: "第一节 映射与函数", pages: "教材第 1-17 页" }
     ];
     for (const course of courses) {
@@ -78,7 +77,6 @@ test.describe("textbook covers and directory demonstration", () => {
       await expect(page.locator(".study-book-switch")).toContainText(course.title);
       await expect(page.locator(".study-book-switch img")).toHaveAttribute("src", `/assets/book-covers/${course.cover}.webp`);
       await expect.poll(() => page.locator(".study-book-switch img").evaluate((image) => (image as HTMLImageElement).naturalWidth > 0)).toBe(true);
-      await expect(page.locator(".study-directory-heading")).toContainText(course.count);
       await expect(page.locator(".study-chapter")).toHaveCount(course.chapters);
       await expect(page.locator(".study-directory-reference")).toHaveCount(course.references);
       const chapterToggle = page.locator(`#study-chapter-${course.chapterId}-toggle`);

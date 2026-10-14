@@ -1,0 +1,132 @@
+/* Match each title to the surface already visible behind it. Load after the
+   page styles so transparent legacy headers cannot expose scrolling content. */
+.app-shell {
+  --page-header-background: var(--color-bg);
+}
+
+/* Every page owns one title row. The 66px offset is measured from the app
+   viewport, including the simulated phone chrome. */
+.app-shell[data-active-screen] {
+  --page-title-top: 66px;
+  --header-block-size: 44px;
+  --page-content-top: calc(var(--page-title-top) + var(--header-block-size) + var(--space-layout));
+}
+
+.app-shell[data-active-screen] > .header-bar:has(.header-title) {
+  top: var(--page-title-top);
+  padding-block: 0;
+  border: 0;
+}
+
+.app-shell[data-active-screen] > .header-bar > .header-glass {
+  height: var(--header-block-size);
+  min-height: var(--header-block-size);
+  grid-template-columns: var(--touch-target-min) minmax(0, 1fr) var(--touch-target-min);
+  align-items: start;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-shell[data-active-screen] .header-title h1 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell[data-active-screen] > .screen-content.with-header {
+  padding-top: var(--page-content-top);
+}
+
+.app-shell[data-active-screen="source"] > .screen-content.with-header {
+  padding-top: calc(var(--page-title-top) + var(--header-block-size) + 1px);
+}
+
+.app-shell[data-active-screen="upload"] {
+  --upload-sheet-top: var(--page-content-top);
+}
+
+/* Questionnaire titles need the full row; their back and progress controls
+   remain in the questionnaire itself. */
+.app-shell:is([data-active-screen="onboarding"], [data-active-screen="courseSetup"]) {
+  --type-title: clamp(22px, 5.6vw, 34px);
+}
+
+.app-shell:is([data-active-screen="onboarding"], [data-active-screen="courseSetup"]) > .header-bar > .header-glass {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell:is([data-active-screen="onboarding"], [data-active-screen="courseSetup"]) .header-glass > :is(.header-spacer, .header-right) {
+  display: none;
+}
+
+.app-shell:is([data-active-screen="onboarding"], [data-active-screen="courseSetup"]) :is(.learning-flow, .motion-screen-transition) {
+  min-height: calc(100dvh - var(--page-content-top) - var(--safe-area-bottom) - 20px);
+}
+
+.app-shell:is(
+  [data-active-screen="processing"],
+  [data-active-screen="courseImportProcessing"],
+  [data-active-screen="chapterConfirm"],
+  [data-active-screen="lesson"],
+  [data-active-screen="mistakes"],
+  [data-active-screen="source"]
+) {
+  --page-header-background: var(--color-surface);
+}
+
+.app-shell:is(
+  [data-active-screen="parseReady"],
+  [data-active-screen="communityBook"]
+) {
+  --page-header-background: var(--color-primary-light);
+}
+
+.app-shell[data-active-screen="upload"] {
+  --page-header-background: var(--upload-cover);
+}
+
+.app-shell[data-active-screen="assignment"] {
+  --page-header-background: #d9d2ff;
+}
+
+.app-shell[data-active-screen] :is(
+  .header-bar,
+  .header-glass,
+  .header-title,
+  .ios-status-bar
+) {
+  background: var(--page-header-background);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Cover the title's outer gutters and safe area without moving its controls. */
+.app-shell[data-active-screen] > .header-bar {
+  isolation: isolate;
+}
+
+.app-shell[data-active-screen] > .header-bar::before {
+  position: absolute;
+  z-index: -1;
+  top: calc(0px - var(--page-title-top));
+  right: calc(0px - var(--safe-area-right) - var(--space-inline));
+  bottom: calc(0px - var(--space-layout));
+  left: calc(0px - var(--safe-area-left) - var(--space-inline));
+  background: var(--page-header-background);
+  pointer-events: none;
+  content: "";
+}
+
+/* Custom controls and completion graphics inherit the page surface. */
+.app-shell[data-active-screen] :is(
+  .study-book-bar,
+  .learning-flow-top,
+  .learning-flow-question,
+  .course-ready-focus-copy,
+  .course-ready-success-heading
+) {
+  background: var(--page-header-background);
+}

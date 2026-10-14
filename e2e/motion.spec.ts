@@ -670,6 +670,65 @@ test.describe("2. global navigation, sheets, AI, and Toast", () => {
     await expect(page.locator(".primary-nav [data-motion-active='true']")).toHaveCount(1);
   });
 
+  test("keeps 675ms semantic navigation gestures stable through rapid selection and reduced motion", async ({ page }) => {
+    await gotoApp(page);
+    await installPauseStyle(page, ".navigation-icon, .navigation-icon *");
+    const nav = page.locator(".primary-nav");
+    const items = nav.locator(".nav-item");
+    const retainedIcons = await nav.locator(".navigation-icon").elementHandles();
+    expect(retainedIcons).toHaveLength(4);
+
+    const gestures = [
+      { index: 1, part: ".navigation-icon-page-lines", name: "motion-nav-page-lines-in" },
+      { index: 2, part: ".navigation-icon-needle", name: "motion-nav-needle-in" },
+      { index: 3, part: ".navigation-icon-head", name: "motion-nav-head-nod" },
+      { index: 0, part: ".navigation-icon-window", name: "motion-nav-window-in" }
+    ];
+
+    let previousIndex = 0;
+    for (const gesture of gestures) {
+      await items.nth(gesture.index).click();
+      const icon = items.nth(gesture.index).locator(".navigation-icon");
+      await expect(icon).toHaveAttribute("data-nav-icon-state", "selected");
+      await expect(nav.locator('[data-nav-icon-state="selected"]')).toHaveCount(1);
+      expect(await readAnimation(icon.locator(gesture.part).first())).toMatchObject({
+        name: gesture.name,
+        duration: "0.675s",
+        playState: "paused"
+      });
+
+      const outlineTransition = await readTransition(icon.locator(".navigation-icon-outline"));
+      expect(outlineTransition).toMatchObject({ duration: "0.2s", property: "stroke-width" });
+      const previousIcon = items.nth(previousIndex).locator(".navigation-icon");
+      await expect(previousIcon).toHaveAttribute("data-nav-icon-state", "unselected");
+      expect(await previousIcon.evaluate((svg) => [...svg.querySelectorAll("*")].every((part) => getComputedStyle(part).animationName === "none")), "deselection cancels all previous icon gestures").toBe(true);
+
+      const iconBounds = await icon.boundingBox();
+      const wrapperBounds = await items.nth(gesture.index).locator(".nav-icon").boundingBox();
+      expect(iconBounds).not.toBeNull();
+      expect(wrapperBounds).not.toBeNull();
+      if (iconBounds && wrapperBounds) {
+        expect(Math.abs(iconBounds.x + iconBounds.width / 2 - wrapperBounds.x - wrapperBounds.width / 2), "opening and settling use the visible SVG center").toBeLessThan(1);
+      }
+      previousIndex = gesture.index;
+    }
+
+    for (const handle of retainedIcons) {
+      expect(await handle.evaluate((svg) => svg.isConnected), "rapid navigation keeps the same SVG nodes mounted").toBe(true);
+    }
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await items.nth(2).click();
+    const compass = items.nth(2).locator(".navigation-icon");
+    await expect(compass).toHaveAttribute("data-nav-icon-state", "selected");
+    expect(await compass.evaluate((svg) => [svg, ...svg.querySelectorAll("*")].every((part) => {
+      const style = getComputedStyle(part);
+      return style.animationName === "none" && style.transitionDuration === "0s";
+    })), "reduced motion exposes the selected icon synchronously").toBe(true);
+    expect(await compass.locator(".navigation-icon-outline").evaluate((part) => getComputedStyle(part).strokeWidth)).toBe("27px");
+    expect(await compass.locator(".navigation-icon-needle").first().evaluate((part) => getComputedStyle(part).transform)).toBe("none");
+  });
+
   test("maps ActionSheet and AI panel+scrim to the same 350ms enter/exit curves", async ({ page }) => {
     await openStudy(page);
     await installPauseStyle(page, ".sheet, .sheet-scrim");
@@ -1916,7 +1975,6 @@ test.describe("4. current SourceReader, Notes, Community, and StudyPlan local li
     }
     await page.locator(".lesson-floating-complete .button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
-    await expect(page.locator(".report-screen")).toHaveCount(0);
     await settleScreen(page);
     expect(await lessonNode.evaluate((element) => element.isConnected), "leaving Lesson detaches its old local root").toBe(false);
     await page.locator(".primary-nav .nav-item").nth(3).click();

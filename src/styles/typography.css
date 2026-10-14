@@ -394,7 +394,7 @@
   }
 }
 
-.app-shell :is(.metric-card strong, .report-score-ring strong) {
+.app-shell .metric-card strong {
   font-size: var(--type-subtitle) !important;
   font-weight: 700 !important;
   line-height: 1.25 !important;

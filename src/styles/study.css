@@ -1,5 +1,4 @@
-.screen-content[data-screen="study"],
-.screen-content[data-screen="book"] {
+.screen-content[data-screen="study"] {
   overflow-anchor: none;
   background: var(--color-bg);
 }
@@ -222,7 +221,7 @@
   margin-bottom: 4px;
 }
 
-.study-plan-heading h1 {
+.study-plan-heading h2 {
   margin: 0;
   font-size: 21px;
   font-weight: 780;
@@ -396,19 +395,12 @@
 }
 
 .study-directory {
-  padding-top: 12px;
+  padding-top: 8px;
   touch-action: pan-y;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .study-directory-heading {
-    cursor: grab;
-  }
-}
-
 @media (max-width: 719px) and (orientation: portrait) {
-  .screen-content[data-screen="study"],
-  .screen-content[data-screen="book"] {
+  .screen-content[data-screen="study"] {
     padding-top: calc(var(--safe-area-top) + 4px);
   }
 
@@ -426,27 +418,6 @@
     border-inline-color: transparent;
     box-shadow: none;
   }
-}
-
-.study-directory-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 2px 13px;
-}
-
-.study-directory-heading h2 {
-  margin: 0;
-  font-size: 23px;
-  line-height: 1.2;
-  letter-spacing: -.025em;
-}
-
-.study-directory-heading > span {
-  padding-bottom: 2px;
-  color: var(--color-text-muted);
-  font-size: 12px;
 }
 
 .study-chapter-list {
@@ -1407,7 +1378,7 @@
     display: contents;
   }
 
-  .study-plan-heading h1 {
+  .study-plan-heading h2 {
     grid-column: 1;
     grid-row: 1;
     font-size: 20px;

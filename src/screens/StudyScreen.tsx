@@ -633,7 +633,7 @@ export function StudyScreen() {
         >
           <div className="study-plan-details" aria-hidden={planCompact}>
             <div className="study-plan-heading">
-              <h1>学习计划</h1>
+              <h2>学习计划</h2>
               <button type="button" tabIndex={planCompact ? -1 : undefined} onClick={() => go("plan")}>
                 计划详情
                 <ChevronRight size={16} aria-hidden="true" />
@@ -653,12 +653,7 @@ export function StudyScreen() {
         </section>}
       </div>
 
-      <section className="study-directory" aria-labelledby="study-directory-title">
-        <div className="study-directory-heading">
-          <h2 id="study-directory-title">课程目录</h2>
-          <span>{directoryOnly ? chapterTree.filter((node) => node.children.length > 0).length : chapterTree.length} {currentSource?.directory_unit_label ?? "章"} · {chapterTree.reduce((sum, node) => sum + countFormalSections(node), 0)} {currentSource?.directory_unit_label ? "个目录项" : "节"}</span>
-        </div>
-        <div className="course-source-heading"><strong>{bookTitle}</strong><button type="button" onClick={() => go("courseDetail")}>管理资料 <ChevronRight size={16} /></button></div>
+      <section className="study-directory" aria-label="课程目录">
         <div className="study-chapter-list">
           {chapterTree.map((node, index) => directoryOnly && node.children.length === 0 ? (
             <article className="study-directory-reference" key={node.chapter.chapter_id}>

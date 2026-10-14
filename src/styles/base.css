@@ -1447,8 +1447,7 @@ textarea:focus-visible {
 
 .privacy-card,
 .guide-card,
-.note-card,
-.report-card {
+.note-card {
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -3074,24 +3073,6 @@ html {
     rgba(255, 255, 255, 0.94);
 }
 
-.report-card {
-  display: grid;
-  align-content: start;
-  gap: 4px;
-  min-height: 224px;
-  border-radius: 24px;
-  background:
-    var(--brand-cloud-report) right 16px top 16px / 165px auto no-repeat,
-    radial-gradient(circle at 20% 56%, rgba(255, 221, 125, 0.36), transparent 20%),
-    radial-gradient(circle at 10% 72%, rgba(230, 120, 255, 0.22), transparent 24%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(218, 235, 255, 0.8));
-}
-
-.report-card h2 {
-  margin-top: 24px;
-  font-size: 28px;
-}
-
 .upload-card {
   min-height: 430px;
   justify-content: center;
@@ -3155,6 +3136,15 @@ html {
   object-fit: contain;
   pointer-events: none;
   user-select: none;
+}
+
+/* Follow the mascot's transparent silhouette instead of its rectangular hit area. */
+.ai-orb.ai-orb-mascot:focus-visible {
+  outline: none;
+}
+
+.ai-orb.ai-orb-mascot:focus-visible > img {
+  filter: drop-shadow(0 0 2px var(--color-focus)) drop-shadow(0 0 1px var(--color-focus));
 }
 
 .ai-orb-mascot[data-side="left"][data-interaction="pressed"] > img,
@@ -4783,69 +4773,6 @@ html {
   flex: 0 0 auto;
 }
 
-.source-reference-sheet {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  align-content: start;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.source-reference-sheet::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.source-reference-sheet > .pill {
-  width: fit-content;
-}
-
-.source-unified-reader {
-  display: grid;
-  gap: 14px;
-}
-
-.source-page-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.source-page-panel .textbook-preview {
-  padding: 0;
-  border: 0;
-  background: var(--color-surface-soft);
-  box-shadow: none;
-}
-
-.source-page-panel .textbook-preview img {
-  display: block;
-  width: 100%;
-  max-height: none;
-  border-radius: 10px;
-}
-
-.source-page-panel .textbook-preview figcaption {
-  padding: 0 10px 10px;
-}
-
-.sheet .source-page-panel .helper-text,
-.sheet .source-selection-hint {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-  line-height: 1.55;
-}
-
-.source-page-selection-surface {
-  position: relative;
-  overflow: hidden;
-  border-radius: 10px;
-  background: white;
-}
-
 .source-page-text-layer {
   position: absolute;
   inset: 7% 5% 7% 39%;
@@ -4870,56 +4797,10 @@ html {
   outline-offset: 2px;
 }
 
-.sheet .source-page-text-layer p {
-  margin: 0;
-  color: transparent;
-  font: inherit;
-}
-
 .source-page-text-layer::selection,
 .source-page-text-layer *::selection {
   color: transparent;
   background: color-mix(in srgb, var(--color-primary) 30%, transparent);
-}
-
-.source-selection-action {
-  position: sticky;
-  z-index: 1;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  color: var(--color-text);
-  background: var(--color-primary-soft);
-}
-
-.source-selection-action > div {
-  min-width: 0;
-}
-
-.sheet .source-selection-action small {
-  color: var(--color-primary-pressed);
-  font-size: 0.75rem;
-  font-weight: 750;
-}
-
-.sheet .source-selection-action p {
-  overflow: hidden;
-  margin: 3px 0 0;
-  color: var(--color-text);
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.source-selection-action .button {
-  min-height: var(--touch-target-min);
-  padding: 9px 12px;
-  white-space: nowrap;
 }
 
 .concept-detail-sheet {
@@ -5348,52 +5229,6 @@ html {
 
 .sticky-actions {
   grid-template-columns: 1fr 1fr;
-}
-
-.report-score-ring {
-  width: 104px;
-  height: 104px;
-  margin-top: 18px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background:
-    radial-gradient(circle, #ffffff 58%, transparent 59%),
-    conic-gradient(#8f79ff 0 45%, #ffdd69 45% 82%, #dde6f5 82% 100%);
-  box-shadow: 0 12px 26px rgba(99, 112, 160, 0.14);
-}
-
-.report-score-ring strong {
-  color: #20263a;
-  font-size: 27px;
-}
-
-.knowledge-map-card,
-.ai-suggestion-card {
-  display: grid;
-  gap: 12px;
-}
-
-.suggestion-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.suggestion-grid button {
-  min-height: 72px;
-  border-radius: 14px;
-  color: #4e5d78;
-  background: #eef5ff;
-  font-weight: 800;
-}
-
-.suggestion-grid button:nth-child(2) {
-  background: #edf7ff;
-}
-
-.suggestion-grid button:nth-child(3) {
-  background: #efedff;
 }
 
 .plan-hero-card {

@@ -44,7 +44,7 @@ test.describe("P1 learning flow safeguards", () => {
 
     await page.getByRole("button", { name: "完成本节", exact: true }).click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
-    await expect(page.locator(".report-screen")).toHaveCount(0);
+    await expect(page.locator('main[data-screen="study"]')).toBeVisible();
     await expect.poll(() => readMainScrollTop(page)).toBe(0);
 
     await page.getByRole("button", { name: "进入学习", exact: true }).click();

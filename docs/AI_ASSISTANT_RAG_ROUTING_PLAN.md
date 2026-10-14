@@ -246,7 +246,7 @@ Vitest 覆盖应至少验证：
 ```text
 npm exec vitest run src/services/DeepSeekRag.test.ts src/screens/SourceReaderScreen.test.tsx src/screens/sheets/citationSource.test.ts scripts/rag-common.test.ts scripts/citation-source-assets.test.ts
 npm exec vitest run src/rag/retrievalMath.test.ts src/services/TextbookRetriever.test.ts
-npm exec eslint src/services/DeepSeekRag.ts src/services/DeepSeekRag.test.ts src/config/deepseek.ts src/services/DemoRepository.ts src/components/ui.tsx src/screens/SourceReaderScreen.tsx src/screens/SourceReaderScreen.test.tsx src/screens/sheets/ChatSheetContent.tsx src/screens/sheets/SourceSheetContent.tsx src/screens/sheets/citationSource.ts src/screens/sheets/citationSource.test.ts src/types/app.ts e2e/lesson-ai-chat.spec.ts
+npm exec eslint src/services/DeepSeekRag.ts src/services/DeepSeekRag.test.ts src/config/deepseek.ts src/services/DemoRepository.ts src/components/ui.tsx src/screens/SourceReaderScreen.tsx src/screens/SourceReaderScreen.test.tsx src/screens/sheets/ChatSheetContent.tsx src/screens/sheets/citationSource.ts src/screens/sheets/citationSource.test.ts src/types/app.ts e2e/lesson-ai-chat.spec.ts
 npm run build
 playwright test e2e/lesson-ai-chat.spec.ts
 npm run rag:validate:source-assets

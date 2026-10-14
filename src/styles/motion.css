@@ -670,29 +670,110 @@
   display: contents;
 }
 
-.nav-item[data-motion-active="true"] .nav-icon-motion svg {
-  animation-duration: var(--motion-duration-local-fast);
+.navigation-icon-outline {
+  transition-duration: var(--motion-duration-local-slow);
+  transition-property: stroke-width;
+  transition-timing-function: var(--motion-ease-local-state);
+}
+
+.navigation-icon-details {
+  pointer-events: none;
+  transition-duration: var(--motion-duration-local-slow), var(--motion-duration-local-fast);
+  transition-property: stroke-width, opacity;
+  transition-timing-function: var(--motion-ease-local-state);
+}
+
+.nav-item[data-motion-active="true"] .navigation-icon,
+.navigation-icon[data-nav-icon-state="selected"] :is(.navigation-icon-window, .navigation-icon-page-lines, .navigation-icon-bookmark, .navigation-icon-needle, .navigation-icon-head) {
+  animation-duration: var(--motion-duration-nav-icon);
   animation-fill-mode: backwards;
-  animation-timing-function: var(--motion-ease-local-state);
-  transform-origin: center;
+  animation-timing-function: var(--motion-ease-local-enter);
+  transform-box: view-box;
+  transform-origin: 128px 148px;
 }
 
-.nav-item[data-motion-active="true"][data-motion-nav-kind="standard"] .nav-icon-motion svg {
-  animation-name: motion-nav-active-in;
+.navigation-icon[data-nav-icon-state="selected"][data-nav-icon="home"] {
+  animation-name: motion-nav-home-in;
+  transform-origin: 50% 58%;
 }
 
-.nav-item[data-motion-active="true"][data-motion-nav-kind="upload"] .nav-icon-motion svg {
-  animation-name: motion-nav-active-in;
+.navigation-icon[data-nav-icon-state="selected"] .navigation-icon-window {
+  animation-name: motion-nav-window-in;
+  transform-origin: 128px 106px;
 }
 
-@keyframes motion-nav-active-in {
-  from {
-    transform: scale(.94);
-  }
+.navigation-icon[data-nav-icon-state="selected"][data-nav-icon="study"] {
+  animation-name: motion-nav-book-open;
+  transform-origin: 50% 58%;
+}
 
-  to {
-    transform: none;
-  }
+.navigation-icon[data-nav-icon-state="selected"] .navigation-icon-page-lines {
+  animation-name: motion-nav-page-lines-in;
+}
+
+.navigation-icon[data-nav-icon-state="selected"] .navigation-icon-bookmark {
+  animation-name: motion-nav-bookmark-in;
+}
+
+.navigation-icon[data-nav-icon-state="selected"] .navigation-icon-needle {
+  animation-name: motion-nav-needle-in;
+  transform-origin: 128px 128px;
+}
+
+.navigation-icon[data-nav-icon-state="selected"] .navigation-icon-head {
+  animation-name: motion-nav-head-nod;
+  transform-origin: 128px 96px;
+}
+
+@keyframes motion-nav-home-in {
+  0% { transform: scale(.95); }
+  55% { transform: scale(1.055); }
+  82% { transform: scale(.99); }
+  100% { transform: none; }
+}
+
+@keyframes motion-nav-window-in {
+  0%, 12% { transform: scale(.6); opacity: .2; }
+  55% { transform: scale(1.4); opacity: 1; }
+  82% { transform: scale(.94); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+@keyframes motion-nav-book-open {
+  0% { transform: scaleX(.72); }
+  55% { transform: scaleX(1.06); }
+  82% { transform: scaleX(.99); }
+  100% { transform: none; }
+}
+
+@keyframes motion-nav-page-lines-in {
+  0%, 12% { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; }
+  65%, 100% { stroke-dasharray: 1; stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes motion-nav-bookmark-in {
+  0%, 18% { transform: translateY(-24px); opacity: 0; }
+  67% { transform: translateY(4.5px); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+@keyframes motion-nav-needle-in {
+  0% { transform: rotate(-45deg); }
+  55% { transform: rotate(17deg); }
+  80% { transform: rotate(-6deg); }
+  100% { transform: none; }
+}
+
+@keyframes motion-nav-head-nod {
+  0% { transform: none; }
+  42% { transform: translateY(14px) scale(.96); }
+  75% { transform: translateY(-3px) scale(1.025); }
+  100% { transform: none; }
+}
+
+/* Dropping selection cancels every gesture and restores its final geometry. */
+.navigation-icon[data-nav-icon-state="unselected"] :is(.navigation-icon-window, .navigation-icon-page-lines, .navigation-icon-bookmark, .navigation-icon-needle, .navigation-icon-head) {
+  animation-name: none;
 }
 
 .sheet-scrim[data-motion-state="entering"],
@@ -2174,6 +2255,7 @@
   .nav-selection,
   .nav-item .nav-icon,
   .nav-item .nav-icon-motion svg,
+  .nav-item .navigation-icon *,
   .sheet,
   .sheet-scrim,
   .ai-overlay,

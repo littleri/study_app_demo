@@ -57,7 +57,7 @@
   margin: 0;
 }
 
-.screen-content[data-screen="upload"] .upload-sheet-card {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-sheet-card {
   width: 100%;
   min-height: calc(100dvh - var(--upload-sheet-top));
   display: grid;
@@ -100,7 +100,7 @@
   text-wrap: balance;
 }
 
-.screen-content[data-screen="upload"] .upload-add-tile {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile {
   width: min(210px, calc(100vw - 112px));
   margin-top: 16px;
   aspect-ratio: 1;
@@ -113,25 +113,25 @@
     0 12px 28px rgba(66, 76, 105, 0.12);
 }
 
-.screen-content[data-screen="upload"] .upload-add-tile:hover:not(:disabled) {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile:hover:not(:disabled) {
   box-shadow:
     inset 0 0 0 1.5px var(--color-primary-light),
     0 12px 28px rgba(66, 76, 105, 0.15);
 }
 
-.screen-content[data-screen="upload"] .upload-add-tile:focus-visible {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile:focus-visible {
   outline-color: rgba(91, 33, 182, 0.46);
 }
 
-.screen-content[data-screen="upload"] .upload-add-tile.has-selection {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile.has-selection {
   width: min(228px, calc(100vw - 88px));
   cursor: default;
   box-shadow:
-    inset 0 0 0 2px var(--color-primary),
+    inset 0 0 0 1.5px var(--color-primary-light),
     0 12px 28px rgba(91, 33, 182, 0.14);
 }
 
-.screen-content[data-screen="upload"] .upload-add-icon {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-icon {
   width: 70px;
   height: 70px;
   color: var(--color-text);
@@ -139,53 +139,68 @@
   border-radius: 0;
 }
 
-.screen-content[data-screen="upload"] .upload-selected-file-visual {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-visual {
   width: 100%;
-  height: 100%;
+  height: auto;
   min-width: 0;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: flex-start;
   gap: 16px 14px;
-  padding: 24px;
+  padding: 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.screen-content[data-screen="upload"] .upload-selected-file-item {
-  width: 58px;
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-item {
+  position: relative;
+  width: 48px;
   min-width: 0;
   display: grid;
   justify-items: center;
   gap: 7px;
 }
 
-.screen-content[data-screen="upload"] .upload-selected-file-icon {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-icon {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: transparent;
   border-radius: 14px;
 }
 
-.screen-content[data-screen="upload"] .upload-selected-file-item strong {
-  color: var(--color-text);
-  font-size: 12px;
+/* Keep file names out of the compact tray; badges identify each document. */
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-file-number {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding-inline: 3px;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border: 2px solid var(--color-surface);
+  border-radius: 999px;
+  font-size: 10px !important;
   font-weight: 800;
-  line-height: 1.25;
-  white-space: nowrap;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums;
 }
 
-.screen-content[data-screen="upload"] .upload-remove-file {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-remove-file {
   position: absolute;
-  top: -14px;
-  right: -14px;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  top: -12px;
+  right: -12px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: grid;
   place-items: center;
   padding: 0;
@@ -195,9 +210,9 @@
   border-radius: 50%;
 }
 
-.screen-content[data-screen="upload"] .upload-remove-file-mark {
-  width: 22px;
-  height: 22px;
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-remove-file-mark {
+  width: 14px;
+  height: 14px;
   display: grid;
   place-items: center;
   color: var(--color-on-primary);
@@ -206,21 +221,21 @@
   box-shadow: 0 2px 5px rgba(180, 35, 60, 0.24);
 }
 
-.screen-content[data-screen="upload"] .upload-remove-file:hover:not(:disabled) .upload-remove-file-mark {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-remove-file:hover:not(:disabled) .upload-remove-file-mark {
   background: #8f1830;
 }
 
-.screen-content[data-screen="upload"] .upload-remove-file:focus-visible {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-remove-file:focus-visible {
   outline-offset: -5px;
 }
 
-.screen-content[data-screen="upload"] .upload-remove-file:disabled {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-remove-file:disabled {
   color: var(--color-text-muted);
   background: transparent;
   border: 0;
 }
 
-.screen-content[data-screen="upload"] .upload-add-more {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-more {
   width: 44px;
   height: 44px;
   min-width: 44px;
@@ -229,19 +244,18 @@
   place-items: center;
   margin: 2px 0 0;
   padding: 0;
-  color: var(--color-primary);
-  background: var(--color-primary-soft);
+  color: var(--color-text);
+  background: transparent;
   border: 0;
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--color-primary-light);
 }
 
-.screen-content[data-screen="upload"] .upload-add-more:hover:not(:disabled) {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-more:hover:not(:disabled) {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
 }
 
-.screen-content[data-screen="upload"] .upload-add-more:disabled {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-more:disabled {
   color: var(--color-text-muted);
   background: var(--color-surface-tint);
   border: 0;
@@ -279,7 +293,7 @@
   color: var(--color-danger);
 }
 
-.screen-content[data-screen="upload"] .upload-flow-primary > .button {
+:is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-flow-primary > .button {
   width: min(100%, 360px);
   height: 48px;
   min-height: 48px;
@@ -305,21 +319,21 @@
     right: calc(var(--safe-area-right) + 12px);
   }
 
-  .screen-content[data-screen="upload"] .upload-sheet-card {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-sheet-card {
     padding-inline: max(28px, calc(var(--safe-area-left) + 28px));
   }
 
-  .screen-content[data-screen="upload"] .upload-add-tile {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile {
     width: min(196px, calc(100vw - 96px));
   }
 
-  .screen-content[data-screen="upload"] .upload-flow-primary > .button {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-flow-primary > .button {
     width: min(100%, 242px);
   }
 }
 
 @media (max-width: 480px) and (max-height: 740px) and (orientation: portrait) {
-  .screen-content[data-screen="upload"] .upload-sheet-card {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-sheet-card {
     padding-top: 28px;
   }
 
@@ -333,30 +347,30 @@
     line-height: 1.4;
   }
 
-  .screen-content[data-screen="upload"] .upload-add-tile {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile {
     width: min(154px, calc(100vw - 104px));
     margin-top: 12px;
   }
 
-  .screen-content[data-screen="upload"] .upload-add-tile.has-selection {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile.has-selection {
     width: min(176px, calc(100vw - 96px));
   }
 
-  .screen-content[data-screen="upload"] .upload-selected-file-visual {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-visual {
     gap: 12px 10px;
     padding: 18px;
   }
 
-  .screen-content[data-screen="upload"] .upload-selected-file-item {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-item {
     width: 48px;
   }
 
-  .screen-content[data-screen="upload"] .upload-selected-file-icon {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-selected-file-icon {
     width: 48px;
     height: 48px;
   }
 
-  .screen-content[data-screen="upload"] .upload-add-more {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-more {
     width: 44px;
     height: 44px;
     min-width: 44px;
@@ -375,7 +389,7 @@
     font-size: 17px;
   }
 
-  .screen-content[data-screen="upload"] .upload-flow-primary > .button {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-flow-primary > .button {
     margin-top: 24px;
   }
 }
@@ -389,26 +403,26 @@
     top: 18px;
   }
 
-  .screen-content[data-screen="upload"] .upload-sheet-card {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-sheet-card {
     padding-top: 28px;
     border-radius: 36px 36px 0 0;
   }
 
-  .screen-content[data-screen="upload"] .upload-add-tile {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile {
     width: 154px;
   }
 
-  .screen-content[data-screen="upload"] .upload-add-tile.has-selection {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile.has-selection {
     width: 176px;
   }
 
-  .screen-content[data-screen="upload"] .upload-flow-primary > .button {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-flow-primary > .button {
     margin-top: 28px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .screen-content[data-screen="upload"] .upload-add-tile {
+  :is(.screen-content[data-screen="upload"], .course-materials-sheet) .upload-add-tile {
     transition: none;
   }
 }

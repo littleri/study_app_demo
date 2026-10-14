@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import { Settings } from "lucide-react";
+import { Settings, Upload } from "lucide-react";
 import {
   ActionSheet,
   AppShell,
@@ -40,7 +40,6 @@ import {
   ExportPreviewScreen,
   FlashcardScreen,
   HomeScreen,
-  LessonReportScreen,
   LessonScreen,
   LibraryScreen,
   MistakeBookScreen,
@@ -80,10 +79,9 @@ import { CourseSetupScreen, OnboardingScreen } from "./features/courses/FlowScre
 import { CourseDetailScreen } from "./features/courses/HomeScreens";
 import { AddMaterialsSheetContent } from "./features/courses/AddMaterialsSheetContent";
 import { courseLocationKey, preferredCourseSource } from "./features/courses/selectors";
-import { bookIdFromResourceId } from "./features/courses/model";
+import { bookIdFromResourceId, diagnosisQuestions } from "./features/courses/model";
 import { prepareLocalSource } from "./services/LocalSources";
 import { createCourseSelectionCoordinator } from "./screens/homeBookModel";
-import { lessonHeaderSubtitle } from "./screens/lessonHeader";
 import {
   hasCompleteLoadedCourseContext,
   resolveCourseSessionClear,
@@ -110,36 +108,34 @@ function loadStudyLocations(): Record<string, StudyLocation> {
   }
 }
 
-const titles: Record<Screen, { title?: string; subtitle?: string; back?: boolean; hideNav?: boolean }> = {
-  home: {},
-  onboarding: { hideNav: true },
-  courseSetup: { hideNav: true },
+const titles: Record<Screen, { title?: string; back?: boolean; hideNav?: boolean }> = {
+  home: { title: "首页" },
+  onboarding: { title: "我们怎么称呼你", hideNav: true },
+  courseSetup: { title: "设置课程", hideNav: true },
   courseDetail: { title: "课程", back: true },
   upload: { title: "创建课程", back: true, hideNav: true },
   parseReady: { title: "解析教材", back: true, hideNav: true },
-  processing: { title: "解析教材", subtitle: "正在识别章节和知识点", back: true, hideNav: true },
-  courseImportProcessing: { title: "正在解析资料", subtitle: "为你准备专属课程", hideNav: true },
-  chapterConfirm: { title: "确认目录", subtitle: "核对资料目录与 AI 课时映射", back: true, hideNav: true },
-  courseReady: { hideNav: true },
-  courseImportReady: { hideNav: true },
-  library: { title: "我的课程", subtitle: "管理课程、教材与学习资料", back: true, hideNav: true },
-  community: { title: "发现", subtitle: "发现同学分享的优质课程" },
+  processing: { title: "解析教材", back: true, hideNav: true },
+  courseImportProcessing: { title: "正在解析资料", hideNav: true },
+  chapterConfirm: { title: "确认目录", back: true, hideNav: true },
+  courseReady: { title: "生成成功", hideNav: true },
+  courseImportReady: { title: "课程导入完成", hideNav: true },
+  library: { title: "我的课程", back: true, hideNav: true },
+  community: { title: "发现" },
   communityBook: { title: "共享课程", back: true, hideNav: true },
-  communityImport: { hideNav: true },
-  study: {},
-  book: {},
-  plan: { title: "学习计划", subtitle: "科学规划，高效学习", back: true, hideNav: true },
-  flashcards: { title: "知识点闪卡", subtitle: "回忆、核对，再安排复习", back: true, hideNav: true },
-  lesson: { title: "章节学习", subtitle: "第 2 章 1 节", back: true, hideNav: true },
-  assignment: { title: "作业练习", subtitle: "按顺序练习，定位卡点", back: true, hideNav: true },
-  diagnosis: { title: "作业诊断", subtitle: "看懂原因，马上巩固", back: true, hideNav: true },
-  mistakes: { title: "错题集", subtitle: "重做卡点，直到真正掌握", back: true, hideNav: true },
-  notes: { title: "学习笔记", subtitle: "保留原始记录与独立整理版", back: true, hideNav: true },
-  voiceNote: { title: "语音笔记", subtitle: "录下想法，再结合教材整理", back: true, hideNav: true },
+  communityImport: { title: "导入成功", hideNav: true },
+  study: { title: "学习" },
+  plan: { title: "学习计划", back: true, hideNav: true },
+  flashcards: { title: "知识点闪卡", back: true, hideNav: true },
+  lesson: { title: "章节学习", back: true, hideNav: true },
+  assignment: { title: "作业练习", back: true, hideNav: true },
+  diagnosis: { title: "作业诊断", back: true, hideNav: true },
+  mistakes: { title: "错题集", back: true, hideNav: true },
+  notes: { title: "学习笔记", back: true, hideNav: true },
+  voiceNote: { title: "语音笔记", back: true, hideNav: true },
   source: { back: true, hideNav: true },
-  export: { title: "导出预览", subtitle: "选择要导出的模块", back: true, hideNav: true },
-  report: { title: "章节报告", subtitle: "完成后调整计划", back: true, hideNav: true },
-  profile: { title: "我的", subtitle: "学习数据与偏好" },
+  export: { title: "导出预览", back: true, hideNav: true },
+  profile: { title: "我的" },
   settings: { title: "设置", back: true, hideNav: true }
 };
 
@@ -1228,16 +1224,17 @@ export default function App() {
     parsedScanResult,
     uploadedFile?.name?.trim() || "教材原文"
   );
-  const header = screen === "lesson"
-    ? {
-        ...titles.lesson,
-        subtitle: lessonHeaderSubtitle(parsedChapters, activeChapterId)
-      }
-    : screen === "source"
-      ? { ...titles.source, title: sourceHeading.title, subtitle: sourceHeading.pageLabel }
-    : screen === "courseDetail"
-      ? { ...titles.courseDetail, title: courses.state.courses.find((item) => item.id === courses.state.activeCourseId)?.name ?? "课程" }
-    : titles[screen];
+  const setupStep = Math.max(parseDraft?.editingCourseId ? -1 : 0, Math.min(5, parseDraft?.step ?? 0));
+  const header = {
+    ...titles[screen],
+    title: screen === "home" ? `Hi，${courses.state.preferences?.displayName ?? "同学"}`
+      : screen === "onboarding" ? ["我们怎么称呼你", "你使用云径的主要目标是", "你每天能投入多少学习时间"][courses.state.onboardingDraft.step]
+      : screen === "courseSetup" ? setupStep < 0 ? "调整课程" : diagnosisQuestions[setupStep].title
+      : screen === "source" ? sourceHeading.title
+      : screen === "courseDetail" ? courses.state.courses.find((item) => item.id === courses.state.activeCourseId)?.name ?? "课程"
+      : (screen === "courseReady" || screen === "courseImportReady") && (!uploadedFile || !generatedLessons?.length) ? "还没有可进入的课程"
+      : titles[screen].title
+  };
 
   function renderScreen() {
     switch (screen) {
@@ -1273,8 +1270,6 @@ export default function App() {
         return <CommunityImportScreen importGeneration={communityImportGeneration} />;
       case "study":
         return <StudyScreen />;
-      case "book":
-        return <StudyScreen />;
       case "plan":
         return <StudyPlanScreen />;
       case "flashcards":
@@ -1295,8 +1290,6 @@ export default function App() {
         return <SourceReaderScreen />;
       case "export":
         return <ExportPreviewScreen />;
-      case "report":
-        return <LessonReportScreen />;
       case "profile":
         return <ProfileScreen />;
       case "settings":
@@ -1338,7 +1331,6 @@ export default function App() {
           </>
         )}
         title={header.title}
-        subtitle={header.subtitle}
         rightAction={screen === "profile" ? (
           <IconButton
             className="profile-header-settings"
@@ -1346,6 +1338,10 @@ export default function App() {
             onClick={() => go("settings")}
           >
             <Settings size={21} aria-hidden="true" />
+          </IconButton>
+        ) : screen === "home" && sourceSummariesLoadState === "error" ? (
+          <IconButton label="创建课程" onClick={() => { courses.startDraft(); go("upload"); }}>
+            <Upload size={21} aria-hidden="true" />
           </IconButton>
         ) : undefined}
         showBack={header.back}

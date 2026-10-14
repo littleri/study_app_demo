@@ -43,7 +43,7 @@ export function CourseDetailScreen() {
   const { plans, errors: planErrors, loading: loadingPlans } = useCoursePlans(course?.id);
 
   if (!course) {
-    return <div className="course-space-detail"><h1>暂无课程</h1><button className="learning-home-primary" type="button" onClick={() => go("home")}>返回首页</button></div>;
+    return <div className="course-space-detail"><p>暂无课程</p><button className="learning-home-primary" type="button" onClick={() => go("home")}>返回首页</button></div>;
   }
 
   const recommendationState = buildCourseRecommendations(course, preferences, plans, resources);
@@ -110,8 +110,6 @@ export function CourseDetailScreen() {
     <div className="course-space-detail">
       <header className="course-space-detail-hero">
         <span className="learning-home-eyebrow"><Sparkles size={16} aria-hidden="true" />当前课程</span>
-        <h1>{course.name}</h1>
-        <p>{course.resourceIds.length} 份资料 · {course.diagnosis.timePattern === "fragmented" ? "碎片时间学习" : "整块时间学习"}</p>
         <div className="course-space-detail-actions">
           <button type="button" onClick={edit}><Pencil size={16} aria-hidden="true" />调整画像与名称</button>
           <button type="button" onClick={() => openSheet({ type: "addMaterials", courseId: course.id })}><Plus size={16} aria-hidden="true" />添加资料</button>

@@ -185,7 +185,6 @@ test.describe("local DemoRepository P0 flow", () => {
     }
     await clickUniqueAction(page, page.getByRole("button", { name: "完成本节", exact: true }), "complete the chapter");
     await expectScreenReady(page, ".book-course-screen", "study directory");
-    await expect(page.locator(".report-screen")).toHaveCount(0);
 
     await page.reload();
     await expect(page.locator(".home-dashboard")).toBeVisible();

@@ -491,7 +491,7 @@ test.describe("current DemoRepository responsive matrix", () => {
     const focusedScreens = [
       "upload", "parseReady", "processing", "chapterConfirm", "courseReady", "library",
       "communityBook", "communityImport", "plan", "flashcards", "lesson", "assignment",
-      "diagnosis", "mistakes", "notes", "source", "export", "report"
+      "diagnosis", "mistakes", "notes", "source", "export"
     ];
 
     for (const viewport of [
@@ -1141,7 +1141,6 @@ test.describe("current DemoRepository responsive matrix", () => {
     await expect(page.locator(".lesson-floating-complete .button")).toBeVisible();
     await page.locator(".lesson-floating-complete .button").click();
     await expect(page.locator(".book-course-screen")).toBeVisible();
-    await expect(page.locator(".report-screen")).toHaveCount(0);
     await settleScreen(page);
     await page.locator(".primary-nav .nav-item").nth(3).click();
     await expect(page.locator(".profile-screen")).toBeVisible();

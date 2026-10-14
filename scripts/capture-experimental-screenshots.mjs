@@ -214,9 +214,6 @@ try {
   await waitForScreen(".source-reader-screen");
   await capture("22-source-reader");
 
-  await goToScreen("report");
-  await waitForScreen(".report-screen");
-  await capture("23-lesson-report");
 } finally {
   await context.close();
   await browser.close();

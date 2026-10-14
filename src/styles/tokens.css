@@ -51,7 +51,6 @@
   --brand-daily-task-cloud: url("/assets/brand/daily-task-cloud-bg.png");
   --brand-cloud-parsing: url("/assets/brand/cloud-mascot-parsing.png");
   --brand-cloud-success: url("/assets/brand/cloud-mascot-success-transparent-v1.png");
-  --brand-cloud-report: url("/assets/brand/cloud-mascot-report.png");
   --brand-community-hero: none;
 
   /* Keep old declaration sites solid while the card system is migrated. */
@@ -129,6 +128,8 @@
   --motion-duration-local-base: 180ms;
   --motion-duration-local-slow: 200ms;
   --motion-duration-catalog-switch: 360ms;
+  /* Icon gestures finish after the immediate navigation selection feedback. */
+  --motion-duration-nav-icon: 675ms;
   --motion-duration-press: 90ms;
   --motion-duration-fast: 140ms;
   --motion-duration-base: 180ms;

@@ -27,7 +27,13 @@ async function addSheet(page: Page) {
 }
 async function closeSheet(page: Page) { await page.getByRole("dialog").getByRole("button", { name: "关闭" }).click(); }
 async function state(page: Page) { return page.evaluate(() => JSON.parse(localStorage.getItem("bookcourse.courses.v2") || "{}")); }
-async function details(page: Page) { await page.locator(".course-source-heading").first().getByRole("button", { name: /管理资料/ }).click(); }
+async function details(page: Page) {
+  const current = await state(page);
+  const course = current.courses.find((item: { id: string }) => item.id === current.activeCourseId);
+  await page.getByRole("button", { name: "首页", exact: true }).click();
+  await page.getByRole("button", { name: "全部课程", exact: false }).click();
+  await page.locator(".course-library-card").filter({ hasText: course.name }).getByRole("button", { name: "课程资料与偏好", exact: true }).click();
+}
 async function completeCreationQuestions(page: Page) {
   const answers = ["正常节奏，按计划来", "整块固定时间", "系统学习", "原理和逻辑", "AI 对话讲解", "定期复盘"];
   for (const [index, answer] of answers.entries()) {
@@ -58,7 +64,8 @@ test("migrates containers into courses, removes the banner and preserves the bac
   await expect(page.locator(".study-active-set-link")).toHaveCount(0);
   await expect(page.getByText("当前教材", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "优先问 AI 讲解" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "课程目录" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "课程目录" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "课程目录", exact: true })).toBeVisible();
   await page.reload(); await study(page);
   expect((await state(page)).courses.filter((course: { id: string }) => course.id === "legacy-biology")).toHaveLength(1);
 });
@@ -79,7 +86,8 @@ test("adds an existing book to the current course without creating a course or m
   await page.locator(".course-source-group .course-source-chapter").first().click();
   await expect.poll(async () => (await state(page)).courses.find((course: { id: string }) => course.id === "legacy-biology").activeResourceId).toMatch(/math/);
   await page.reload(); await study(page);
-  await expect(page.locator(".course-source-heading").first()).toContainText("数学");
+  await expect(page.locator(".study-chapter-list")).toBeVisible();
+  expect((await state(page)).courses.find((course: { id: string }) => course.id === "legacy-biology").activeResourceId).toMatch(/math/);
 });
 
 test("imports independent files, survives reload, detects duplicates and retains originals on removal", async ({ page }) => {
@@ -98,7 +106,9 @@ test("imports independent files, survives reload, detects duplicates and retains
   await closeSheet(page); await details(page);
   const card = page.locator(".course-space-book").filter({ hasText: "能量守恒" });
   await card.getByRole("button", { name: /进入/ }).click();
-  await expect(page.locator(".course-source-heading").first()).toContainText("能量守恒");
+  const importedSource = imported.resources.find((resource: { name: string }) => resource.name === "能量守恒.txt");
+  await expect.poll(async () => (await state(page)).courses.find((course: { id: string }) => course.id === "legacy-biology").activeResourceId).toBe(`local:${importedSource.id}`);
+  await expect(page.locator(".study-chapter-list")).toBeVisible();
   await page.reload(); await study(page); await details(page);
   await page.getByRole("button", { name: "从课程移出 能量守恒" }).click();
   const after = await state(page);
@@ -148,14 +158,14 @@ test("creates a course from mock materials and restores its separate identity", 
   const continueButton = importer.getByRole("button", { name: "保存资料并继续", exact: true });
   await expect(continueButton).toBeDisabled();
   await importer.getByRole("button", { name: "选择课程资料", exact: true }).click();
-  await expect(importer.locator('.upload-add-icon [data-sticker-icon="FileText"]')).toBeVisible();
-  await expect(importer.locator(".course-upload-files")).toHaveText("示例课程资料.txt");
+  await expect(importer.locator('.upload-selected-file-icon [data-sticker-icon="FileText"]')).toBeVisible();
+  await expect(importer.locator(".upload-file-number")).toHaveText(["1"]);
+  await expect(importer.getByText("示例课程资料.txt", { exact: true })).toHaveCount(0);
   await expect(continueButton).toBeEnabled();
-  await importer.getByRole("button", { name: "已添加示例课程资料", exact: true }).click();
-  await expect(importer.locator(".course-upload-files > div")).toHaveCount(1);
-  await importer.getByRole("button", { name: "移除 示例课程资料.txt", exact: true }).click();
+  await expect(importer.getByRole("button", { name: "继续添加资料", exact: true })).toBeVisible();
+  await importer.getByRole("button", { name: "移除资料 1", exact: true }).click();
   await expect(continueButton).toBeDisabled();
-  await expect(importer.locator(".course-upload-files > div")).toHaveCount(0);
+  await expect(importer.locator(".upload-selected-file-item")).toHaveCount(0);
   await importer.getByRole("button", { name: "选择课程资料", exact: true }).click();
   await importer.getByRole("button", { name: "保存资料并继续", exact: true }).click();
   await expect(page.getByRole("heading", { name: "你当前学习的紧迫程度？", exact: true })).toBeVisible({ timeout: 15_000 });

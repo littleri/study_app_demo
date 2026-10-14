@@ -15,6 +15,7 @@ const durationTokens = new Map([
   ["--motion-duration-local-base", "180ms"],
   ["--motion-duration-local-slow", "200ms"],
   ["--motion-duration-catalog-switch", "360ms"],
+  ["--motion-duration-nav-icon", "675ms"],
   ["--motion-duration-loading", "1200ms"],
   ["--motion-duration-success-sprite", "900ms"]
 ]);
@@ -732,6 +733,7 @@ export const semanticMotionTokenFixture = `
   --motion-duration-local-base: 180ms;
   --motion-duration-local-slow: 200ms;
   --motion-duration-catalog-switch: 360ms;
+  --motion-duration-nav-icon: 675ms;
   --motion-duration-loading: 1200ms;
   --motion-duration-success-sprite: 900ms;
   --motion-ease-global-enter: cubic-bezier(.25, 1, .5, 1);

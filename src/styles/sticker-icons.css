@@ -38,7 +38,8 @@
   .course-ready-success-mark,
   .chapter-conflict-icon,
   .parse-ready-cover-icon,
-  .upload-add-icon
+  .upload-add-icon,
+  .upload-selected-file-icon
 ):has(> .sticker-icon, > .stage-completion-check > .sticker-icon) {
   --sticker-ink: #252436;
   box-sizing: border-box;

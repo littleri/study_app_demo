@@ -184,10 +184,8 @@ function FocusedCourseCompletion({
 
         <div className="course-ready-focus-copy" aria-hidden={!copyRevealed}>
           <div className="course-ready-success-heading">
-            <h1>{statusTitle}</h1>
             <CourseReadySuccessMark key={motionKey} motionKey={motionKey} />
           </div>
-          <p>{completionMessage}</p>
         </div>
       </div>
 
@@ -244,10 +242,9 @@ export function CourseCompletionScreen({
       <div className="course-ready-primary" data-brand-moment="course-ready">
         <CourseReadyHeroImage key={`${motionKey}:image`} statusTitle={statusTitle} />
         <div className="course-ready-success-heading">
-          <h1>{statusTitle}</h1>
           <CourseReadySuccessMark key={motionKey} motionKey={motionKey} />
         </div>
-        <p role="status" aria-live="polite">{completionMessage ?? `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课时。`}</p>
+        <p className="sr-only" role="status" aria-live="polite">{completionMessage ?? `已将《${courseTitle}》编排为 ${lessonCount} 节 AI 课时。`}</p>
       </div>
       <aside className="course-ready-support" aria-label={`${statusTitle}结果`}>
         <div className="module-grid">
@@ -274,8 +271,6 @@ export function CourseReadyScreen({ imported = false }: { imported?: boolean }) 
     return (
       <div className="screen-stack centered-flow parse-complete-screen course-ready-screen course-ready-empty">
         <FileText size={42} aria-hidden="true" />
-        <h1>还没有可进入的课程</h1>
-        <p>完成上传和后端解析后，课程目录、RAG 片段和学习计划会显示在这里。</p>
         <Button icon={<Upload size={18} aria-hidden="true" />} onClick={() => go("upload")}>上传教材</Button>
         <Button variant="secondary" onClick={() => go("library")}>查看课程库</Button>
       </div>

@@ -37,7 +37,7 @@ test.describe("study directory flow", () => {
         planBottom: Math.round(plan?.getBoundingClientRect().bottom ?? -1),
         planHeight: Math.round(plan?.getBoundingClientRect().height ?? -1),
         directoryTop: Math.round(directory?.getBoundingClientRect().top ?? -1),
-        directoryHeadingTop: Math.round(directory?.querySelector<HTMLElement>(".study-directory-heading")?.getBoundingClientRect().top ?? -1),
+        directoryContentTop: Math.round(directory?.querySelector<HTMLElement>(".study-chapter-list")?.getBoundingClientRect().top ?? -1),
         stickyBackground: getComputedStyle(element.querySelector<HTMLElement>(".study-sticky-stack")!).backgroundColor,
         statusBarBottom: Math.round(statusBar?.getBoundingClientRect().bottom ?? -1)
       };
@@ -47,8 +47,8 @@ test.describe("study directory flow", () => {
     expect(initialLayout.planTop - initialLayout.barBottom).toBeLessThanOrEqual(1);
     expect(initialLayout.planHeight).toBeLessThanOrEqual(176);
     expect(initialLayout.planBottom).toBeLessThanOrEqual(initialLayout.directoryTop);
-    expect(initialLayout.directoryHeadingTop - initialLayout.planBottom).toBeGreaterThanOrEqual(8);
-    expect(initialLayout.directoryHeadingTop - initialLayout.planBottom).toBeLessThanOrEqual(12);
+    expect(initialLayout.directoryContentTop - initialLayout.planBottom).toBeGreaterThanOrEqual(8);
+    expect(initialLayout.directoryContentTop - initialLayout.planBottom).toBeLessThanOrEqual(12);
     expect(initialLayout.stickyBackground).toBe("rgba(0, 0, 0, 0)");
     await scroller.evaluate((element) => {
       element.scrollTop = Math.min(600, element.scrollHeight - element.clientHeight);
@@ -188,7 +188,7 @@ test.describe("study directory flow", () => {
     await page.getByRole("button", { name: "学习", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "学习计划", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "打开 AI 助手", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "当前课程 生物 必修 2 遗传与进化", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "添加资料", exact: true })).toBeVisible();
     const expandedChapterCandidate = page.locator(".study-chapter-toggle[aria-expanded='true']").first();
@@ -365,7 +365,6 @@ test.describe("study directory flow", () => {
     await pausedCompletionTransition.evaluate((style) => style.remove());
     await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
     await expect(page.locator(".book-course-screen")).toBeVisible();
-    await expect(page.locator(".report-screen")).toHaveCount(0);
     await expect(secondChapter).toHaveAttribute("aria-expanded", "true");
 
     await page.getByRole("button", { name: "作业诊断 提交解题过程，定位理解卡点", exact: true }).click();
@@ -431,7 +430,7 @@ test.describe("study directory flow", () => {
     await page.setViewportSize({ width: 834, height: 1194 });
     await page.goto("/?embedded=device-preview");
     await page.getByRole("button", { name: "学习", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "课程目录", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "课程目录", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "第 7 章 现代生物进化理论 2 个小节 教材第 109-130 页 学习进度 0%", exact: true })).toBeVisible();
 
     const layout = await page.locator(".study-screen").evaluate((element) => {

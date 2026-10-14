@@ -18,7 +18,6 @@ export type Screen =
   | "communityBook"
   | "communityImport"
   | "study"
-  | "book"
   | "plan"
   | "flashcards"
   | "lesson"
@@ -29,7 +28,6 @@ export type Screen =
   | "voiceNote"
   | "source"
   | "export"
-  | "report"
   | "profile"
   | "settings";
 
