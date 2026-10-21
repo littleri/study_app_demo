@@ -1,5 +1,33 @@
 # 教材视觉资产 provenance
 
+## AI 助手状态图标
+
+`public/assets/brand/ai-assistant/` 为用户确认后的云朵贴纸风透明 PNG，均由 Codex 内置 ImageGen 生成。状态盘点与完整提示词保存在 `docs/design/ip-exploration/ai-chat-states-preview-v1/`，头像提示词位于 `docs/design/ip-exploration/ai-chat-icon-preview-v1/generation-prompt.txt`。
+
+| 文件 | 运行时使用 |
+| --- | --- |
+| `idle-right-v1.png` / `idle-left-v1.png` | 全局与章节入口右侧 / 左侧静止 |
+| `pressed-v1.png` | 按下反馈，左侧通过 CSS 镜像 |
+| `dragging-v1.png` | 拖动状态及弹窗展开 / 收起过渡，左侧拖动通过 CSS 镜像 |
+| `avatar-v1.png` | 弹窗题头（44px）、等待与正常 AI 回复头像（32px） |
+
+两处入口共用 `src/components/aiAssistantArtwork.ts` 的状态映射；用户消息头像保持现有样式。实际接入截图总览保存在 `docs/design/ip-exploration/ai-chat-integrated-v1/`；交互回归位于 `e2e/lesson-ai-chat.spec.ts`，覆盖状态素材、拖动吸附、对话操作及跨底部标签页保留位置。
+
+## 云朵缺省状态插画
+
+`public/assets/brand/empty-states/` 下的四张透明 PNG 由 Codex 内置 ImageGen 生成并抠图，沿用用户确认的蓝色云朵贴纸风与浅蓝色椭圆阴影。白底原图及完整提示词保存在 `docs/design/ip-exploration/empty-states-v1/`。
+
+| 文件 | 接入场景 |
+| --- | --- |
+| `no-courses-v1.png` | 学习页尚无课程 |
+| `no-notes-v1.png` | 我的笔记列表为空 |
+| `no-results-v1.png` | 发现页搜索或分类没有匹配书籍 |
+| `connection-error-v1.png` | 首页首次课程列表加载失败且无可展示课程 |
+
+共享组件为 `src/components/EmptyStateIllustration.tsx`，实际显示尺寸在 `src/styles/empty-states.css` 中设为已确认预览尺寸的 90%。图片仅为装饰，状态与操作由相邻文字表达。实际接入后的三种视口截图总览保存在 `docs/design/ip-exploration/integrated-v1/`。
+
+同风格的正面、侧面和背面形象探索图为 `docs/design/ip-exploration/cloud-sticker-three-views-v1.png`；提示词保存在同名 `.prompt.txt` 文件中，该图不作为运行时资源。
+
 `public/assets/textbook/` 中的 WebP 不是本轮 MinerU 运行直接导出的文件，而是从源前端迁移的既有视觉基线。它们用于保持 Demo 的页面观感；课程正文和引用不把这些图片当作 OCR 证据，正文证据统一来自 `.cache/mineru` 中的 `content_list.json` / `middle.json`。
 
 | 资产 | 来源 | MinerU 直接导出 | 课程页映射 | 授权状态 |

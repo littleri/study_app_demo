@@ -1,4 +1,5 @@
 import { StickerIcon } from "../components/icons/StickerIcon";
+import { EmptyStateIllustration } from "../components/EmptyStateIllustration";
 import { StickyControlsBackground } from "../components/PageHeaderBackground";
 import {
   useEffect,
@@ -358,10 +359,10 @@ function StudyChapter({
 function StudyEmptyState({ kind }: { kind: "empty" | "unavailable" }) {
   const { courses, go } = useAppContext();
   return (
-    <section className="study-empty-state">
-      <span className="study-empty-icon" aria-hidden="true">
-        {kind === "empty" ? <StickerIcon name="Upload" size={26} /> : <StickerIcon name="LibraryBig" size={26} />}
-      </span>
+    <section className={`study-empty-state${kind === "empty" ? " has-cloud-illustration" : ""}`}>
+      {kind === "empty" ? <EmptyStateIllustration scene="courses" /> : (
+        <span className="study-empty-icon" aria-hidden="true"><StickerIcon name="LibraryBig" size={26} /></span>
+      )}
       <h2>{kind === "empty" ? "开始你的第一门课程" : "课程资料还在准备中"}</h2>
       <p>{kind === "empty" ? "添加教材后，这里会按原书目录整理章节和每个小节的学习入口。" : "你可以查看解析进度，或先选择另一门已经就绪的课程。"}</p>
       <Button onClick={() => { if (kind === "empty") { courses.startDraft(); go("upload"); } else go("library"); }}>

@@ -7,7 +7,8 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent
 } from "react";
-import { ChevronDown, Search, SearchX, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
+import { EmptyStateIllustration } from "../components/EmptyStateIllustration";
 import { StickyControlsBackground } from "../components/PageHeaderBackground";
 import { communityBooks } from "../data/mockBook";
 import { useAppContext } from "../context/AppContext";
@@ -287,7 +288,7 @@ export function CommunityScreen() {
             </div>
           ) : (
             <div className="community-empty-state">
-              <SearchX size={24} aria-hidden="true" />
+              <EmptyStateIllustration scene="search" />
               <div role="status">
                 <h3>没有找到匹配书籍</h3>
                 <p>换一个关键词，或返回推荐分类继续看看。</p>

@@ -1,0 +1,47 @@
+{
+  "source": "Current code audit",
+  "interactions": [
+    "idle",
+    "pressed",
+    "dragging"
+  ],
+  "sides": [
+    "left",
+    "right"
+  ],
+  "combinationCount": 6,
+  "sourceFiles": [
+    {
+      "state": "idle-right",
+      "old": "cloud-mascot-ai-chat-edge-ui.webp",
+      "new": "cloud-chat-idle-right.png",
+      "prompt": "Use case: stylized-concept. Asset type: ONE small app AI assistant interaction-state icon with genuine transparent alpha background. Reference 1 is the approved NEW blue cloud chat mascot: preserve its canonical sky-blue scalloped cloud body, large rounded top dome, compact body proportions, same dark vertical oval eye size and spacing, single white eye catchlights, tiny curved brows, pink oval cheeks, mitten hands and short arms. Crisp flat cartoon sticker style, bold rounded deep ink #252436 outlines, sky-blue #91c9ff, pink #ffa9c3, ivory #fffdf7 speech bubble with three dark dots. Keep small hard dark offset shadow tucked behind lower-right contour. No 3D, no realistic texture, no white sticker halo, no floor shadow or ellipse, no book, no extra characters, no text or labels, no tile or enclosing frame. Reference 2 is ONLY a pose/cropping/state guide for the old purple icon: copy its function and docking orientation but do NOT use the purple color, white outline, tail or facial design. Design for legibility at 62-76px. One clear icon, large on a square transparent canvas. RIGHT EDGE IDLE PEEKING state. Blue cloud peeks in from the RIGHT edge of screen, with a vertical crop flush at canvas right boundary, approximately the outer quarter of body extends out of frame. The two eyes, full face, smile, cheek marks and large top lobe remain visible left of the cropped edge. On the LEFT, one short mitten arm makes a friendly wave toward page center. Small ivory three-dot speech bubble sits near the LOWER LEFT next to the cloud, completely visible with clean gap, bubble width about 28% cloud width. Relaxed eyes open and warm small smiling mouth. No second arm clutter. This is a restrained docked peeking pose, NOT the full-body free-floating cloud. Position the cropped cloud flush right with no transparent gutter on right, generous clear transparency left and above."
+    },
+    {
+      "state": "idle-left",
+      "old": "cloud-mascot-ai-chat-edge-left-ui.webp",
+      "new": "cloud-chat-idle-left.png",
+      "prompt": "Use case: stylized-concept. Asset type: ONE small app AI assistant interaction-state icon with genuine transparent alpha background. Reference 1 is the approved NEW blue cloud chat mascot: preserve its canonical sky-blue scalloped cloud body, large rounded top dome, compact body proportions, same dark vertical oval eye size and spacing, single white eye catchlights, tiny curved brows, pink oval cheeks, mitten hands and short arms. Crisp flat cartoon sticker style, bold rounded deep ink #252436 outlines, sky-blue #91c9ff, pink #ffa9c3, ivory #fffdf7 speech bubble with three dark dots. Keep small hard dark offset shadow tucked behind lower-right contour. No 3D, no realistic texture, no white sticker halo, no floor shadow or ellipse, no book, no extra characters, no text or labels, no tile or enclosing frame. Reference 2 is ONLY a pose/cropping/state guide for the old purple icon: copy its function and docking orientation but do NOT use the purple color, white outline, tail or facial design. Design for legibility at 62-76px. One clear icon, large on a square transparent canvas. LEFT EDGE IDLE PEEKING state. Blue cloud peeks in from the LEFT edge of screen, with a vertical crop flush at canvas left boundary, approximately outer quarter of body extends out of frame. The two eyes, full face, smile, cheek marks and large top lobe remain visible right of cropped edge. On the RIGHT, one short mitten arm makes a friendly wave toward page center. Small ivory three-dot speech bubble sits near LOWER RIGHT next to cloud, completely visible with clean gap, bubble width about 28% cloud width. Relaxed eyes open and warm small smiling mouth. Composition is opposite docking orientation to the old right-edge icon but SAME blue mascot model. This is a docked peeking pose, not a full-body pose. Cloud flush left, no transparent gutter on left, clear transparency above and right."
+    },
+    {
+      "state": "pressed",
+      "old": "cloud-mascot-ai-chat-edge-pressed-ui.webp",
+      "new": "cloud-chat-pressed.png",
+      "prompt": "Use case: stylized-concept. Asset type: ONE small app AI assistant interaction-state icon with genuine transparent alpha background. Reference 1 is the approved NEW blue cloud chat mascot: preserve its canonical sky-blue scalloped cloud body, large rounded top dome, compact body proportions, same dark vertical oval eye size and spacing, single white eye catchlights, tiny curved brows, pink oval cheeks, mitten hands and short arms. Crisp flat cartoon sticker style, bold rounded deep ink #252436 outlines, sky-blue #91c9ff, pink #ffa9c3, ivory #fffdf7 speech bubble with three dark dots. Keep small hard dark offset shadow tucked behind lower-right contour. No 3D, no realistic texture, no white sticker halo, no floor shadow or ellipse, no book, no extra characters, no text or labels, no tile or enclosing frame. Reference 2 is ONLY a pose/cropping/state guide for the old purple icon: copy its function and docking orientation but do NOT use the purple color, white outline, tail or facial design. Design for legibility at 62-76px. One clear icon, large on a square transparent canvas. RIGHT EDGE PRESSED state. Keep same docked peeking layout as old pose guide, crop flush at canvas right edge, body upper dome and lobes remain same blue model but gently squash vertically by around 10 percent and broaden slightly to show a soft press. BOTH EYES are now happy curved closed arcs exactly in original eye positions, same cheeks, relaxed tiny closed smiling mouth. Left mitten stays in friendly wave but lower and closer to body. Small ivory three-dot bubble fully visible near lower left. This is subtle tactile happy press feedback, do not change character identity or add symbols, tears or burst shapes. Transparent background; right edge cropped for docking."
+    },
+    {
+      "state": "dragging",
+      "old": "cloud-mascot-ai-chat-airborne-ui.webp",
+      "new": "cloud-chat-dragging.png",
+      "prompt": "Use case: stylized-concept. Asset type: ONE small app AI assistant interaction-state icon with genuine transparent alpha background. Reference 1 is the approved NEW blue cloud chat mascot: preserve its canonical sky-blue scalloped cloud body, large rounded top dome, compact body proportions, same dark vertical oval eye size and spacing, single white eye catchlights, tiny curved brows, pink oval cheeks, mitten hands and short arms. Crisp flat cartoon sticker style, bold rounded deep ink #252436 outlines, sky-blue #91c9ff, pink #ffa9c3, ivory #fffdf7 speech bubble with three dark dots. Keep small hard dark offset shadow tucked behind lower-right contour. No 3D, no realistic texture, no white sticker halo, no floor shadow or ellipse, no book, no extra characters, no text or labels, no tile or enclosing frame. Reference 2 is ONLY a pose/cropping/state guide for the old purple icon: copy its function and docking orientation but do NOT use the purple color, white outline, tail or facial design. Design for legibility at 62-76px. One clear icon, large on a square transparent canvas. FREE FLOATING / DRAGGING state. ENTIRE approved blue cloud model visible and uncropped with transparent margin on all four sides; no vertical docking cut. Same rounded cloud body, eyes open at exact canonical size/spacing, eyebrows lightly raised, mouth a tiny cheerful round O with pink interior suggesting being picked up. Both short mitten hands lift slightly outward, one higher than the other to suggest floating and balance. Small ivory three-dot speech bubble near lower right, fully visible, same style/size as approved icon. Add two very short subtle violet curved motion strokes underneath body to suggest gentle lift, no floor ellipse, no tail or legs. Keep overall body and face proportions identical to other states. This complete-body version also serves the dialog opening/closing transition."
+    }
+  ],
+  "reuse": {
+    "dialogTransition": "dragging icon, entering and closing",
+    "dialogHeader": "previously generated cloud-chat-icon-transparent.png",
+    "replyAvatar": "same icon for normal and waiting",
+    "hoverFocusSettling": "CSS changes only; no separate raster image"
+  },
+  "unused": "cloud-mascot-ai-chat-edge-dragging-ui.webp exists but is not referenced by current entry state mappings",
+  "mode": "Codex built-in ImageGen; static preview only"
+}

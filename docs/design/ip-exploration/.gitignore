@@ -1,0 +1,19 @@
+# Local review bundles and browser capture utilities are reproducible working
+# files. Keep canonical artwork, generation prompts and final overview images.
+*.html
+*.zip
+render-*.mjs
+*-before.png
+*-screen.png
+*-screen-preview.png
+phone-*.png
+tablet-*.png
+
+# Earlier review-only mockups and duplicate copies of installed PNG assets.
+white-bg-preview/
+sticker-preview/
+ai-chat-icon-preview-v1/cloud-chat-icon-transparent.png
+ai-chat-states-preview-v1/cloud-chat-*.png
+ai-chat-states-preview-v1/*-overview.png
+empty-states-v1/*-transparent.png
+empty-states-v1/four-scenes-preview-overview.png

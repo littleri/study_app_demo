@@ -11,6 +11,9 @@ test.describe("lesson AI chat entry", () => {
 
     await entry.click();
     await expect(dialog.getByRole("textbox", { name: "向 AI 助手提问", exact: true })).toBeFocused();
+    const headerAvatar = dialog.locator(".ai-avatar img");
+    await expect(headerAvatar).toHaveAttribute("src", "/assets/brand/ai-assistant/avatar-v1.png");
+    await expect.poll(() => headerAvatar.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
     await dialog.getByRole("button", { name: "收起 AI 助手", exact: true }).click();
     await expect(dialog).toHaveCount(0);
     await expect(entry).toBeFocused();
@@ -46,6 +49,54 @@ test.describe("lesson AI chat entry", () => {
     await expect(entry).toBeVisible();
   });
 
+  test("keeps the shared dock position across bottom tabs and restores it after Profile", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/?embedded=device-preview");
+    const entry = page.locator(".ai-orb");
+    await expect(entry).toBeVisible();
+    await expect.poll(() => entry.evaluate((element) => element.offsetTop)).toBeGreaterThan(0);
+    const position = () => entry.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { side: element.getAttribute("data-side"), top: bounds.top, left: bounds.left };
+    });
+    const navigate = async (label: string, screen: string) => {
+      await page.locator(".primary-nav").getByRole("button", { name: label, exact: true }).click();
+      await expect(page.locator(".app-shell")).toHaveAttribute("data-active-screen", screen);
+    };
+    const initialPosition = await position();
+    for (const [label, screen] of [["学习", "study"], ["发现", "community"], ["首页", "home"]]) {
+      await navigate(label, screen);
+      await expect.poll(position).toEqual(initialPosition);
+    }
+
+    // A phone position above discovery controls must survive page changes.
+    // On a tablet, keep the chosen dock below the sidebar's navigation buttons.
+    const bounds = await entry.boundingBox();
+    const shell = await page.locator(".app-shell").boundingBox();
+    if (!bounds || !shell) throw new Error("Assistant geometry is unavailable");
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    const dockCenterY = shell.y + (shell.width >= 720 && shell.height >= 600 ? 420 : 140);
+    await page.mouse.move(shell.x + bounds.width / 2 + 3, dockCenterY, { steps: 8 });
+    await page.mouse.up();
+    await page.mouse.move(0, 0);
+    await expect(entry).toHaveAttribute("data-interaction", "idle");
+    await expect(entry).toHaveAttribute("data-side", "left");
+    const draggedPosition = await position();
+    expect(Math.abs(draggedPosition.top - initialPosition.top)).toBeGreaterThan(20);
+    for (const [label, screen] of [["学习", "study"], ["发现", "community"], ["首页", "home"]]) {
+      await navigate(label, screen);
+      await expect.poll(position).toEqual(draggedPosition);
+    }
+    await navigate("我的", "profile");
+    await expect(entry).toHaveCount(0);
+    await navigate("发现", "community");
+    await expect(entry).toBeVisible();
+    await expect.poll(position).toEqual(draggedPosition);
+    await navigate("首页", "home");
+    await expect.poll(position).toEqual(draggedPosition);
+  });
+
   test("switches mascot states, docks across edges, and opens the shared course-aware AI dialog", async ({ page }) => {
     test.slow();
     let directDeepSeekRequests = 0;
@@ -72,7 +123,7 @@ test.describe("lesson AI chat entry", () => {
     await expect(globalEntry.locator(":scope > img")).toHaveCount(1);
     await expect(globalEntry.locator(":scope > img")).toHaveAttribute(
       "src",
-      /cloud-mascot-ai-chat-edge(?:-left)?-ui\.webp/
+      /\/ai-assistant\/idle-(?:left|right)-v1\.png/
     );
     await expect(globalEntry.locator(":scope > svg")).toHaveCount(0);
     const globalEntryBounds = await globalEntry.boundingBox();
@@ -85,13 +136,13 @@ test.describe("lesson AI chat entry", () => {
     await expect(globalEntry).toHaveAttribute("data-interaction", "pressed");
     await expect(globalEntry.locator(":scope > img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-edge-pressed-ui.webp"
+      "/assets/brand/ai-assistant/pressed-v1.png"
     );
     await page.mouse.move(globalPointerX, globalPointerY - 48, { steps: 5 });
     await expect(globalEntry).toHaveAttribute("data-interaction", "dragging");
     await expect(globalEntry.locator(":scope > img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
+      "/assets/brand/ai-assistant/dragging-v1.png"
     );
     await page.mouse.up();
     await expect(globalEntry).toHaveAttribute("data-interaction", "idle");
@@ -108,8 +159,17 @@ test.describe("lesson AI chat entry", () => {
     await expect(entry).toHaveAttribute("data-interaction", "idle");
     await expect(entry.locator("img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-edge-ui.webp"
+      "/assets/brand/ai-assistant/idle-right-v1.png"
     );
+
+    // Docking geometry excludes the existing 3px inward hover nudge. The
+    // pointer can still sit over this entry after the global entry is dragged.
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => {
+      const entryBox = await entry.boundingBox();
+      const shellBox = await shell.boundingBox();
+      return entryBox && shellBox ? Math.abs(entryBox.x + entryBox.width - shellBox.x - shellBox.width) : Infinity;
+    }).toBeLessThanOrEqual(2);
 
     const initialEntryBounds = await entry.boundingBox();
     const shellBounds = await shell.boundingBox();
@@ -129,7 +189,7 @@ test.describe("lesson AI chat entry", () => {
     await expect(entry).toHaveAttribute("data-interaction", "pressed");
     await expect(entry.locator("img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-edge-pressed-ui.webp"
+      "/assets/brand/ai-assistant/pressed-v1.png"
     );
 
     const leftDockX = shellBounds.x + initialEntryBounds.width * 0.5;
@@ -139,7 +199,7 @@ test.describe("lesson AI chat entry", () => {
     await expect(entry).toHaveAttribute("data-side", "left");
     await expect(entry.locator("img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
+      "/assets/brand/ai-assistant/dragging-v1.png"
     );
     await page.mouse.up();
 
@@ -147,7 +207,7 @@ test.describe("lesson AI chat entry", () => {
     await expect(entry).toHaveAttribute("data-side", "left");
     await expect(entry.locator("img")).toHaveAttribute(
       "src",
-      "/assets/brand/cloud-mascot-ai-chat-edge-left-ui.webp"
+      "/assets/brand/ai-assistant/idle-left-v1.png"
     );
     await expect(page.getByRole("dialog")).toHaveCount(0);
     const draggedEntryBounds = await entry.boundingBox();
@@ -184,6 +244,9 @@ test.describe("lesson AI chat entry", () => {
     await expect(dialog).toContainText("没有找到足够可靠", { timeout: 60_000 });
     await expect(dialog.locator(".ai-message-citations")).toHaveCount(0);
     await expect(dialog.locator(".ai-message.ai").last()).toContainText("当前教材未检索到可靠原文");
+    await expect(dialog.locator(".ai-message-row.ai .ai-cloud-avatar img").last())
+      .toHaveAttribute("src", "/assets/brand/ai-assistant/avatar-v1.png");
+    await expect(dialog.locator(".ai-message-row.user .ai-cloud-avatar")).toHaveCount(0);
     await expect(dialog.locator(".ai-message.ai").last().getByRole("button", { name: /查看.*教材原文/ }))
       .toHaveCount(0);
 

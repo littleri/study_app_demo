@@ -2,9 +2,14 @@ import { StickerIcon } from "./icons/StickerIcon";
 import { NavigationIcon } from "./icons/NavigationIcon";
 import { BottomNavigationBlur } from "./BottomNavigationBlur";
 import { PageHeaderBackground } from "./PageHeaderBackground";
+import {
+  aiAssistantIdleImages as aiOrbIdleImageBySide,
+  aiAssistantActiveImages as aiOrbActiveImageByInteraction,
+  aiAssistantAvatarSource
+} from "./aiAssistantArtwork";
 import { courseRagScope } from "../features/courses/selectors";
 import { courseSourceBookIds } from "../features/courses/model";
-import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type Dispatch, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SetStateAction, type SyntheticEvent } from "react";
 import { useGSAP } from "@gsap/react";
 import gsap from "gsap";
 import {
@@ -504,6 +509,8 @@ export function AppShell({
     momentumScopeKey: active
   });
   const appShellRef = useRef<HTMLDivElement>(null);
+  // Keep the dock position while tabs that hide the assistant unmount it.
+  const [aiOrbPosition, setAiOrbPosition] = useState<OrbPosition | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
   const prepareSidebarMotion = usePadSidebarMotion({ shellRef: appShellRef, mainRef, expanded: isNavExpanded, enabled: deviceLayout === "pad" && !hideNav, reducedMotion: motionReduced });
   const [appShellElement, setAppShellElement] = useState<HTMLDivElement | null>(null);
@@ -560,6 +567,9 @@ export function AppShell({
     main.style.scrollBehavior = "auto";
     main.scrollTop = contentScrollTop;
     main.scrollLeft = 0;
+    // Browser focus/scroll-into-view can leave the shell horizontally offset;
+    // keep viewport-docked overlays in the same coordinate space on navigation.
+    if (appShellRef.current) appShellRef.current.scrollLeft = 0;
     main.style.scrollBehavior = inlineScrollBehavior;
     main.focus({ preventScroll: true });
   }, [contentScrollTop, focusMainNonce]);
@@ -614,7 +624,8 @@ export function AppShell({
             active={active}
             containerElement={appShellElement}
             containerRef={appShellRef}
-            homeLayout={active === "home"}
+            position={aiOrbPosition}
+            setPosition={setAiOrbPosition}
             reducedMotion={motionReduced}
           />
         ) : null}
@@ -716,16 +727,6 @@ type OrbPosition = {
 };
 
 type AiOrbInteraction = "idle" | "pressed" | "dragging";
-
-const aiOrbIdleImageBySide: Record<OrbPosition["side"], string> = {
-  left: "/assets/brand/cloud-mascot-ai-chat-edge-left-ui.webp",
-  right: "/assets/brand/cloud-mascot-ai-chat-edge-ui.webp"
-};
-
-const aiOrbActiveImageByInteraction: Record<Exclude<AiOrbInteraction, "idle">, string> = {
-  pressed: "/assets/brand/cloud-mascot-ai-chat-edge-pressed-ui.webp",
-  dragging: "/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
-};
 
 type AiDialogView = { key: "ai-assistant" };
 
@@ -845,7 +846,7 @@ function getOverlayViewportMetrics(shell: HTMLElement): OverlayViewportMetrics {
   };
 }
 
-function getOrbMetrics(shell: HTMLElement, reservedTop = 0): OrbMetrics {
+function getOrbMetrics(shell: HTMLElement): OrbMetrics {
   const bounds = shell.getBoundingClientRect();
   const style = getComputedStyle(shell);
   const viewport = getOverlayViewportMetrics(shell);
@@ -863,7 +864,7 @@ function getOrbMetrics(shell: HTMLElement, reservedTop = 0): OrbMetrics {
   const verticalInset = 12;
   const baseTopMin = Math.min(bottom - orbHeight, visibleTop + safeTop + verticalInset);
   const topMax = Math.max(baseTopMin, bottom - safeBottom - navHeight - verticalInset - orbHeight);
-  const topMin = Math.min(topMax, Math.max(baseTopMin, reservedTop));
+  const topMin = Math.min(topMax, Math.max(baseTopMin, 0));
   const leftMin = safeLeft;
   const leftMax = Math.max(leftMin, bounds.width - safeRight - orbWidth);
 
@@ -874,13 +875,15 @@ function GlobalAIAssistant({
   active,
   containerElement,
   containerRef,
-  homeLayout,
+  position,
+  setPosition: setOrbPosition,
   reducedMotion
 }: {
   active: Screen;
   containerElement: HTMLDivElement | null;
   containerRef: RefObject<HTMLDivElement | null>;
-  homeLayout: boolean;
+  position: OrbPosition | null;
+  setPosition: Dispatch<SetStateAction<OrbPosition | null>>;
   reducedMotion: boolean;
 }) {
   const bookcourseRepository = useBookCourseRepository();
@@ -954,16 +957,15 @@ function GlobalAIAssistant({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [creditError, setCreditError] = useState<string | null>(null);
-  const [orbPosition, setOrbPosition] = useState<OrbPosition>({
+  const orbPosition: OrbPosition = position ?? {
     side: "right",
     top: 0,
     left: null
-  });
+  };
   const [orbInteraction, setOrbInteraction] = useState<AiOrbInteraction>("idle");
   const orbRef = useRef<HTMLButtonElement | null>(null);
   const dialogOriginRef = useRef<HTMLButtonElement | null>(null);
   const suppressOrbClickRef = useRef(false);
-  const hasDraggedOrbRef = useRef(false);
   const dialogEpochRef = useRef(0);
   const conversationEpochRef = useRef(0);
   const dialogCloseEpochRef = useRef<number | null>(null);
@@ -1096,31 +1098,22 @@ function GlobalAIAssistant({
   const constrainOrb = useCallback(() => {
     const shell = containerRef.current;
     if (!shell) return;
-    const shellBounds = shell.getBoundingClientRect();
-    const discoveryControls = active === "community"
-      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
-      : null;
-    const reservedTop = discoveryControls
-      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
-      : 0;
-    const metrics = getOrbMetrics(shell, reservedTop);
+    // Only viewport geometry constrains the shared position. Page content must
+    // not move the assistant when the user switches bottom navigation tabs.
+    const metrics = getOrbMetrics(shell);
     const useLeftDock = shell.clientHeight < 600 && shell.clientWidth > shell.clientHeight;
 
     setOrbPosition((current) => {
-      const defaultTopRatio = homeLayout
-        ? (metrics.visibleHeight < 760 ? .69 : .82)
-        : .65;
+      const defaultTopRatio = metrics.visibleHeight < 760 ? .69 : .82;
       const defaultTop = metrics.topMin + ((metrics.topMax - metrics.topMin) * defaultTopRatio);
-      const requestedTop = hasDraggedOrbRef.current ? (current.top || defaultTop) : defaultTop;
+      if (!current) return { side: useLeftDock ? "left" : "right", top: defaultTop, left: null };
+      const requestedTop = current.top;
       const nextTop = clamp(requestedTop, metrics.topMin, metrics.topMax);
       const nextLeft = current.left === null ? null : clamp(current.left, metrics.leftMin, metrics.leftMax);
-      const nextSide = current.left === null && !hasDraggedOrbRef.current
-        ? (useLeftDock ? "left" : "right")
-        : current.side;
-      if (nextTop === current.top && nextLeft === current.left && nextSide === current.side) return current;
-      return { ...current, side: nextSide, top: nextTop, left: nextLeft };
+      if (nextTop === current.top && nextLeft === current.left) return current;
+      return { ...current, top: nextTop, left: nextLeft };
     });
-  }, [active, containerRef, homeLayout]);
+  }, [containerRef, setOrbPosition]);
 
   const cancelOrbInteraction = useCallback(() => {
     clearOrbMotion();
@@ -1141,10 +1134,6 @@ function GlobalAIAssistant({
     constrainOrb();
     const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleViewportChange);
     resizeObserver?.observe(shell);
-    const discoveryControls = active === "community"
-      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
-      : null;
-    if (discoveryControls) resizeObserver?.observe(discoveryControls);
     const visualViewport = window.visualViewport;
     visualViewport?.addEventListener("resize", handleViewportChange);
     visualViewport?.addEventListener("scroll", handleViewportChange);
@@ -1340,7 +1329,6 @@ function GlobalAIAssistant({
       return;
     }
 
-    hasDraggedOrbRef.current = true;
     const shell = containerRef.current;
     const orb = orbRef.current;
     if (!shell || !orb) {
@@ -1351,13 +1339,7 @@ function GlobalAIAssistant({
 
     const before = orb.getBoundingClientRect();
     const shellBounds = shell.getBoundingClientRect();
-    const discoveryControls = active === "community"
-      ? shell.querySelector<HTMLElement>(".community-discovery-controls")
-      : null;
-    const reservedTop = discoveryControls
-      ? discoveryControls.getBoundingClientRect().bottom - shellBounds.top + 8
-      : 0;
-    const metrics = getOrbMetrics(shell, reservedTop);
+    const metrics = getOrbMetrics(shell);
     const releasedLeft = reducedMotion ? dragState.current.baseLeft + pendingDragRef.current.x : before.left;
     const releasedTop = reducedMotion ? dragState.current.baseTop + pendingDragRef.current.y : before.top;
     const top = clamp(releasedTop - shellBounds.top, metrics.topMin, metrics.topMax);
@@ -1717,7 +1699,7 @@ function AIAssistantDialog({
         aria-hidden="true"
       >
         <img
-          src="/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
+          src={aiOrbActiveImageByInteraction.dragging}
           alt=""
           aria-hidden="true"
           decoding="async"
@@ -1746,8 +1728,8 @@ function AIAssistantDialog({
       >
         <div className="ai-overlay-head">
           <div>
-            <span className="ai-avatar">
-              <StickerIcon name="Bot" size={18} aria-hidden="true" />
+            <span className="ai-avatar ai-cloud-avatar" aria-hidden="true">
+              <img src={aiAssistantAvatarSource} alt="" decoding="async" draggable={false} />
             </span>
             <h2 id={titleId}>AI 导学助手</h2>
           </div>
@@ -1793,8 +1775,8 @@ function AIAssistantDialog({
                 className={`ai-message-row ${message.role}`}
                 key={`${message.role}-${index}`}
               >
-                <span className="ai-message-avatar" aria-hidden="true">
-                  {message.role === "ai" ? <StickerIcon name="Bot" size={15} /> : <StickerIcon name="User" size={15} />}
+                <span className={`ai-message-avatar${message.role === "ai" ? " ai-cloud-avatar" : ""}`} aria-hidden="true">
+                  {message.role === "ai" ? <img src={aiAssistantAvatarSource} alt="" decoding="async" draggable={false} /> : <StickerIcon name="User" size={15} />}
                 </span>
                 <div className={`ai-message ${message.role}`}>
                   {message.role === "ai" ? <span className="ai-message-author">AI 导学助手</span> : null}
@@ -1846,8 +1828,8 @@ function AIAssistantDialog({
             ))}
             {loading ? (
               <div className="ai-message-row ai ai-message-row-loading" role="status">
-                <span className="ai-message-avatar" aria-hidden="true">
-                  <StickerIcon name="Bot" size={15} />
+                <span className="ai-message-avatar ai-cloud-avatar" aria-hidden="true">
+                  <img src={aiAssistantAvatarSource} alt="" decoding="async" draggable={false} />
                 </span>
                 <div className="ai-message ai">
                   <span className="ai-message-author">AI 导学助手</span>

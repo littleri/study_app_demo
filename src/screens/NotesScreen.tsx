@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { StickerIcon } from "../components/icons/StickerIcon";
+import { EmptyStateIllustration } from "../components/EmptyStateIllustration";
 import { BookOpen, FileDown, NotebookPen, Plus, Sparkles, Upload } from "lucide-react";
 import { Button, Card, Pill } from "../components/ui";
 import { useAppContext } from "../context/AppContext";
@@ -165,7 +166,7 @@ export function NotesScreen() {
         </div>
       ) : null}
 
-      <div className="notes-workspace">
+      <div className={`notes-workspace${view === "mine" && !loading && filteredNotes.length === 0 ? " is-empty" : ""}`}>
         <div className="notes-list" aria-label={view === "mine" ? "我的学习笔记列表" : "AI 导学列表"}>
           {view === "mine" ? (
             loading ? <Card className="note-card"><p>正在载入本地笔记…</p></Card> : filteredNotes.length > 0 ? filteredNotes.map((note) => (
@@ -186,8 +187,7 @@ export function NotesScreen() {
               </button>
             )) : (
               <Card className="notes-empty-state">
-                <span className="notes-ink-wave" aria-hidden="true" />
-                <NotebookPen size={30} aria-hidden="true" />
+                <EmptyStateIllustration scene="notes" />
                 <h2>把课堂想法留在教材旁</h2>
                 <p>你可以输入文字、直接批注教材原页，或录下语音后整理。</p>
                 <Button icon={<Plus size={18} />} onClick={openNewNote}>新建第一条笔记</Button>

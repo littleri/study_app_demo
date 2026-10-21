@@ -9,6 +9,10 @@ import {
   type MouseEvent,
   type PointerEvent
 } from "react";
+import {
+  aiAssistantIdleImages as idleImageBySide,
+  aiAssistantActiveImages as activeImageByState
+} from "../components/aiAssistantArtwork";
 
 type LessonAiEntryState = "idle" | "pressed" | "dragging";
 type LessonAiEntrySide = "left" | "right";
@@ -22,15 +26,6 @@ type EntryBounds = {
 
 const dragThreshold = 7;
 const defaultTopRatio = 0.56;
-const idleImageBySide: Record<LessonAiEntrySide, string> = {
-  left: "/assets/brand/cloud-mascot-ai-chat-edge-left-ui.webp",
-  right: "/assets/brand/cloud-mascot-ai-chat-edge-ui.webp"
-};
-const activeImageByState: Record<Exclude<LessonAiEntryState, "idle">, string> = {
-  pressed: "/assets/brand/cloud-mascot-ai-chat-edge-pressed-ui.webp",
-  dragging: "/assets/brand/cloud-mascot-ai-chat-airborne-ui.webp"
-};
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
