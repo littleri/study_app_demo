@@ -422,31 +422,6 @@
       calc(var(--safe-area-right) + var(--space-inline));
   }
 
-  .app-shell:has(> .screen-content[data-screen="communityBook"]) .header-bar::before {
-    right: 0;
-    left: 0;
-  }
-
-  /* The discovery title stays over the scrolling cards and joins the sticky controls. */
-  .app-shell:has(> .screen-content[data-screen="community"]) .header-bar {
-    right: 0;
-    left: calc(var(--safe-area-left) + var(--nav-rail-width));
-    padding-inline: var(--space-inline) calc(var(--safe-area-right) + var(--space-inline));
-    isolation: isolate;
-  }
-
-  .app-shell:has(> .screen-content[data-screen="community"]) .header-bar::before {
-    position: absolute;
-    z-index: -1;
-    top: calc(0px - var(--safe-area-top) - var(--space-layout));
-    right: 0;
-    bottom: calc(0px - var(--space-layout));
-    left: 0;
-    pointer-events: none;
-    background: var(--color-bg);
-    content: "";
-  }
-
   /* Home keeps the phone's book -> chapter tools -> study actions sequence. */
   .home-dashboard {
     grid-template-columns: minmax(0, 1fr);
@@ -577,12 +552,6 @@
   .community-category-menu {
     width: calc(100cqw + var(--space-inline) + var(--space-inline));
     margin-left: calc(0px - var(--space-inline));
-  }
-
-  .community-discovery-controls::before {
-    left: calc(0px - var(--space-inline));
-    right: auto;
-    width: calc(100cqw + var(--space-inline) + var(--space-inline));
   }
 
   .community-category-list {

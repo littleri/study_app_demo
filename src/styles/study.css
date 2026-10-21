@@ -43,14 +43,19 @@
   pointer-events: none;
 }
 
-.study-sticky-stack > .study-book-bar,
-.study-sticky-stack > .study-plan-summary,
-.study-sticky-stack > .study-directory-preview-note {
+.study-sticky-controls {
+  position: relative;
+  display: flow-root;
+}
+
+.study-sticky-controls > .study-book-bar,
+.study-sticky-controls > .study-plan-summary,
+.study-sticky-controls > .study-directory-preview-note {
   pointer-events: auto;
 }
 
-.study-sticky-stack > .study-directory-preview-note {
-  background: var(--color-bg);
+.study-sticky-controls > .study-directory-preview-note {
+  background: transparent;
 }
 
 .study-book-bar {
@@ -62,17 +67,7 @@
   gap: 10px;
   padding: 8px 0 16px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg);
-}
-
-.study-book-bar::before {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: 100%;
-  height: calc(var(--safe-area-top) + var(--space-layout));
-  background: var(--color-bg);
-  pointer-events: none;
+  background: transparent;
 }
 
 .study-book-switch,
@@ -193,7 +188,7 @@
   padding: 8px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-large);
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
   transition:
     padding-block var(--motion-duration-local-slow) var(--motion-ease-local-state),
     background-color var(--motion-duration-local-base) var(--motion-ease-local-state),
@@ -334,7 +329,7 @@
 
 .study-plan-summary.is-compact {
   padding-block: 10px;
-  background-color: color-mix(in srgb, var(--color-primary-soft) 12%, var(--color-surface));
+  background-color: color-mix(in srgb, var(--color-surface) 65%, transparent);
   box-shadow: var(--glass-shadow-soft);
 }
 

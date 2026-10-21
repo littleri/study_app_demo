@@ -8,6 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent
 } from "react";
 import { ChevronDown, Search, SearchX, X } from "lucide-react";
+import { StickyControlsBackground } from "../components/PageHeaderBackground";
 import { communityBooks } from "../data/mockBook";
 import { useAppContext } from "../context/AppContext";
 import { useLocalMotionItem } from "../motion";
@@ -155,6 +156,7 @@ export function CommunityScreen() {
   return (
     <div className="screen-stack community-screen">
       <div {...discoveryMotion.attributes} className="community-discovery-controls">
+        <StickyControlsBackground />
         <div className="community-search-panel" role="search">
           <label className="community-search-label" htmlFor={searchInputId}>
             搜索课程

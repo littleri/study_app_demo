@@ -28,26 +28,48 @@ async function expectPageTitle(page: Page, name?: string) {
   expect(layout.contentTop).toBeGreaterThanOrEqual(layout.headerBottom);
 }
 
-test("main tabs keep one title at 66px with no subtitle, including while scrolling", async ({ page }) => {
+test("study and discovery start with sticky controls; other tabs retain their title", async ({ page }, testInfo) => {
   await page.goto("/?embedded=device-preview");
   await expect(page.locator(".home-dashboard")).toBeVisible();
   await expectPageTitle(page);
-  for (const label of ["学习", "发现", "我的"]) {
+  for (const [label, selector] of [["学习", ".study-sticky-controls"], ["发现", ".community-discovery-controls"]]) {
     await page.locator(`.primary-nav .nav-item[aria-label="${label}"]`).click();
-    await expectPageTitle(page, label);
+    await expect(page.locator(".header-bar")).toHaveCount(0);
+    await expect(page.locator(".header-title h1")).toHaveCount(0);
+    const controls = page.locator(selector);
+    await expect(controls).toBeVisible();
+    const statusBottom = await page.locator(".app-shell").evaluate((element) => element.querySelector(".ios-status-bar")?.getBoundingClientRect().bottom ?? 0);
+    await expect.poll(async () => (await controls.boundingBox())!.y).toBeCloseTo(statusBottom + 4, 0);
+    const initial = await controls.boundingBox();
     await page.locator("main").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-    await expectPageTitle(page, label);
+    await expect.poll(async () => (await controls.boundingBox())!.y).toBeCloseTo(initial!.y, 0);
+    await expect.poll(async () => controls.evaluate((element) => {
+      const blur = element.querySelector(".sticky-controls-background")!.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return Math.abs(blur.bottom - bounds.bottom);
+    })).toBeLessThan(1);
+    const blur = controls.locator(".sticky-controls-background");
+    await expect.poll(async () => (await blur.boundingBox())!.y).toBeCloseTo(0, 0);
+    const railRight = await page.locator(".primary-nav").evaluate((element) => {
+      return element.closest(".app-shell")?.getAttribute("data-device-layout") === "pad" ? element.getBoundingClientRect().right : 0;
+    });
+    await expect.poll(async () => (await blur.boundingBox())!.x).toBeCloseTo(railRight, 0);
+    await page.screenshot({ path: testInfo.outputPath(`${label === "学习" ? "study" : "discovery"}-sticky-controls.png`) });
   }
+  await page.locator('.primary-nav .nav-item[aria-label="我的"]').click();
+  await expectPageTitle(page, "我的");
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await expectPageTitle(page, "设置");
 });
 
-test("all 28 page header layouts use the same title and content offsets", async ({ page }) => {
+test("the 26 shared page headers use the same title and content offsets", async ({ page }) => {
   await page.goto("/?embedded=device-preview");
   await expect(page.locator(".home-dashboard")).toBeVisible();
   await page.locator('.primary-nav .nav-item[aria-label="我的"]').click();
   await expectPageTitle(page, "我的");
   expect(pageHeaders).toHaveLength(28);
+  const sharedHeaders = pageHeaders.filter(({ screen }) => screen !== "study" && screen !== "community");
+  expect(sharedHeaders).toHaveLength(26);
   const layouts = await page.evaluate((headers) => {
     const shell = document.querySelector<HTMLElement>(".app-shell")!;
     const main = document.querySelector<HTMLElement>("main")!;
@@ -66,7 +88,7 @@ test("all 28 page header layouts use the same title and content offsets", async 
         contentTop: parseFloat(getComputedStyle(main).paddingTop)
       };
     });
-  }, pageHeaders);
+  }, sharedHeaders);
   for (const layout of layouts) {
     expect(layout.titleTop, layout.screen).toBe(66);
     expect(layout.headerHeight, layout.screen).toBe(44);

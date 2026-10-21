@@ -31,6 +31,8 @@ import "./styles/tablet.css";
 import "./styles/typography.css";
 import "./styles/sticker-icons.css";
 import "./styles/page-headers.css";
+import "./styles/page-header-background.css";
+import "./styles/bottom-navigation-blur.css";
 
 const searchParams = new URLSearchParams(window.location.search);
 const isPreviewStudio = searchParams.get("preview") === "device-preview";

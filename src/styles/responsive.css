@@ -1,6 +1,7 @@
 :root {
   --header-block-size: 48px;
   --primary-nav-height: 72px;
+  --primary-nav-bottom: 39px;
   --overlay-visual-top: 0px;
   --overlay-visual-height: 100dvh;
   --overlay-visual-bottom: 0px;
@@ -116,7 +117,7 @@ body {
 .primary-nav {
   left: calc(var(--safe-area-left) + var(--space-inline));
   right: calc(var(--safe-area-right) + var(--space-inline));
-  bottom: 39px;
+  bottom: var(--primary-nav-bottom);
   width: auto;
   height: var(--primary-nav-height);
   min-height: var(--primary-nav-height);

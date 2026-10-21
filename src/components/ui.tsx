@@ -1,5 +1,7 @@
 import { StickerIcon } from "./icons/StickerIcon";
 import { NavigationIcon } from "./icons/NavigationIcon";
+import { BottomNavigationBlur } from "./BottomNavigationBlur";
+import { PageHeaderBackground } from "./PageHeaderBackground";
 import { courseRagScope } from "../features/courses/selectors";
 import { courseSourceBookIds } from "../features/courses/model";
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ButtonHTMLAttributes, type ComponentPropsWithoutRef, type FormEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type RefObject, type SyntheticEvent } from "react";
@@ -604,6 +606,7 @@ export function AppShell({
         onWheelCapture={mouseDragScroll.onWheelCapture}
       >
         {deviceChrome}
+        <PageHeaderBackground screen={active} visible={Boolean(title)} />
         {title ? <HeaderBar title={title} showBack={showBack} onBack={onBack} rightAction={rightAction} /> : null}
         <main ref={setMainNode} tabIndex={-1} className={`screen-content ${title ? "with-header" : ""} ${hideNav ? "without-nav" : ""}`} data-screen={active}>{children}</main>
         {active !== "profile" && active !== "communityBook" && active !== "onboarding" && active !== "courseSetup" && active !== "settings" ? (
@@ -615,6 +618,7 @@ export function AppShell({
             reducedMotion={motionReduced}
           />
         ) : null}
+        <BottomNavigationBlur visible={!hideNav && deviceLayout === "phone"} />
         {!hideNav ? (
           <PrimaryNav
             active={active}

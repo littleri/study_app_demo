@@ -1,0 +1,94 @@
+.app-shell {
+  /* Share the nav's geometry so the blur never starts above its top edge. */
+  --bottom-navigation-blur-height: calc(var(--primary-nav-height) + var(--primary-nav-bottom));
+}
+
+.bottom-navigation-blur {
+  position: absolute;
+  z-index: 25;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--bottom-navigation-blur-height);
+  pointer-events: none;
+  user-select: none;
+}
+
+.bottom-navigation-blur[hidden] {
+  display: none;
+}
+
+/* Keep masks on each sibling layer. Masking or fading their parent would
+   prevent its descendants from sampling the page behind the overlay. */
+.bottom-navigation-blur-layer {
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(var(--bottom-navigation-blur-radius));
+  backdrop-filter: blur(var(--bottom-navigation-blur-radius));
+  -webkit-mask-image: var(--bottom-navigation-blur-mask);
+  mask-image: var(--bottom-navigation-blur-mask);
+}
+
+.bottom-navigation-blur-layer:nth-child(1) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 0%, #000 12%, #000 24%, transparent 40%);
+}
+
+.bottom-navigation-blur-layer:nth-child(2) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 8%, #000 24%, #000 40%, transparent 56%);
+}
+
+.bottom-navigation-blur-layer:nth-child(3) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 24%, #000 40%, #000 56%, transparent 72%);
+}
+
+.bottom-navigation-blur-layer:nth-child(4) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 40%, #000 56%, #000 72%, transparent 88%);
+}
+
+.bottom-navigation-blur-layer:nth-child(5) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 56%, #000 72%, #000 88%, transparent 100%);
+}
+
+.bottom-navigation-blur-layer:nth-child(6) {
+  --bottom-navigation-blur-mask: linear-gradient(to bottom, transparent 72%, #000 88%);
+}
+
+.bottom-navigation-blur::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 10%, var(--color-bg));
+  opacity: .6;
+  content: "";
+}
+
+/* The last row can scroll completely above the blur, including with a large
+   native safe area. This does not change the content's scroll viewport. */
+.app-shell:has(> .bottom-navigation-blur:not([hidden])) > .screen-content {
+  padding-bottom: max(
+    calc(var(--safe-area-bottom) + var(--primary-nav-height) + var(--space-layout)),
+    calc(var(--bottom-navigation-blur-height) + var(--space-layout))
+  );
+  scroll-padding-bottom: calc(var(--bottom-navigation-blur-height) + var(--space-layout));
+}
+
+@supports not (((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and ((mask-image: linear-gradient(black, transparent)) or (-webkit-mask-image: linear-gradient(black, transparent)))) {
+  .bottom-navigation-blur-layer {
+    display: none;
+  }
+
+  .bottom-navigation-blur::after {
+    background: linear-gradient(to bottom, transparent, var(--color-bg) 80%);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bottom-navigation-blur-layer {
+    display: none;
+  }
+
+  .bottom-navigation-blur::after {
+    background: linear-gradient(to bottom, transparent, var(--color-bg) 80%);
+    opacity: 1;
+  }
+}

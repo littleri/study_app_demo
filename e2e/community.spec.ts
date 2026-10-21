@@ -6,7 +6,8 @@ import { communityImportDiagnosis, completeCommunityImportQuestions } from "./fi
 async function openCommunity(page: Page) {
   await page.goto("/?embedded=device-preview");
   await page.getByRole("button", { name: "发现", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "发现", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "发现", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("搜索课程", { exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "社区课程", exact: true })).toBeVisible();
   await expect(page.locator(".motion-screen-transition")).toHaveAttribute("data-motion-state", "idle");
 }

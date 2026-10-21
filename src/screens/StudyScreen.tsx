@@ -1,4 +1,5 @@
 import { StickerIcon } from "../components/icons/StickerIcon";
+import { StickyControlsBackground } from "../components/PageHeaderBackground";
 import {
   useEffect,
   useLayoutEffect,
@@ -594,16 +595,21 @@ export function StudyScreen() {
   if (!hasLoadedCourse || !uploadedFile || !activeChapters?.length) {
     return (
       <div className="study-screen book-course-screen">
-        <header className="study-book-bar study-book-bar-empty">
-          <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
-            <span className="study-book-cover-placeholder"><StickerIcon name="LibraryBig" size={19} aria-hidden="true" /></span>
-            <span><small>当前课程</small><strong>{activeCourse?.name ?? "尚未选择"}</strong></span>
-            <ChevronDown size={19} aria-hidden="true" />
-          </button>
-          <button type="button" className="study-add-button" onClick={() => { if (activeCourse) openSheet({ type: "addMaterials", courseId: activeCourse.id }); else { courses.startDraft(); go("upload"); } }}>
-            <Plus size={18} aria-hidden="true" />{activeCourse ? "添加资料" : "创建课程"}
-          </button>
-        </header>
+        <div className="study-sticky-stack">
+          <div className="study-sticky-controls">
+            <StickyControlsBackground />
+            <header className="study-book-bar study-book-bar-empty">
+              <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
+                <span className="study-book-cover-placeholder"><StickerIcon name="LibraryBig" size={19} aria-hidden="true" /></span>
+                <span><small>当前课程</small><strong>{activeCourse?.name ?? "尚未选择"}</strong></span>
+                <ChevronDown size={19} aria-hidden="true" />
+              </button>
+              <button type="button" className="study-add-button" onClick={() => { if (activeCourse) openSheet({ type: "addMaterials", courseId: activeCourse.id }); else { courses.startDraft(); go("upload"); } }}>
+                <Plus size={18} aria-hidden="true" />{activeCourse ? "添加资料" : "创建课程"}
+              </button>
+            </header>
+          </div>
+        </div>
         <StudyEmptyState kind={sourceSummaries.length === 0 ? "empty" : "unavailable"} />
       </div>
     );
@@ -612,45 +618,48 @@ export function StudyScreen() {
   return (
     <div ref={studyScreenRef} className="study-screen book-course-screen" data-directory-only={directoryOnly ? "true" : undefined}>
       <div className={`study-sticky-stack ${planCompact ? "is-plan-compact" : ""}`}>
-        <header className="study-book-bar">
-          <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
-            <img src={courseCoverImageUrl(uploadedFile.bookId)} alt="" />
-            <span>
-              <small>当前课程</small>
-              <strong>{activeCourse?.name ?? bookTitle}</strong>
-            </span>
-            <ChevronDown size={19} aria-hidden="true" />
-          </button>
-          <button type="button" className="study-add-button" onClick={() => activeCourse && openSheet({ type: "addMaterials", courseId: activeCourse.id })}>
-            <Plus size={18} aria-hidden="true" />添加资料
-          </button>
-        </header>
+        <div className="study-sticky-controls">
+          <StickyControlsBackground />
+          <header className="study-book-bar">
+            <button className="study-book-switch" type="button" onClick={() => openSheet({ type: "bookSwitcher" })}>
+              <img src={courseCoverImageUrl(uploadedFile.bookId)} alt="" />
+              <span>
+                <small>当前课程</small>
+                <strong>{activeCourse?.name ?? bookTitle}</strong>
+              </span>
+              <ChevronDown size={19} aria-hidden="true" />
+            </button>
+            <button type="button" className="study-add-button" onClick={() => activeCourse && openSheet({ type: "addMaterials", courseId: activeCourse.id })}>
+              <Plus size={18} aria-hidden="true" />添加资料
+            </button>
+          </header>
 
-        {directoryOnly ? <p className="study-directory-preview-note">演示课程 · 仅展示教材封面、标题和原书目录</p> : <section
-          className={`study-plan-summary ${planCompact ? "is-compact" : ""}`}
-          data-plan-state={planCompact ? "compact" : "expanded"}
-          aria-label="学习计划"
-        >
-          <div className="study-plan-details" aria-hidden={planCompact}>
-            <div className="study-plan-heading">
-              <h2>学习计划</h2>
-              <button type="button" tabIndex={planCompact ? -1 : undefined} onClick={() => go("plan")}>
-                计划详情
-                <ChevronRight size={16} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="study-plan-copy">
-              <span className="study-plan-icon" aria-hidden="true"><StickerIcon name="Check" size={18} /></span>
-              <div>
-                <small>
-                  今日建议 · {todayMinutes} 分钟
-                </small>
-                <strong>{activePlanTitle}</strong>
+          {directoryOnly ? <p className="study-directory-preview-note">演示课程 · 仅展示教材封面、标题和原书目录</p> : <section
+            className={`study-plan-summary ${planCompact ? "is-compact" : ""}`}
+            data-plan-state={planCompact ? "compact" : "expanded"}
+            aria-label="学习计划"
+          >
+            <div className="study-plan-details" aria-hidden={planCompact}>
+              <div className="study-plan-heading">
+                <h2>学习计划</h2>
+                <button type="button" tabIndex={planCompact ? -1 : undefined} onClick={() => go("plan")}>
+                  计划详情
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <div className="study-plan-copy">
+                <span className="study-plan-icon" aria-hidden="true"><StickerIcon name="Check" size={18} /></span>
+                <div>
+                  <small>
+                    今日建议 · {todayMinutes} 分钟
+                  </small>
+                  <strong>{activePlanTitle}</strong>
+                </div>
               </div>
             </div>
-          </div>
-          <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
-        </section>}
+            <ProgressBar value={planProgress} label={`计划完成 ${planProgress}%`} />
+          </section>}
+        </div>
       </div>
 
       <section className="study-directory" aria-label="课程目录">

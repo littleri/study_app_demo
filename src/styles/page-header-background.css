@@ -1,0 +1,178 @@
+.page-header-background {
+  position: absolute;
+  z-index: 15;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--page-content-top);
+  background: var(--page-header-background);
+  pointer-events: none;
+  user-select: none;
+}
+
+.page-header-background[hidden] {
+  display: none;
+}
+
+.page-header-blur-layer {
+  display: none;
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(var(--page-header-blur-radius));
+  backdrop-filter: blur(var(--page-header-blur-radius));
+  -webkit-mask-image: var(--page-header-blur-mask);
+  mask-image: var(--page-header-blur-mask);
+}
+
+.page-header-background[data-material="progressive"] {
+  /* End exactly at the title row, without covering the first content row. */
+  height: calc(var(--page-title-top) + var(--header-block-size));
+  background: transparent;
+}
+
+.page-header-background[data-material="progressive"] > .page-header-blur-layer {
+  display: block;
+}
+
+/* Masks belong to the individual siblings, leaving their parent transparent
+   so each layer can sample the scrolling page beneath the header. */
+.page-header-blur-layer:nth-child(1) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(var(--page-title-top) + 24px), #000 calc(var(--page-title-top) + 36px), transparent 100%);
+}
+
+.page-header-blur-layer:nth-child(2) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(var(--page-title-top) + 18px), #000 calc(var(--page-title-top) + 30px), #000 calc(var(--page-title-top) + 36px), transparent 100%);
+}
+
+.page-header-blur-layer:nth-child(3) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(var(--page-title-top) + 10px), #000 calc(var(--page-title-top) + 22px), #000 calc(var(--page-title-top) + 30px), transparent calc(var(--page-title-top) + 40px));
+}
+
+.page-header-blur-layer:nth-child(4) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(var(--page-title-top) + 2px), #000 calc(var(--page-title-top) + 14px), #000 calc(var(--page-title-top) + 22px), transparent calc(var(--page-title-top) + 36px));
+}
+
+.page-header-blur-layer:nth-child(5) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(var(--page-title-top) - 12px), #000 var(--page-title-top), #000 calc(var(--page-title-top) + 14px), transparent calc(var(--page-title-top) + 28px));
+}
+
+.page-header-blur-layer:nth-child(6) {
+  --page-header-blur-mask: linear-gradient(to bottom, #000 calc(var(--page-title-top) + 6px), transparent calc(var(--page-title-top) + 28px));
+}
+
+.page-header-background[data-material="progressive"]::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--page-header-background) 72%, transparent);
+  opacity: .88;
+  content: "";
+}
+
+/* A focused page has no rail. Other pad headers stop at the rail boundary,
+   including while the sidebar switches between collapsed and expanded. */
+.app-shell[data-device-layout="pad"]:has(> .primary-nav) > .page-header-background {
+  left: calc(var(--safe-area-left) + var(--nav-rail-width));
+}
+
+/* Share a gentle 72px tint fade with the discovery arrow. All stops are
+   measured from the bottom so short controls use the same part of the curve. */
+.study-sticky-controls,
+.community-discovery-controls {
+  --sticky-controls-tint-fade: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--page-header-background) 56%, transparent) calc(100% - 72px),
+    color-mix(in srgb, var(--page-header-background) 52%, transparent) calc(100% - 60px),
+    color-mix(in srgb, var(--page-header-background) 38%, transparent) calc(100% - 44px),
+    color-mix(in srgb, var(--page-header-background) 20%, transparent) calc(100% - 28px),
+    color-mix(in srgb, var(--page-header-background) 5%, transparent) calc(100% - 12px),
+    transparent 100%
+  );
+}
+
+/* Extend from the safe area to the actual control edge, never to the study
+   stack's reserved expanded height. Fading earlier keeps that edge soft. */
+.sticky-controls-background {
+  position: absolute;
+  z-index: 0;
+  top: calc(0px - var(--page-content-top));
+  bottom: 0;
+  left: 50%;
+  width: calc(100cqw + var(--space-inline) + var(--space-inline));
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+.study-sticky-controls > :not(.sticky-controls-background),
+.community-discovery-controls > :not(.sticky-controls-background) {
+  position: relative;
+  z-index: 1;
+}
+
+.sticky-controls-background > .page-header-blur-layer {
+  display: block;
+}
+
+/* Discovery aligns its capped search field to the leading gutter; its category
+   rail and material still span the full content viewport on wide tablets. */
+.community-discovery-controls > .sticky-controls-background {
+  left: calc(0px - var(--space-inline));
+  transform: none;
+}
+
+.sticky-controls-background > :nth-child(1) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(100% - 36px), rgb(0 0 0 / .25) calc(100% - 24px), rgb(0 0 0 / .45) calc(100% - 16px), rgb(0 0 0 / .18) calc(100% - 8px), transparent 100%);
+}
+
+.sticky-controls-background > :nth-child(2) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(100% - 52px), rgb(0 0 0 / .35) calc(100% - 36px), rgb(0 0 0 / .65) calc(100% - 24px), rgb(0 0 0 / .35) calc(100% - 14px), rgb(0 0 0 / .08) calc(100% - 6px), transparent 100%);
+}
+
+.sticky-controls-background > :nth-child(3) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(100% - 68px), rgb(0 0 0 / .4) calc(100% - 52px), rgb(0 0 0 / .8) calc(100% - 40px), rgb(0 0 0 / .5) calc(100% - 28px), rgb(0 0 0 / .12) calc(100% - 14px), transparent 100%);
+}
+
+.sticky-controls-background > :nth-child(4) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(100% - 84px), rgb(0 0 0 / .45) calc(100% - 68px), rgb(0 0 0 / .85) calc(100% - 52px), rgb(0 0 0 / .5) calc(100% - 36px), rgb(0 0 0 / .1) calc(100% - 20px), transparent calc(100% - 8px));
+}
+
+.sticky-controls-background > :nth-child(5) {
+  --page-header-blur-mask: linear-gradient(to bottom, transparent calc(100% - 104px), rgb(0 0 0 / .45) calc(100% - 88px), rgb(0 0 0 / .9) calc(100% - 72px), rgb(0 0 0 / .55) calc(100% - 56px), rgb(0 0 0 / .12) calc(100% - 40px), transparent calc(100% - 24px));
+}
+
+.sticky-controls-background > :nth-child(6) {
+  --page-header-blur-mask: linear-gradient(to bottom, #000 calc(100% - 88px), rgb(0 0 0 / .9) calc(100% - 76px), rgb(0 0 0 / .55) calc(100% - 60px), rgb(0 0 0 / .15) calc(100% - 44px), transparent calc(100% - 28px));
+}
+
+.sticky-controls-background::after {
+  position: absolute;
+  inset: 0;
+  background: var(--sticky-controls-tint-fade);
+  content: "";
+}
+
+@supports not (((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) and ((mask-image: linear-gradient(black, transparent)) or (-webkit-mask-image: linear-gradient(black, transparent)))) {
+  .page-header-background[data-material="progressive"] > .page-header-blur-layer,
+  .sticky-controls-background > .page-header-blur-layer {
+    display: none;
+  }
+
+  .page-header-background[data-material="progressive"]::after,
+  .sticky-controls-background::after {
+    background: var(--page-header-background);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .page-header-background[data-material="progressive"] > .page-header-blur-layer,
+  .sticky-controls-background > .page-header-blur-layer {
+    display: none;
+  }
+
+  .page-header-background[data-material="progressive"]::after,
+  .sticky-controls-background::after {
+    background: var(--page-header-background);
+    opacity: 1;
+  }
+}
